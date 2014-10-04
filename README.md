@@ -41,7 +41,6 @@ To do list
  * Enable ignoring discordant and/or singleton alignments
  * Enable trimming based on M-bias
  * The -D option seems to only be approximate. Is the an htslib issue?
- * Support CRAM files
  * Is it possible to support non-directional libraries with this method?
  * If a fasta file isn't indexed, we should do that automatically
  * If a BAM (or ideally CRAM) file isn't yet indexed, we should do that automatically

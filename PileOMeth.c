@@ -91,7 +91,7 @@ int filter_func(void *data, bam1_t *b) {
     uint8_t *p;
 
     while(1) {
-        rv = bam_read1(ldata->config->fp->fp.bgzf, b);
+        rv = sam_read1(ldata->config->fp, ldata->hdr, b);
         if(rv<0) return rv;
         if(b->core.tid == -1 || b->core.flag & BAM_FUNMAP) continue;
         if(b->core.qual < ldata->config->minMapq) continue;
@@ -108,12 +108,13 @@ int filter_func(void *data, bam1_t *b) {
 }
 
 void extractCalls(Config *config) {
-    bam_hdr_t *hdr = bam_hdr_read(config->fp->fp.bgzf);
+    bam_hdr_t *hdr = sam_hdr_read(config->fp);
     bam_mplp_t iter;
-    int ret, tid, pos, n_plp, i, seqlen, type, rv;
+    int ret, tid, pos, i, seqlen, type, rv;
+    int n_plp; //This will need to be modified for multiple input files
     int ctid = -1; //The tid of the contig whose sequence is stored in "seq"
     uint32_t nmethyl, nunmethyl;
-    const bam_pileup1_t **plp = calloc(1, sizeof(bam_pileup1_t *));
+    const bam_pileup1_t **plp = calloc(1, sizeof(bam_pileup1_t *)); //This will have to be modified for multiple input files
     char *seq = NULL;
     mplp_data *data = malloc(sizeof(mplp_data));
 
