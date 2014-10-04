@@ -7,21 +7,6 @@
 #include <string.h>
 #include <inttypes.h>
 
-/****************************************
-*
-* TO DO
-*
-* Add an -l option to just parse a specific region
-* add an -r/--region REGION option to just look at one region
-* Enable ignoring discordant and/or singleton alignments
-* Enable trimming based on M-bias
-* Change the default max depth to 1000 and allow the user to further change it
-* Support CRAM files
-* Is it possible to support non-directional libraries with this method?
-*    config.bai = bam_index_load(argv[optind+1]); //How do we close this?
-* 
-****************************************/
-
 inline int isCpG(char *seq, int pos, int seqlen) {
     if(pos+1 == seqlen) return 0;
     if(*(seq+pos) == 'C' || *(seq+pos) == 'c') {
@@ -60,7 +45,7 @@ inline int isCHH(char *seq, int pos, int seqlen) {
 
 typedef struct {
     int KeepCpG, KeepCHG, KeepCHH;
-    int minMapq, minPhred;
+    int minMapq, minPhred, ignoreDupes;
     FILE **output_fp;
     htsFile *fp;
     hts_idx_t *bai;
@@ -101,14 +86,22 @@ int updateMetrics(Config *config, const bam_pileup1_t *plp) {
 
 //This needs to be defined
 int filter_func(void *data, bam1_t *b) {
-    int rv;
+    int rv, NH;
     mplp_data *ldata = (mplp_data *) data;
+    uint8_t *p;
 
     while(1) {
         rv = bam_read1(ldata->config->fp->fp.bgzf, b);
         if(rv<0) return rv;
         if(b->core.tid == -1 || b->core.flag & BAM_FUNMAP) continue;
         if(b->core.qual < ldata->config->minMapq) continue;
+        if(b->core.flag & 0x300) continue; //Ignore secondary alignments and those with QC failed
+        if(ldata->config->ignoreDupes && b->core.flag & BAM_FDUP) continue;
+        p = bam_aux_get(b, "NH");
+        if(p != NULL) {
+            NH = bam_aux2i(p);
+            if(NH>1) continue; //Ignore obvious multimappers
+        }
         break;
     }
     return rv;
@@ -181,6 +174,8 @@ void usage(char *prog) {
 " -p INT           Minimum Phred threshold to include a base (default 10)\n"
 " -o, --opref STR  Output filename prefix. CpG/CHG/CHH metrics will be\n"
 "                  output to STR_CpG.bedGraph and so on.\n"
+" --KeepDupes      By default, any alignment marked as a duplicate is ignored.\n"
+"                  This option causes them to be incorporated.\n"
 " --noCpG          Do not output CpG methylation metrics\n"
 " --CHG            Output CHG methylation metrics\n"
 " --CHH            Output CHH methylation metrics\n");
@@ -193,7 +188,7 @@ int main(int argc, char *argv[]) {
 
     //Defaults
     config.KeepCpG = 1; config.KeepCHG = 0; config.KeepCHH = 0;
-    config.minMapq = 5; config.minPhred = 5;
+    config.minMapq = 5; config.minPhred = 5; config.ignoreDupes = 1;
     config.fai = NULL;
     config.fp = NULL;
     config.bai = NULL;
@@ -203,6 +198,7 @@ int main(int argc, char *argv[]) {
         {"noCpG", 0, NULL,                1},
         {"CHG",   0, NULL,                2},
         {"CHH",   0, NULL,                3},
+        {"ignoreDupes", 0, NULL,              '4'},
         {"help",  0, NULL,              'h'}
     };
     while((c = getopt_long(argc, argv, "q:p:", lopts,NULL)) >= 0) {
@@ -221,6 +217,9 @@ int main(int argc, char *argv[]) {
             break;
         case 3 :
             config.KeepCHH = 1;
+            break;
+        case 4 :
+            config.ignoreDupes = 0;
             break;
         case 'q' :
             config.minMapq = atoi(optarg);

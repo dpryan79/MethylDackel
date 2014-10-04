@@ -45,8 +45,5 @@ To do list
  * Is it possible to support non-directional libraries with this method?
  * If a fasta file isn't indexed, we should do that automatically
  * If a BAM (or ideally CRAM) file isn't yet indexed, we should do that automatically
- * Perhaps we should auto-ignore obvious multi-mappers (NH:i > 1) rather than rely on the MAPQ score
- * Similarly, we should simply skip marked secondary alignments.
- * What about marked duplicates? Perhaps make that up to the user with default=ignore.
  * Is the output format the most convenient (it's what Bison uses, so converters have already been written)?
  * Test to ensure that the results are correct!
