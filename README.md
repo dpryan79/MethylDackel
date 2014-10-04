@@ -38,11 +38,10 @@ To do list
 
  * Add an -l option to parse only regions in a BED file
  * add an -r/--region REGION option to just look at one region
- * Enable ignoring discordant and/or singleton alignments
  * Enable trimming based on M-bias
  * The -D option seems to only be approximate. Is the an htslib issue?
  * Is it possible to support non-directional libraries with this method?
- * If a fasta file isn't indexed, we should do that automatically
  * If a BAM (or ideally CRAM) file isn't yet indexed, we should do that automatically
- * Is the output format the most convenient (it's what Bison uses, so converters have already been written)?
+ * Is the output format the most convenient (it's what Bison uses, so converters have already been written)? It makes more sense to output a predefined VCF format, which would allow processing multiple samples at once. This would require a spec., which should have pretty broad input.
+ * Perhaps things should be restructured to allow making a library out of this, for easier incorporation into python (e.g., pysam).
  * Test to ensure that the results are correct!
