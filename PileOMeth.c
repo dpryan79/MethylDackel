@@ -45,7 +45,7 @@ inline int isCHH(char *seq, int pos, int seqlen) {
 
 typedef struct {
     int KeepCpG, KeepCHG, KeepCHH;
-    int minMapq, minPhred, ignoreDupes;
+    int minMapq, minPhred, ignoreDupes, maxDepth;
     FILE **output_fp;
     htsFile *fp;
     hts_idx_t *bai;
@@ -123,7 +123,7 @@ void extractCalls(Config *config) {
     //Start the pileup
     iter = bam_mplp_init(1, filter_func, (void **) &data);
     bam_mplp_init_overlaps(iter);
-    bam_mplp_set_maxcnt(iter, 2000); //Should be user definable
+    bam_mplp_set_maxcnt(iter, config->maxDepth); //Should be user definable
     while((ret = bam_mplp_auto(iter, &tid, &pos, &n_plp, plp)) > 0) {
         //Do we need to process this position?
         if(tid != ctid) {
@@ -172,6 +172,7 @@ void usage(char *prog) {
 "Options:\n"
 " -q INT           Minimum MAPQ threshold to include an alignment (default 5)\n"
 " -p INT           Minimum Phred threshold to include a base (default 10)\n"
+" -D INT           Maximum per-base depth (default 2000)\n"
 " -o, --opref STR  Output filename prefix. CpG/CHG/CHH metrics will be\n"
 "                  output to STR_CpG.bedGraph and so on.\n"
 " --KeepDupes      By default, any alignment marked as a duplicate is ignored.\n"
@@ -189,6 +190,7 @@ int main(int argc, char *argv[]) {
     //Defaults
     config.KeepCpG = 1; config.KeepCHG = 0; config.KeepCHH = 0;
     config.minMapq = 5; config.minPhred = 5; config.ignoreDupes = 1;
+    config.maxDepth = 2000;
     config.fai = NULL;
     config.fp = NULL;
     config.bai = NULL;
@@ -201,13 +203,16 @@ int main(int argc, char *argv[]) {
         {"ignoreDupes", 0, NULL,              '4'},
         {"help",  0, NULL,              'h'}
     };
-    while((c = getopt_long(argc, argv, "q:p:", lopts,NULL)) >= 0) {
+    while((c = getopt_long(argc, argv, "q:p:o:D:", lopts,NULL)) >= 0) {
         switch(c) {
         case 'h' :
             usage(argv[0]);
             return 0;
         case 'o' :
             opref = strdup(optarg);
+            break;
+        case 'D' :
+            config.maxDepth = atoi(optarg);
             break;
         case 1 :
             config.KeepCpG = 0;

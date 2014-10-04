@@ -40,7 +40,7 @@ To do list
  * add an -r/--region REGION option to just look at one region
  * Enable ignoring discordant and/or singleton alignments
  * Enable trimming based on M-bias
- * Allow users to toggle the max depth (it's currently 2000)
+ * The -D option seems to only be approximate. Is the an htslib issue?
  * Support CRAM files
  * Is it possible to support non-directional libraries with this method?
  * If a fasta file isn't indexed, we should do that automatically
