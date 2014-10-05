@@ -173,6 +173,7 @@ void extractCalls(Config *config) {
     }
 
     bam_hdr_destroy(hdr);
+    if(data->iter) hts_itr_destroy(data->iter);
     bam_mplp_destroy(iter);
     free(data);
     free(plp);
@@ -355,6 +356,8 @@ int main(int argc, char *argv[]) {
     if(config.keepCHH) fclose(config.output_fp[2]);
     hts_idx_destroy(config.bai);
     free(opref);
+    if(config.reg) free(config.reg);
+
     free(oname);
     free(config.output_fp);
 
