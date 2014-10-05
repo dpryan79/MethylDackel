@@ -47,6 +47,7 @@ typedef struct {
     int KeepCpG, KeepCHG, KeepCHH;
     int minMapq, minPhred, ignoreDupes, maxDepth;
     FILE **output_fp;
+    char *reg;
     htsFile *fp;
     hts_idx_t *bai;
     faidx_t *fai;
@@ -55,6 +56,7 @@ typedef struct {
 typedef struct {
     Config *config;
     bam_hdr_t *hdr;
+    hts_itr_t *iter;
 } mplp_data;
 
 int getStrand(bam1_t *b) {
@@ -91,7 +93,7 @@ int filter_func(void *data, bam1_t *b) {
     uint8_t *p;
 
     while(1) {
-        rv = sam_read1(ldata->config->fp, ldata->hdr, b);
+        rv = ldata->iter ? sam_itr_next(ldata->config->fp, ldata->iter, b) : sam_read1(ldata->config->fp, ldata->hdr, b);
         if(rv<0) return rv;
         if(b->core.tid == -1 || b->core.flag & BAM_FUNMAP) continue;
         if(b->core.qual < ldata->config->minMapq) continue;
@@ -111,6 +113,7 @@ void extractCalls(Config *config) {
     bam_hdr_t *hdr = sam_hdr_read(config->fp);
     bam_mplp_t iter;
     int ret, tid, pos, i, seqlen, type, rv;
+    int beg0 = 0, end0 = 1u<<29;
     int n_plp; //This will need to be modified for multiple input files
     int ctid = -1; //The tid of the contig whose sequence is stored in "seq"
     uint32_t nmethyl, nunmethyl;
@@ -120,13 +123,20 @@ void extractCalls(Config *config) {
 
     data->config = config;
     data->hdr = hdr;
+    if (config->reg) {
+        if((data->iter = sam_itr_querys(config->bai, hdr, config->reg)) == 0){
+            fprintf(stderr, "failed to parse regions %s", config->reg);
+            exit(1);
+        }
+   }
 
     //Start the pileup
     iter = bam_mplp_init(1, filter_func, (void **) &data);
     bam_mplp_init_overlaps(iter);
-    bam_mplp_set_maxcnt(iter, config->maxDepth); //Should be user definable
+    bam_mplp_set_maxcnt(iter, config->maxDepth);
     while((ret = bam_mplp_auto(iter, &tid, &pos, &n_plp, plp)) > 0) {
         //Do we need to process this position?
+	if (config->reg && (pos < beg0 || pos >= end0)) continue; // out of the region requested
         if(tid != ctid) {
             if(seq != NULL) free(seq);
             seq = faidx_fetch_seq(config->fai, hdr->target_name[tid], 0, faidx_seq_len(config->fai, hdr->target_name[tid]), &seqlen);
@@ -174,6 +184,7 @@ void usage(char *prog) {
 " -q INT           Minimum MAPQ threshold to include an alignment (default 5)\n"
 " -p INT           Minimum Phred threshold to include a base (default 10)\n"
 " -D INT           Maximum per-base depth (default 2000)\n"
+" -r STR           Region string in which to extract methylation\n"
 " -o, --opref STR  Output filename prefix. CpG/CHG/CHH metrics will be\n"
 "                  output to STR_CpG.bedGraph and so on.\n"
 " --KeepDupes      By default, any alignment marked as a duplicate is ignored.\n"
@@ -195,6 +206,7 @@ int main(int argc, char *argv[]) {
     config.fai = NULL;
     config.fp = NULL;
     config.bai = NULL;
+    config.reg = NULL;
 
     static struct option lopts[] = {
         {"opref", 1, NULL,              'o'},
@@ -202,9 +214,10 @@ int main(int argc, char *argv[]) {
         {"CHG",   0, NULL,                2},
         {"CHH",   0, NULL,                3},
         {"ignoreDupes", 0, NULL,              '4'},
+        {"region",      1, NULL,              'r'},
         {"help",  0, NULL,              'h'}
     };
-    while((c = getopt_long(argc, argv, "q:p:o:D:", lopts,NULL)) >= 0) {
+    while((c = getopt_long(argc, argv, "q:p:r:o:D:", lopts,NULL)) >= 0) {
         switch(c) {
         case 'h' :
             usage(argv[0]);
@@ -215,6 +228,9 @@ int main(int argc, char *argv[]) {
         case 'D' :
             config.maxDepth = atoi(optarg);
             break;
+	case 'r':
+	    config.reg = strdup(optarg);
+	    break;
         case 1 :
             config.KeepCpG = 0;
             break;
@@ -262,7 +278,7 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Couldn't open %s for reading!\n", argv[optind+1]);
         return -4;
     }
-    config.bai = sam_index_load(config.fp, argv[optind+1]); //How do we close this?
+    config.bai = sam_index_load(config.fp, argv[optind+1]);
     if(config.bai == NULL) {
         fprintf(stderr, "Couldn't open the index for %s!\n", argv[optind+1]);
         return -5;
@@ -274,6 +290,7 @@ int main(int argc, char *argv[]) {
         opref = strdup(argv[optind+1]);
         p = strrchr(opref, '.');
         *p = '\0';
+        fprintf(stderr, "writing to prefix:'%s'\n", opref);
     }
     oname = malloc(sizeof(char) * (strlen(opref)+14));
     if(config.KeepCpG) {
