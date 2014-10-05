@@ -44,8 +44,9 @@ inline int isCHH(char *seq, int pos, int seqlen) {
 }
 
 typedef struct {
-    int KeepCpG, KeepCHG, KeepCHH;
-    int minMapq, minPhred, ignoreDupes, maxDepth;
+    int keepCpG, keepCHG, keepCHH;
+    int minMapq, minPhred, keepDupes, maxDepth;
+    int noDiscordant, noSingleton;
     FILE **output_fp;
     char *reg;
     htsFile *fp;
@@ -86,7 +87,7 @@ int updateMetrics(Config *config, const bam_pileup1_t *plp) {
     return 0;
 }
 
-//This needs to be defined
+//This will need to be restructured to handle multiple input files
 int filter_func(void *data, bam1_t *b) {
     int rv, NH;
     mplp_data *ldata = (mplp_data *) data;
@@ -95,15 +96,17 @@ int filter_func(void *data, bam1_t *b) {
     while(1) {
         rv = ldata->iter ? sam_itr_next(ldata->config->fp, ldata->iter, b) : sam_read1(ldata->config->fp, ldata->hdr, b);
         if(rv<0) return rv;
-        if(b->core.tid == -1 || b->core.flag & BAM_FUNMAP) continue;
-        if(b->core.qual < ldata->config->minMapq) continue;
+        if(b->core.tid == -1 || b->core.flag & BAM_FUNMAP) continue; //Unmapped
+        if(b->core.qual < ldata->config->minMapq) continue; //-q
         if(b->core.flag & 0x300) continue; //Ignore secondary alignments and those with QC failed
-        if(ldata->config->ignoreDupes && b->core.flag & BAM_FDUP) continue;
+        if(!ldata->config->keepDupes && b->core.flag & BAM_FDUP) continue;
         p = bam_aux_get(b, "NH");
         if(p != NULL) {
             NH = bam_aux2i(p);
             if(NH>1) continue; //Ignore obvious multimappers
         }
+        if(ldata->config->noSingleton && (b->core.flag & 0x9) == 0x9) continue; //Singleton
+        if(ldata->config->noDiscordant && (b->core.flag & 0x3) == 0x1) continue; //Discordant
         break;
     }
     return rv;
@@ -148,11 +151,11 @@ void extractCalls(Config *config) {
             }
             ctid = tid;
         }
-        if(config->KeepCpG && isCpG(seq, pos, seqlen)) {
+        if(config->keepCpG && isCpG(seq, pos, seqlen)) {
             type = 0;
-        } else if(config->KeepCHG && isCHG(seq, pos, seqlen)) {
+        } else if(config->keepCHG && isCHG(seq, pos, seqlen)) {
             type = 1;
-        } else if(config->KeepCHH && isCHH(seq, pos, seqlen)) {
+        } else if(config->keepCHH && isCHH(seq, pos, seqlen)) {
             type = 2;
         } else {
             continue;
@@ -187,8 +190,14 @@ void usage(char *prog) {
 " -r STR           Region string in which to extract methylation\n"
 " -o, --opref STR  Output filename prefix. CpG/CHG/CHH metrics will be\n"
 "                  output to STR_CpG.bedGraph and so on.\n"
-" --KeepDupes      By default, any alignment marked as a duplicate is ignored.\n"
+" --keepDupes      By default, any alignment marked as a duplicate is ignored.\n"
 "                  This option causes them to be incorporated.\n"
+" --noSingleton    By default, if only one read in a pair aligns (a singleton)\n"
+"                  then it's included in the metrics. This options will ignore\n"
+"                  such alignments.\n"
+" --noDiscordant   Ignore paired-end reads that aren't concordantly aligned\n"
+"                  (the definition of this is dependent on your aligner and the\n"
+"                  settings you gave to it).\n"
 " --noCpG          Do not output CpG methylation metrics\n"
 " --CHG            Output CHG methylation metrics\n"
 " --CHH            Output CHH methylation metrics\n");
@@ -200,8 +209,9 @@ int main(int argc, char *argv[]) {
     Config config;
 
     //Defaults
-    config.KeepCpG = 1; config.KeepCHG = 0; config.KeepCHH = 0;
-    config.minMapq = 5; config.minPhred = 5; config.ignoreDupes = 1;
+    config.keepCpG = 1; config.keepCHG = 0; config.keepCHH = 0;
+    config.minMapq = 5; config.minPhred = 10; config.keepDupes = 0;
+    config.noSingleton = 0, config.noDiscordant = 1;
     config.maxDepth = 2000;
     config.fai = NULL;
     config.fp = NULL;
@@ -209,13 +219,14 @@ int main(int argc, char *argv[]) {
     config.reg = NULL;
 
     static struct option lopts[] = {
-        {"opref", 1, NULL,              'o'},
-        {"noCpG", 0, NULL,                1},
-        {"CHG",   0, NULL,                2},
-        {"CHH",   0, NULL,                3},
-        {"ignoreDupes", 0, NULL,              '4'},
-        {"region",      1, NULL,              'r'},
-        {"help",  0, NULL,              'h'}
+        {"opref",        1, NULL, 'o'},
+        {"noCpG",        0, NULL,   1},
+        {"CHG",          0, NULL,   2},
+        {"CHH",          0, NULL,   3},
+        {"keepDupes",    0, NULL,   4},
+        {"noSingleton",  0, NULL,   5},
+        {"noDiscordant", 0, NULL,   6},
+        {"help",         0, NULL, 'h'}
     };
     while((c = getopt_long(argc, argv, "q:p:r:o:D:", lopts,NULL)) >= 0) {
         switch(c) {
@@ -232,16 +243,22 @@ int main(int argc, char *argv[]) {
 	    config.reg = strdup(optarg);
 	    break;
         case 1 :
-            config.KeepCpG = 0;
+            config.keepCpG = 0;
             break;
         case 2 :
-            config.KeepCHG = 1;
+            config.keepCHG = 1;
             break;
         case 3 :
-            config.KeepCHH = 1;
+            config.keepCHH = 1;
             break;
         case 4 :
-            config.ignoreDupes = 0;
+            config.keepDupes = 1;
+            break;
+        case 5 :
+            config.noSingleton = 1;
+            break;
+        case 6 :
+            config.noDiscordant = 1;
             break;
         case 'q' :
             config.minMapq = atoi(optarg);
@@ -263,6 +280,12 @@ int main(int argc, char *argv[]) {
     if(argc-optind != 2) {
         fprintf(stderr, "You must supply a reference genome in fasta format and an input BAM file!!!\n");
         usage(argv[0]);
+        return -1;
+    }
+
+    //Is there still a metric to output?
+    if(!(config.keepCpG + config.keepCHG + config.keepCHH)) {
+        fprintf(stderr, "You haven't specified any metrics to output!\nEither don't use the --noCpG option or specify --CHG and/or --CHH.\n");
         return -1;
     }
 
@@ -293,7 +316,7 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "writing to prefix:'%s'\n", opref);
     }
     oname = malloc(sizeof(char) * (strlen(opref)+14));
-    if(config.KeepCpG) {
+    if(config.keepCpG) {
         sprintf(oname, "%s_CpG.bedGraph", opref);
         config.output_fp[0] = fopen(oname, "w");
         if(config.output_fp[0] == NULL) {
@@ -302,7 +325,7 @@ int main(int argc, char *argv[]) {
         }
         fprintf(config.output_fp[0], "track type=\"bedGraph\" description=\"%s CpG methylation levels\"\n", opref);
     }
-    if(config.KeepCHG) {
+    if(config.keepCHG) {
         sprintf(oname, "%s_CHG.bedGraph", opref);
         config.output_fp[1] = fopen(oname, "w");
         if(config.output_fp[1] == NULL) {
@@ -311,7 +334,7 @@ int main(int argc, char *argv[]) {
         }
         fprintf(config.output_fp[0], "track type=\"bedGraph\" description=\"%s CHG methylation levels\"\n", opref);
     }
-    if(config.KeepCHH) {
+    if(config.keepCHH) {
         sprintf(oname, "%s_CHH.bedGraph", opref);
         config.output_fp[2] = fopen(oname, "w");
         if(config.output_fp[2] == NULL) {
@@ -327,9 +350,9 @@ int main(int argc, char *argv[]) {
     //Close things up
     hts_close(config.fp);
     fai_destroy(config.fai);
-    if(config.KeepCpG) fclose(config.output_fp[0]);
-    if(config.KeepCHG) fclose(config.output_fp[1]);
-    if(config.KeepCHH) fclose(config.output_fp[2]);
+    if(config.keepCpG) fclose(config.output_fp[0]);
+    if(config.keepCHG) fclose(config.output_fp[1]);
+    if(config.keepCHH) fclose(config.output_fp[2]);
     hts_idx_destroy(config.bai);
     free(opref);
     free(oname);
