@@ -313,7 +313,7 @@ int main(int argc, char *argv[]) {
     if(opref == NULL) {
         opref = strdup(argv[optind+1]);
         p = strrchr(opref, '.');
-        *p = '\0';
+        if(p != NULL) *p = '\0';
         fprintf(stderr, "writing to prefix:'%s'\n", opref);
     }
     oname = malloc(sizeof(char) * (strlen(opref)+14));
