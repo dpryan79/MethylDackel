@@ -10,13 +10,13 @@ Compilation
 
 PileOMeth can either dynamically link to HTSlib or statically incorporate it. To compile for dynamic linkage, use:
 
-`gcc -Wall -O3 -I/path/to/headers -L/path/to/libhts.so -o PileOMeth PileOMeth.c -lhts -lz -lpthread`
+`gcc -Wall -O3 -I/path/to/headers -L/path/to/libhts.so -o PileOMeth bed.c PileOMeth.c -lhts -lz -lpthread`
 
 If your HTSlib headers are under ~/include/htslib then use `-I~/include`.
 
 If you prefer to statically incorporate HTSlib (e.g., due to this being the only program needing it), compile HTSlib and then use the following:
 
-`gcc -Wall -O3 -I/path/to/htslib/compilation -o PileOMeth PileOMeth.c /path/to/htslib/compilation/libhts.a -lz -lpthread`
+`gcc -Wall -O3 -I/path/to/htslib/compilation -o PileOMeth bed.c PileOMeth.c /path/to/htslib/compilation/libhts.a -lz -lpthread`
 
 If you downloaded and compiled HTSlib in ~/Downloads/htslib-1.1, then `/path/to/htslib/compilation` is `~/Downloads/htslib-1.1`.
 
@@ -36,12 +36,9 @@ PileOMeth can filter reads and bases according to MAPQ and Phred score, respecti
 To do list
 ==========
 
- * Add an -l option to parse only regions in a BED file
- * add an -r/--region REGION option to just look at one region
  * Enable trimming based on M-bias
  * The -D option seems to only be approximate. Is the an htslib issue?
- * Is it possible to support non-directional libraries with this method?
  * If a BAM (or ideally CRAM) file isn't yet indexed, we should do that automatically
  * Is the output format the most convenient (it's what Bison uses, so converters have already been written)? It makes more sense to output a predefined VCF format, which would allow processing multiple samples at once. This would require a spec., which should have pretty broad input.
- * Perhaps things should be restructured to allow making a library out of this, for easier incorporation into python (e.g., pysam).
+ * Need to finish restructuring things to allow easy library incorporation
  * Test to ensure that the results are correct!

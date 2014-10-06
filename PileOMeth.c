@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
+#include <assert.h>
+#include "PileOMeth.h"
 
 inline int isCpG(char *seq, int pos, int seqlen) {
     if(pos+1 == seqlen) return 0;
@@ -44,52 +46,63 @@ inline int isCHH(char *seq, int pos, int seqlen) {
 }
 
 typedef struct {
-    int keepCpG, keepCHG, keepCHH;
-    int minMapq, minPhred, keepDupes, maxDepth;
-    int noDiscordant, noSingleton;
-    FILE **output_fp;
-    char *reg;
-    htsFile *fp;
-    hts_idx_t *bai;
-    faidx_t *fai;
-} Config;
-
-typedef struct {
     Config *config;
     bam_hdr_t *hdr;
     hts_itr_t *iter;
 } mplp_data;
 
 int getStrand(bam1_t *b) {
-    if(b->core.flag & BAM_FPAIRED) {
-        if((b->core.flag & 0x50) == 0x50) return 1; //Read1, reverse comp. == OB
-        else if(b->core.flag & 0x40) return 0; //Read1, forward == OT
-        else if((b->core.flag & 0x90) == 0x90) return 0; //Read2, reverse comp. == OT
-        else if(b->core.flag & 0x80) return 0; //Read2, forward == OB
-        return -1; //One of the above should be set!
+    char *XG = (char *) bam_aux_get(b, "XG");
+    if(XG == NULL) { //Can't handle non-directional libraries!
+        if(b->core.flag & BAM_FPAIRED) {
+            if((b->core.flag & 0x50) == 0x50) return 2; //Read1, reverse comp. == OB
+            else if(b->core.flag & 0x40) return 1; //Read1, forward == OT
+            else if((b->core.flag & 0x90) == 0x90) return 1; //Read2, reverse comp. == OT
+            else if(b->core.flag & 0x80) return 2; //Read2, forward == OB
+            return 0; //One of the above should be set!
+        } else {
+            if(b->core.flag & 0x10) return 2; //Reverse comp. == OB
+            return 0;
+        }
     } else {
-        if(b->core.flag & 0x10) return 1; //Reverse comp. == OB
-        return 0;
+        if(*XG == 'C') { //OT or CTOT, due to C->T converted genome
+            if((b->core.flag & 0x51) == 0x41) return 1; //Read#1 forward == OT
+            else if((b->core.flag & 0x51) == 0x51) return 3; //Read #1 reverse == CTOT
+            else if((b->core.flag & 0x91) == 0x81) return 3; //Read #2 forward == CTOT
+            else if((b->core.flag & 0x91) == 0x91) return 1; //Read #2 reverse == OT
+            else if(b->core.flag & 0x10) return 3; //Single-end reverse == CTOT
+            else return 1; //Single-end forward == OT
+        } else {
+            if((b->core.flag & 0x51) == 0x41) return 4; //Read#1 forward == CTOB
+            else if((b->core.flag & 0x51) == 0x51) return 2; //Read #1 reverse == OB
+            else if((b->core.flag & 0x91) == 0x81) return 2; //Read #2 forward == OB
+            else if((b->core.flag & 0x91) == 0x91) return 4; //Read #2 reverse == CTOB
+            else if(b->core.flag & 0x10) return 2; //Single-end reverse == OB
+            else return 4; //Single-end forward == CTOB
+        }
     }
 }
 
 int updateMetrics(Config *config, const bam_pileup1_t *plp) {
     uint8_t base = bam_seqi(bam_get_seq(plp->b), plp->qpos);
-    int strand = getStrand(plp->b); //0=OT, 1=OB, 2=CTOT, 3=CTOB
+    int strand = getStrand(plp->b); //1=OT, 2=OB, 3=CTOT, 4=CTOB
+
+    assert(("Can't determine the strand of a read!", strand != 0));
 
     //Is the phred score even high enough?
     if(bam_get_qual(plp->b)[plp->qpos] < config->minMapq) return 0;
 
-    if(base == 2 && strand == 0) return 1; //C on an OT read
-    else if(base == 8 && strand == 0)  return -1; //T on an OT read
-    else if(base == 4 && strand == 1) return 1; //G on an OB read
-    else if(base == 1 && strand == 1) return -1; //A on an OB read
+    if(base == 2 && (strand & 1)) return 1; //C on an OT/CTOT alignment
+    else if(base == 8 && (strand & 1))  return -1; //T on an OT/CTOT alignment
+    else if(base == 4 && (strand & 2)) return 1; //G on an OB/CTOB alignment
+    else if(base == 1 && (strand & 2)) return -1; //A on an OB/CTOB alignment
     return 0;
 }
 
 //This will need to be restructured to handle multiple input files
 int filter_func(void *data, bam1_t *b) {
-    int rv, NH;
+    int rv, NH, overlap;
+    static int32_t idxBED = 0;
     mplp_data *ldata = (mplp_data *) data;
     uint8_t *p;
 
@@ -107,6 +120,14 @@ int filter_func(void *data, bam1_t *b) {
         }
         if(ldata->config->noSingleton && (b->core.flag & 0x9) == 0x9) continue; //Singleton
         if(ldata->config->noDiscordant && (b->core.flag & 0x3) == 0x1) continue; //Discordant
+        if(ldata->config->bed) { //Prefilter reads overlapping a BED file (N.B., strand independent).
+            overlap = spanOverlapsBED(b->core.tid, b->core.pos, bam_endpos(b), ldata->config->bed, &idxBED);
+            if(overlap == 0) continue;
+            if(overlap < 0) {
+                rv = -1;
+                break;
+            }
+        }
         break;
     }
     return rv;
@@ -115,23 +136,39 @@ int filter_func(void *data, bam1_t *b) {
 void extractCalls(Config *config) {
     bam_hdr_t *hdr = sam_hdr_read(config->fp);
     bam_mplp_t iter;
-    int ret, tid, pos, i, seqlen, type, rv;
+    int ret, tid, pos, i, seqlen, type, rv, o = 0;
     int beg0 = 0, end0 = 1u<<29;
     int n_plp; //This will need to be modified for multiple input files
     int ctid = -1; //The tid of the contig whose sequence is stored in "seq"
+    int idxBED = 0;
     uint32_t nmethyl, nunmethyl;
-    const bam_pileup1_t **plp = calloc(1, sizeof(bam_pileup1_t *)); //This will have to be modified for multiple input files
+    const bam_pileup1_t **plp = NULL;
     char *seq = NULL;
-    mplp_data *data = malloc(sizeof(mplp_data));
+    mplp_data *data = NULL;
 
-    data->config = config;
-    data->hdr = hdr;
     if (config->reg) {
         if((data->iter = sam_itr_querys(config->bai, hdr, config->reg)) == 0){
             fprintf(stderr, "failed to parse regions %s", config->reg);
-            exit(1);
+            return;
         }
-   }
+    }
+    if(config->bedName) {
+        config->bed = parseBED(config->bedName, hdr);
+        if(config->bed == NULL) return;
+    }
+
+    data = calloc(1,sizeof(mplp_data));
+    if(data == NULL) {
+        fprintf(stderr, "Couldn't allocate space for the data structure in extractCalls()!\n");
+        return;
+    }
+    data->config = config;
+    data->hdr = hdr;
+    plp = calloc(1, sizeof(bam_pileup1_t *)); //This will have to be modified for multiple input files
+    if(plp == NULL) {
+        fprintf(stderr, "Couldn't allocate space for the plp structure in extractCalls()!\n");
+        return;
+    }
 
     //Start the pileup
     iter = bam_mplp_init(1, filter_func, (void **) &data);
@@ -151,6 +188,12 @@ void extractCalls(Config *config) {
             }
             ctid = tid;
         }
+
+        if(config->bed) { //Handle -l
+            while((o = posOverlapsBED(tid, pos, config->bed, idxBED)) == -1) idxBED++;
+            if(o == 0) continue; //Wrong strand
+        }
+
         if(config->keepCpG && isCpG(seq, pos, seqlen)) {
             type = 0;
         } else if(config->keepCHG && isCHG(seq, pos, seqlen)) {
@@ -163,6 +206,7 @@ void extractCalls(Config *config) {
 
         nmethyl = nunmethyl = 0;
         for(i=0; i<n_plp; i++) {
+            if(config->bed) if(!readStrandOverlapsBED(plp[0][i].b, config->bed->region[idxBED])) continue;
             rv = updateMetrics(config, plp[0]+i);
             if(rv > 0) nmethyl++;
             else if(rv<0) nunmethyl++;
@@ -189,6 +233,12 @@ void usage(char *prog) {
 " -p INT           Minimum Phred threshold to include a base (default 10)\n"
 " -D INT           Maximum per-base depth (default 2000)\n"
 " -r STR           Region string in which to extract methylation\n"
+" -l FILE          A BED file listing regions for inclusion. Note that unlike\n"
+"                  samtools mpileup, this option will utilize the strand column\n"
+"                  (column 6) if present. Thus, if a region has a '+' in this\n"
+"                  column, then only metrics from the top strand will be\n"
+"                  output. Note that the -r option can be used to limit the\n"
+"                  regions of -l.\n"
 " -o, --opref STR  Output filename prefix. CpG/CHG/CHH metrics will be\n"
 "                  output to STR_CpG.bedGraph and so on.\n"
 " --keepDupes      By default, any alignment marked as a duplicate is ignored.\n"
@@ -218,6 +268,8 @@ int main(int argc, char *argv[]) {
     config.fp = NULL;
     config.bai = NULL;
     config.reg = NULL;
+    config.bedName = NULL;
+    config.bed = NULL;
 
     static struct option lopts[] = {
         {"opref",        1, NULL, 'o'},
@@ -229,7 +281,7 @@ int main(int argc, char *argv[]) {
         {"noDiscordant", 0, NULL,   6},
         {"help",         0, NULL, 'h'}
     };
-    while((c = getopt_long(argc, argv, "q:p:r:o:D:", lopts,NULL)) >= 0) {
+    while((c = getopt_long(argc, argv, "q:p:r:l:o:D:", lopts,NULL)) >= 0) {
         switch(c) {
         case 'h' :
             usage(argv[0]);
@@ -243,6 +295,9 @@ int main(int argc, char *argv[]) {
 	case 'r':
 	    config.reg = strdup(optarg);
 	    break;
+        case 'l' :
+            config.bedName = optarg;
+            break;
         case 1 :
             config.keepCpG = 0;
             break;
@@ -357,7 +412,7 @@ int main(int argc, char *argv[]) {
     hts_idx_destroy(config.bai);
     free(opref);
     if(config.reg) free(config.reg);
-
+    if(config.bed) destroyBED(config.bed);
     free(oname);
     free(config.output_fp);
 
