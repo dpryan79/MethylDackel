@@ -351,21 +351,25 @@ int main(int argc, char *argv[]) {
     }
 
     //Open the files
-    config.fai = fai_load(argv[optind]);
-    if(config.fai == NULL) {
+    if((config.fai = fai_load(argv[optind])) == NULL) {
         fprintf(stderr, "Couldn't open the index for %s!\n", argv[optind]);
         usage(argv[0]);
         return -2;
     }
-    config.fp = hts_open(argv[optind+1], "rb"); //Does this return NULL on error?
-    if(config.fp == NULL) {
+    if((config.fp = hts_open(argv[optind+1], "rb")) == NULL) {
         fprintf(stderr, "Couldn't open %s for reading!\n", argv[optind+1]);
         return -4;
     }
-    config.bai = sam_index_load(config.fp, argv[optind+1]);
-    if(config.bai == NULL) {
-        fprintf(stderr, "Couldn't open the index for %s!\n", argv[optind+1]);
-        return -5;
+    if((config.bai = sam_index_load(config.fp, argv[optind+1])) == NULL) {
+        fprintf(stderr, "Couldn't load the index for %s, will attempt to build it.\n", argv[optind+1]);
+        if(bam_index_build(argv[optind+1], 0) < 0) {
+            fprintf(stderr, "Couldn't build the index for %s! File corrupted?\n", argv[optind+1]);
+            return -5;
+        }
+        if((config.bai = sam_index_load(config.fp, argv[optind+1])) == NULL) {
+            fprintf(stderr, "Still couldn't load the index, quiting.\n");
+            return -5;
+        }
     }
 
     //Output files
