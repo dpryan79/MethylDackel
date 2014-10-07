@@ -108,6 +108,7 @@ int filter_func(void *data, bam1_t *b) {
 
     while(1) {
         rv = ldata->iter ? sam_itr_next(ldata->config->fp, ldata->iter, b) : sam_read1(ldata->config->fp, ldata->hdr, b);
+
         if(rv<0) return rv;
         if(b->core.tid == -1 || b->core.flag & BAM_FUNMAP) continue; //Unmapped
         if(b->core.qual < ldata->config->minMapq) continue; //-q
@@ -146,6 +147,7 @@ void extractCalls(Config *config) {
     char *seq = NULL;
     mplp_data *data = NULL;
 
+    data = calloc(1,sizeof(mplp_data));
     if (config->reg) {
         if((data->iter = sam_itr_querys(config->bai, hdr, config->reg)) == 0){
             fprintf(stderr, "failed to parse regions %s", config->reg);
@@ -157,7 +159,6 @@ void extractCalls(Config *config) {
         if(config->bed == NULL) return;
     }
 
-    data = calloc(1,sizeof(mplp_data));
     if(data == NULL) {
         fprintf(stderr, "Couldn't allocate space for the data structure in extractCalls()!\n");
         return;
@@ -176,7 +177,11 @@ void extractCalls(Config *config) {
     bam_mplp_set_maxcnt(iter, config->maxDepth);
     while((ret = bam_mplp_auto(iter, &tid, &pos, &n_plp, plp)) > 0) {
         //Do we need to process this position?
-	if (config->reg && (pos < beg0 || pos >= end0)) continue; // out of the region requested
+	if (config->reg){
+	    // not sure why this is needed, but it's used in bam_plcmd
+	    beg0 = data->iter->beg, end0 = data->iter->end;
+	    if ((pos < beg0 || pos >= end0)) continue; // out of the region requested
+	}
         if(tid != ctid) {
             if(seq != NULL) free(seq);
             seq = faidx_fetch_seq(config->fai, hdr->target_name[tid], 0, faidx_seq_len(config->fai, hdr->target_name[tid]), &seqlen);
