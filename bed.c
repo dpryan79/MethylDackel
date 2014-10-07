@@ -184,8 +184,8 @@ bedRegions *parseBED(char *fn, bam_hdr_t *hdr) {
             goto err;
         }
         if(regions->region[regions->n].start < 0) regions->region[regions->n].start = 0;
-        if(regions->region[regions->n].end > hdr->target_length[regions->region[regions->n].tid]+1) \
-            regions->region[regions->n].end = hdr->target_length[regions->region[regions->].tid]+1;
+        if(regions->region[regions->n].end > hdr->target_len[regions->region[regions->n].tid]+1) \
+            regions->region[regions->n].end = hdr->target_len[regions->region[regions->n].tid]+1;
 
         //It's possible to have an additional 3 (or more) fields, in which case we need to skip 2 and parse the third
         regions->n++;
