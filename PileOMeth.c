@@ -86,8 +86,13 @@ int getStrand(bam1_t *b) {
 int updateMetrics(Config *config, const bam_pileup1_t *plp) {
     uint8_t base = bam_seqi(bam_get_seq(plp->b), plp->qpos);
     int strand = getStrand(plp->b); //1=OT, 2=OB, 3=CTOT, 4=CTOB
-
     assert(("Can't determine the strand of a read!", strand != 0));
+
+	int pos = plp->qpos + 1; // 1-based
+	// ASK Devon: need to consider strand from above for this?
+	if(pos <= config->trim5) return 0;
+	if(pos > (plp->b->core.l_qseq - config->trim3)) return 0;
+
 
     //Is the phred score even high enough?
     if(bam_get_qual(plp->b)[plp->qpos] < config->minMapq) return 0;
@@ -142,7 +147,7 @@ void extractCalls(Config *config) {
     int n_plp; //This will need to be modified for multiple input files
     int ctid = -1; //The tid of the contig whose sequence is stored in "seq"
     int idxBED = 0;
-    uint32_t nmethyl, nunmethyl;
+    uint32_t nmethyl, nunmethyl, nskip;
     const bam_pileup1_t **plp = NULL;
     char *seq = NULL;
     mplp_data *data = NULL;
@@ -177,11 +182,11 @@ void extractCalls(Config *config) {
     bam_mplp_set_maxcnt(iter, config->maxDepth);
     while((ret = bam_mplp_auto(iter, &tid, &pos, &n_plp, plp)) > 0) {
         //Do we need to process this position?
-	if (config->reg){
-	    // not sure why this is needed, but it's used in bam_plcmd
-	    beg0 = data->iter->beg, end0 = data->iter->end;
-	    if ((pos < beg0 || pos >= end0)) continue; // out of the region requested
-	}
+        if (config->reg){
+           // not sure why this is needed, but it's used in bam_plcmd
+           beg0 = data->iter->beg, end0 = data->iter->end;
+           if ((pos < beg0 || pos >= end0)) continue; // out of the region requested
+        }
         if(tid != ctid) {
             if(seq != NULL) free(seq);
             seq = faidx_fetch_seq(config->fai, hdr->target_name[tid], 0, faidx_seq_len(config->fai, hdr->target_name[tid]), &seqlen);
@@ -209,12 +214,13 @@ void extractCalls(Config *config) {
             continue;
         }
 
-        nmethyl = nunmethyl = 0;
+        nskip = nmethyl = nunmethyl = 0;
         for(i=0; i<n_plp; i++) {
             if(config->bed) if(!readStrandOverlapsBED(plp[0][i].b, config->bed->region[idxBED])) continue;
             rv = updateMetrics(config, plp[0]+i);
             if(rv > 0) nmethyl++;
             else if(rv<0) nunmethyl++;
+			else nskip++;
         }
 
         if(nmethyl+nunmethyl) fprintf(config->output_fp[type], "%s\t%i\t%i\t%f\t%" PRIu32 "\t%" PRIu32 "\n", \
@@ -256,7 +262,9 @@ void usage(char *prog) {
 "                  settings you gave to it).\n"
 " --noCpG          Do not output CpG methylation metrics\n"
 " --CHG            Output CHG methylation metrics\n"
-" --CHH            Output CHH methylation metrics\n");
+" --CHH            Output CHH methylation metrics\n"
+" -5 INT           Trim this many bases from the 5' end of each read to avoid bias\n"
+" -3 INT           Trim this many bases from the 3' end of each read to avoid bias\n");
 }
 
 int main(int argc, char *argv[]) {
@@ -273,6 +281,7 @@ int main(int argc, char *argv[]) {
     config.fp = NULL;
     config.bai = NULL;
     config.reg = NULL;
+    config.trim3 = 0; config.trim5 = 0;
     config.bedName = NULL;
     config.bed = NULL;
 
@@ -286,7 +295,7 @@ int main(int argc, char *argv[]) {
         {"noDiscordant", 0, NULL,   6},
         {"help",         0, NULL, 'h'}
     };
-    while((c = getopt_long(argc, argv, "q:p:r:l:o:D:", lopts,NULL)) >= 0) {
+    while((c = getopt_long(argc, argv, "q:p:r:l:o:D:5:3:", lopts, NULL)) >= 0) {
         switch(c) {
         case 'h' :
             usage(argv[0]);
@@ -297,11 +306,17 @@ int main(int argc, char *argv[]) {
         case 'D' :
             config.maxDepth = atoi(optarg);
             break;
-	case 'r':
-	    config.reg = strdup(optarg);
-	    break;
+        case 'r':
+            config.reg = strdup(optarg);
+            break;
         case 'l' :
             config.bedName = optarg;
+            break;
+        case '3':
+            config.trim3 = atoi(optarg);
+            break;
+        case '5':
+            config.trim5 = atoi(optarg);
             break;
         case 1 :
             config.keepCpG = 0;

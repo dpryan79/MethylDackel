@@ -63,6 +63,7 @@ typedef struct {
     char *bedName;
     bedRegions *bed;
     faidx_t *fai;
+    int trim3, trim5;
 } Config;
 
 /*! @function
