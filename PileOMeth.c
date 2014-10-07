@@ -148,6 +148,12 @@ void extractCalls(Config *config) {
     mplp_data *data = NULL;
 
     data = calloc(1,sizeof(mplp_data));
+    if(data == NULL) {
+        fprintf(stderr, "Couldn't allocate space for the data structure in extractCalls()!\n");
+        return;
+    }
+    data->config = config;
+    data->hdr = hdr;
     if (config->reg) {
         if((data->iter = sam_itr_querys(config->bai, hdr, config->reg)) == 0){
             fprintf(stderr, "failed to parse regions %s", config->reg);
@@ -159,12 +165,6 @@ void extractCalls(Config *config) {
         if(config->bed == NULL) return;
     }
 
-    if(data == NULL) {
-        fprintf(stderr, "Couldn't allocate space for the data structure in extractCalls()!\n");
-        return;
-    }
-    data->config = config;
-    data->hdr = hdr;
     plp = calloc(1, sizeof(bam_pileup1_t *)); //This will have to be modified for multiple input files
     if(plp == NULL) {
         fprintf(stderr, "Couldn't allocate space for the plp structure in extractCalls()!\n");
