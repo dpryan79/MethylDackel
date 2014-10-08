@@ -12,7 +12,7 @@
 inline int isCpG(char *seq, int pos, int seqlen) {
     if(pos+1 == seqlen) return 0;
     if(*(seq+pos) == 'C' || *(seq+pos) == 'c') {
-        if(*(seq+pos+1) == 'G' || *(seq+pos+1) == 'G') return 1;
+        if(*(seq+pos+1) == 'G' || *(seq+pos+1) == 'g') return 1;
         return 0;
     } else if(*(seq+pos) == 'G' || *(seq+pos) == 'g') {
         if(pos == 0) return 0;
@@ -25,7 +25,7 @@ inline int isCpG(char *seq, int pos, int seqlen) {
 inline int isCHG(char *seq, int pos, int seqlen) {
     if(pos+2 >= seqlen) return 0;
     if(*(seq+pos) == 'C' || *(seq+pos) == 'c') {
-        if(*(seq+pos+2) == 'G' || *(seq+pos+2) == 'G') return 1;
+        if(*(seq+pos+2) == 'G' || *(seq+pos+2) == 'g') return 1;
         return 0;
     } else if(*(seq+pos) == 'G' || *(seq+pos) == 'g') {
         if(pos <= 1) return 0;
@@ -122,6 +122,7 @@ int filter_func(void *data, bam1_t *b) {
         if(ldata->config->noSingleton && (b->core.flag & 0x9) == 0x9) continue; //Singleton
         if(ldata->config->noDiscordant && (b->core.flag & 0x3) == 0x1) continue; //Discordant
         if(ldata->config->bed) { //Prefilter reads overlapping a BED file (N.B., strand independent).
+            printf("BED file!\n"); fflush(stdout);
             overlap = spanOverlapsBED(b->core.tid, b->core.pos, bam_endpos(b), ldata->config->bed, &idxBED);
             if(overlap == 0) continue;
             if(overlap < 0) {
@@ -199,11 +200,14 @@ void extractCalls(Config *config) {
             if(o == 0) continue; //Wrong strand
         }
 
-        if(config->keepCpG && isCpG(seq, pos, seqlen)) {
+        if(isCpG(seq, pos, seqlen)) {
+            if(!config->keepCpG) continue;
             type = 0;
-        } else if(config->keepCHG && isCHG(seq, pos, seqlen)) {
+        } else if(isCHG(seq, pos, seqlen)) {
+            if(!config->keepCHG) continue;
             type = 1;
-        } else if(config->keepCHH && isCHH(seq, pos, seqlen)) {
+        } else if(isCHH(seq, pos, seqlen)) {
+            if(!config->keepCHH) continue;
             type = 2;
         } else {
             continue;
@@ -267,7 +271,7 @@ int main(int argc, char *argv[]) {
     //Defaults
     config.keepCpG = 1; config.keepCHG = 0; config.keepCHH = 0;
     config.minMapq = 5; config.minPhred = 10; config.keepDupes = 0;
-    config.noSingleton = 0, config.noDiscordant = 1;
+    config.noSingleton = 0, config.noDiscordant = 0;
     config.maxDepth = 2000;
     config.fai = NULL;
     config.fp = NULL;
@@ -393,7 +397,7 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "Couldn't open the output CHG metrics file for writing! Insufficient permissions?\n");
             return -3;
         }
-        fprintf(config.output_fp[0], "track type=\"bedGraph\" description=\"%s CHG methylation levels\"\n", opref);
+        fprintf(config.output_fp[1], "track type=\"bedGraph\" description=\"%s CHG methylation levels\"\n", opref);
     }
     if(config.keepCHH) {
         sprintf(oname, "%s_CHH.bedGraph", opref);
@@ -402,7 +406,7 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "Couldn't open the output CHH metrics file for writing! Insufficient permissions?\n");
             return -3;
         }
-        fprintf(config.output_fp[0], "track type=\"bedGraph\" description=\"%s CHH methylation levels\"\n", opref);
+        fprintf(config.output_fp[2], "track type=\"bedGraph\" description=\"%s CHH methylation levels\"\n", opref);
     }
 
     //Run the pileup
