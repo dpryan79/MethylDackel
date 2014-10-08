@@ -214,12 +214,10 @@ void extractCalls(Config *config) {
         for(i=0; i<n_plp; i++) {
             if(config->bed) if(!readStrandOverlapsBED(plp[0][i].b, config->bed->region[idxBED])) continue;
             rv = updateMetrics(config, plp[0]+i);
-            printf("rv = %i\n", rv); fflush(stdout);
             if(rv > 0) nmethyl++;
             else if(rv<0) nunmethyl++;
         }
 
-        printf("nmethyl: %" PRIu32 "\tnunmethyl: %" PRIu32 "\n", nmethyl, nunmethyl); fflush(stdout);
         if(nmethyl+nunmethyl) fprintf(config->output_fp[type], "%s\t%i\t%i\t%f\t%" PRIu32 "\t%" PRIu32 "\n", \
             hdr->target_name[tid], pos, pos+1, 1000.0 * ((double) nmethyl)/(nmethyl+nunmethyl), nmethyl, nunmethyl);
     }
