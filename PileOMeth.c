@@ -90,7 +90,7 @@ int updateMetrics(Config *config, const bam_pileup1_t *plp) {
     assert(("Can't determine the strand of a read!", strand != 0));
 
     //Is the phred score even high enough?
-    if(bam_get_qual(plp->b)[plp->qpos] < config->minMapq) return 0;
+    if(bam_get_qual(plp->b)[plp->qpos] < config->minPhred) return 0;
 
     if(base == 2 && (strand & 1)) return 1; //C on an OT/CTOT alignment
     else if(base == 8 && (strand & 1))  return -1; //T on an OT/CTOT alignment
@@ -179,7 +179,6 @@ void extractCalls(Config *config) {
     while((ret = bam_mplp_auto(iter, &tid, &pos, &n_plp, plp)) > 0) {
         //Do we need to process this position?
 	if (config->reg){
-	    // not sure why this is needed, but it's used in bam_plcmd
 	    beg0 = data->iter->beg, end0 = data->iter->end;
 	    if ((pos < beg0 || pos >= end0)) continue; // out of the region requested
 	}
