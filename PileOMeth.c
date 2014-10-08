@@ -200,11 +200,14 @@ void extractCalls(Config *config) {
             if(o == 0) continue; //Wrong strand
         }
 
-        if(config->keepCpG && isCpG(seq, pos, seqlen)) {
+        if(isCpG(seq, pos, seqlen)) {
+            if(!config->keepCpG) continue;
             type = 0;
-        } else if(config->keepCHG && isCHG(seq, pos, seqlen)) {
+        } else if(isCHG(seq, pos, seqlen)) {
+            if(!config->keepCHG) continue;
             type = 1;
-        } else if(config->keepCHH && isCHH(seq, pos, seqlen)) {
+        } else if(isCHH(seq, pos, seqlen)) {
+            if(!config->keepCHH) continue;
             type = 2;
         } else {
             continue;
@@ -394,7 +397,7 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "Couldn't open the output CHG metrics file for writing! Insufficient permissions?\n");
             return -3;
         }
-        fprintf(config.output_fp[0], "track type=\"bedGraph\" description=\"%s CHG methylation levels\"\n", opref);
+        fprintf(config.output_fp[1], "track type=\"bedGraph\" description=\"%s CHG methylation levels\"\n", opref);
     }
     if(config.keepCHH) {
         sprintf(oname, "%s_CHH.bedGraph", opref);
@@ -403,7 +406,7 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "Couldn't open the output CHH metrics file for writing! Insufficient permissions?\n");
             return -3;
         }
-        fprintf(config.output_fp[0], "track type=\"bedGraph\" description=\"%s CHH methylation levels\"\n", opref);
+        fprintf(config.output_fp[2], "track type=\"bedGraph\" description=\"%s CHH methylation levels\"\n", opref);
     }
 
     //Run the pileup
