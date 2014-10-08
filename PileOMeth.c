@@ -65,7 +65,7 @@ int getStrand(bam1_t *b) {
             return 0;
         }
     } else {
-        if(*XG == 'C') { //OT or CTOT, due to C->T converted genome
+        if(*(XG+1) == 'C') { //OT or CTOT, due to C->T converted genome
             if((b->core.flag & 0x51) == 0x41) return 1; //Read#1 forward == OT
             else if((b->core.flag & 0x51) == 0x51) return 3; //Read #1 reverse == CTOT
             else if((b->core.flag & 0x91) == 0x81) return 3; //Read #2 forward == CTOT
@@ -238,7 +238,8 @@ void usage(char *prog) {
 "\n"
 "Options:\n"
 " -q INT           Minimum MAPQ threshold to include an alignment (default 5)\n"
-" -p INT           Minimum Phred threshold to include a base (default 10)\n"
+" -p INT           Minimum Phred threshold to include a base (default 10). This\n"
+"                  must be >0.\n"
 " -D INT           Maximum per-base depth (default 2000)\n"
 " -r STR           Region string in which to extract methylation\n"
 " -l FILE          A BED file listing regions for inclusion. Note that unlike\n"
@@ -345,6 +346,16 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "You must supply a reference genome in fasta format and an input BAM file!!!\n");
         usage(argv[0]);
         return -1;
+    }
+
+    //Are the options reasonable?
+    if(config.minPhred < 1) {
+        fprintf(stderr, "-p %i is invalid. resetting to 1, which is the lowest possible value.\n", config.minPhred);
+        config.minPhred = 1;
+    }
+    if(config.minMapq < 0) {
+        fprintf(stderr, "-q %i is invalid. Resetting to 0, which is the lowest possible value.\n", config.minMapq);
+        config.minMapq = 0;
     }
 
     //Is there still a metric to output?
