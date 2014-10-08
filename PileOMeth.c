@@ -119,8 +119,8 @@ int filter_func(void *data, bam1_t *b) {
             NH = bam_aux2i(p);
             if(NH>1) continue; //Ignore obvious multimappers
         }
-        if(ldata->config->noSingleton && (b->core.flag & 0x9) == 0x9) continue; //Singleton
-        if(ldata->config->noDiscordant && (b->core.flag & 0x3) == 0x1) continue; //Discordant
+        if(!ldata->config->keepSingleton && (b->core.flag & 0x9) == 0x9) continue; //Singleton
+        if(!ldata->config->keepDiscordant && (b->core.flag & 0x3) == 0x1) continue; //Discordant
         if(ldata->config->bed) { //Prefilter reads overlapping a BED file (N.B., strand independent).
             printf("BED file!\n"); fflush(stdout);
             overlap = spanOverlapsBED(b->core.tid, b->core.pos, bam_endpos(b), ldata->config->bed, &idxBED);
@@ -252,12 +252,12 @@ void usage(char *prog) {
 "                  output to STR_CpG.bedGraph and so on.\n"
 " --keepDupes      By default, any alignment marked as a duplicate is ignored.\n"
 "                  This option causes them to be incorporated.\n"
-" --noSingleton    By default, if only one read in a pair aligns (a singleton)\n"
-"                  then it's included in the metrics. This options will ignore\n"
-"                  such alignments.\n"
-" --noDiscordant   Ignore paired-end reads that aren't concordantly aligned\n"
-"                  (the definition of this is dependent on your aligner and the\n"
-"                  settings you gave to it).\n"
+" --keepSingleton  By default, if only one read in a pair aligns (a singleton)\n"
+"                  then it's ignored.\n"
+" --keepDiscordant By default, paired-end alignments with the properly-paired bit\n"
+"                  unset in the FLAG field are ignored. Note that the definition\n"
+"                  of concordant and discordant is based on your aligner\n"
+"                  settings.\n"
 " --noCpG          Do not output CpG methylation metrics\n"
 " --CHG            Output CHG methylation metrics\n"
 " --CHH            Output CHH methylation metrics\n");
@@ -271,7 +271,7 @@ int main(int argc, char *argv[]) {
     //Defaults
     config.keepCpG = 1; config.keepCHG = 0; config.keepCHH = 0;
     config.minMapq = 5; config.minPhred = 10; config.keepDupes = 0;
-    config.noSingleton = 0, config.noDiscordant = 0;
+    config.keepSingleton = 0, config.keepDiscordant = 0;
     config.maxDepth = 2000;
     config.fai = NULL;
     config.fp = NULL;
@@ -286,8 +286,8 @@ int main(int argc, char *argv[]) {
         {"CHG",          0, NULL,   2},
         {"CHH",          0, NULL,   3},
         {"keepDupes",    0, NULL,   4},
-        {"noSingleton",  0, NULL,   5},
-        {"noDiscordant", 0, NULL,   6},
+        {"keepSingleton",  0, NULL,   5},
+        {"keepDiscordant", 0, NULL,   6},
         {"help",         0, NULL, 'h'}
     };
     while((c = getopt_long(argc, argv, "q:p:r:l:o:D:", lopts,NULL)) >= 0) {
@@ -320,10 +320,10 @@ int main(int argc, char *argv[]) {
             config.keepDupes = 1;
             break;
         case 5 :
-            config.noSingleton = 1;
+            config.keepSingleton = 1;
             break;
         case 6 :
-            config.noDiscordant = 1;
+            config.keepDiscordant = 1;
             break;
         case 'q' :
             config.minMapq = atoi(optarg);

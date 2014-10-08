@@ -43,8 +43,8 @@ typedef struct {
  @field	minPhred	Minimum Phred score to include a base (-p)
  @field	keepDupes	1: Include marked duplicates when calculating metrics
  @field	maxDepth	Maximum depth for the pileup
- @field noDiscordant	1: Do not include discordantly aligned reads when calculating metrics
- @field	noSingleton	1: Do not include singletons when calculating metrics
+ @field keepDiscordant	0: Do not include discordantly aligned reads when calculating metrics
+ @field	keepSingleton	0: Do not include singletons when calculating metrics
  @field output_fp	Output file pointers (to CpG, CHG, and CHH, respectively)
  @field	reg	A region specified by -r
  @field fp	Input file pointer (must be a BAM or CRAM file)
@@ -55,7 +55,7 @@ typedef struct {
 typedef struct {
     int keepCpG, keepCHG, keepCHH;
     int minMapq, minPhred, keepDupes, maxDepth;
-    int noDiscordant, noSingleton;
+    int keepDiscordant, keepSingleton;
     FILE **output_fp;
     char *reg;
     htsFile *fp;
