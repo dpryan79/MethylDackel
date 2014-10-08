@@ -12,7 +12,7 @@
 inline int isCpG(char *seq, int pos, int seqlen) {
     if(pos+1 == seqlen) return 0;
     if(*(seq+pos) == 'C' || *(seq+pos) == 'c') {
-        if(*(seq+pos+1) == 'G' || *(seq+pos+1) == 'G') return 1;
+        if(*(seq+pos+1) == 'G' || *(seq+pos+1) == 'g') return 1;
         return 0;
     } else if(*(seq+pos) == 'G' || *(seq+pos) == 'g') {
         if(pos == 0) return 0;
@@ -25,7 +25,7 @@ inline int isCpG(char *seq, int pos, int seqlen) {
 inline int isCHG(char *seq, int pos, int seqlen) {
     if(pos+2 >= seqlen) return 0;
     if(*(seq+pos) == 'C' || *(seq+pos) == 'c') {
-        if(*(seq+pos+2) == 'G' || *(seq+pos+2) == 'G') return 1;
+        if(*(seq+pos+2) == 'G' || *(seq+pos+2) == 'g') return 1;
         return 0;
     } else if(*(seq+pos) == 'G' || *(seq+pos) == 'g') {
         if(pos <= 1) return 0;
@@ -122,6 +122,7 @@ int filter_func(void *data, bam1_t *b) {
         if(ldata->config->noSingleton && (b->core.flag & 0x9) == 0x9) continue; //Singleton
         if(ldata->config->noDiscordant && (b->core.flag & 0x3) == 0x1) continue; //Discordant
         if(ldata->config->bed) { //Prefilter reads overlapping a BED file (N.B., strand independent).
+            printf("BED file!\n"); fflush(stdout);
             overlap = spanOverlapsBED(b->core.tid, b->core.pos, bam_endpos(b), ldata->config->bed, &idxBED);
             if(overlap == 0) continue;
             if(overlap < 0) {
@@ -213,10 +214,12 @@ void extractCalls(Config *config) {
         for(i=0; i<n_plp; i++) {
             if(config->bed) if(!readStrandOverlapsBED(plp[0][i].b, config->bed->region[idxBED])) continue;
             rv = updateMetrics(config, plp[0]+i);
+            printf("rv = %i\n", rv); fflush(stdout);
             if(rv > 0) nmethyl++;
             else if(rv<0) nunmethyl++;
         }
 
+        printf("nmethyl: %" PRIu32 "\tnunmethyl: %" PRIu32 "\n", nmethyl, nunmethyl); fflush(stdout);
         if(nmethyl+nunmethyl) fprintf(config->output_fp[type], "%s\t%i\t%i\t%f\t%" PRIu32 "\t%" PRIu32 "\n", \
             hdr->target_name[tid], pos, pos+1, 1000.0 * ((double) nmethyl)/(nmethyl+nunmethyl), nmethyl, nunmethyl);
     }
@@ -267,7 +270,7 @@ int main(int argc, char *argv[]) {
     //Defaults
     config.keepCpG = 1; config.keepCHG = 0; config.keepCHH = 0;
     config.minMapq = 5; config.minPhred = 10; config.keepDupes = 0;
-    config.noSingleton = 0, config.noDiscordant = 1;
+    config.noSingleton = 0, config.noDiscordant = 0;
     config.maxDepth = 2000;
     config.fai = NULL;
     config.fp = NULL;
