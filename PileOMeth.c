@@ -149,6 +149,12 @@ void extractCalls(Config *config) {
     mplp_data *data = NULL;
 
     data = calloc(1,sizeof(mplp_data));
+    if(data == NULL) {
+        fprintf(stderr, "Couldn't allocate space for the data structure in extractCalls()!\n");
+        return;
+    }
+    data->config = config;
+    data->hdr = hdr;
     if (config->reg) {
         if((data->iter = sam_itr_querys(config->bai, hdr, config->reg)) == 0){
             fprintf(stderr, "failed to parse regions %s", config->reg);
@@ -160,12 +166,6 @@ void extractCalls(Config *config) {
         if(config->bed == NULL) return;
     }
 
-    if(data == NULL) {
-        fprintf(stderr, "Couldn't allocate space for the data structure in extractCalls()!\n");
-        return;
-    }
-    data->config = config;
-    data->hdr = hdr;
     plp = calloc(1, sizeof(bam_pileup1_t *)); //This will have to be modified for multiple input files
     if(plp == NULL) {
         fprintf(stderr, "Couldn't allocate space for the plp structure in extractCalls()!\n");
@@ -365,21 +365,25 @@ int main(int argc, char *argv[]) {
     }
 
     //Open the files
-    config.fai = fai_load(argv[optind]);
-    if(config.fai == NULL) {
+    if((config.fai = fai_load(argv[optind])) == NULL) {
         fprintf(stderr, "Couldn't open the index for %s!\n", argv[optind]);
         usage(argv[0]);
         return -2;
     }
-    config.fp = hts_open(argv[optind+1], "rb"); //Does this return NULL on error?
-    if(config.fp == NULL) {
+    if((config.fp = hts_open(argv[optind+1], "rb")) == NULL) {
         fprintf(stderr, "Couldn't open %s for reading!\n", argv[optind+1]);
         return -4;
     }
-    config.bai = sam_index_load(config.fp, argv[optind+1]);
-    if(config.bai == NULL) {
-        fprintf(stderr, "Couldn't open the index for %s!\n", argv[optind+1]);
-        return -5;
+    if((config.bai = sam_index_load(config.fp, argv[optind+1])) == NULL) {
+        fprintf(stderr, "Couldn't load the index for %s, will attempt to build it.\n", argv[optind+1]);
+        if(bam_index_build(argv[optind+1], 0) < 0) {
+            fprintf(stderr, "Couldn't build the index for %s! File corrupted?\n", argv[optind+1]);
+            return -5;
+        }
+        if((config.bai = sam_index_load(config.fp, argv[optind+1])) == NULL) {
+            fprintf(stderr, "Still couldn't load the index, quiting.\n");
+            return -5;
+        }
     }
 
     //Output files
