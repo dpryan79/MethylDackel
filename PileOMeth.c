@@ -121,8 +121,8 @@ int filter_func(void *data, bam1_t *b) {
         }
         if(!ldata->config->keepSingleton && (b->core.flag & 0x9) == 0x9) continue; //Singleton
         if(!ldata->config->keepDiscordant && (b->core.flag & 0x3) == 0x1) continue; //Discordant
+        if((b->core.flag & 0x9) == 0x1) b->core.flag |= 0x2; //Discordant pairs can cause double counts
         if(ldata->config->bed) { //Prefilter reads overlapping a BED file (N.B., strand independent).
-            printf("BED file!\n"); fflush(stdout);
             overlap = spanOverlapsBED(b->core.tid, b->core.pos, bam_endpos(b), ldata->config->bed, &idxBED);
             if(overlap == 0) continue;
             if(overlap < 0) {
@@ -145,7 +145,7 @@ void extractCalls(Config *config) {
     int idxBED = 0;
     uint32_t nmethyl, nunmethyl;
     const bam_pileup1_t **plp = NULL;
-    char *seq = NULL;
+    char *seq = NULL, base;
     mplp_data *data = NULL;
 
     data = calloc(1,sizeof(mplp_data));
@@ -213,15 +213,21 @@ void extractCalls(Config *config) {
         }
 
         nmethyl = nunmethyl = 0;
+        base = *(seq+pos);
         for(i=0; i<n_plp; i++) {
             if(config->bed) if(!readStrandOverlapsBED(plp[0][i].b, config->bed->region[idxBED])) continue;
+            if(getStrand((plp[0]+i)->b) & 1) {
+                if(base != 'C' && base != 'c') continue;
+            } else {
+                if(base != 'G' && base != 'g') continue;
+            }
             rv = updateMetrics(config, plp[0]+i);
             if(rv > 0) nmethyl++;
             else if(rv<0) nunmethyl++;
         }
 
-        if(nmethyl+nunmethyl) fprintf(config->output_fp[type], "%s\t%i\t%i\t%f\t%" PRIu32 "\t%" PRIu32 "\n", \
-            hdr->target_name[tid], pos, pos+1, 1000.0 * ((double) nmethyl)/(nmethyl+nunmethyl), nmethyl, nunmethyl);
+        if(nmethyl+nunmethyl) fprintf(config->output_fp[type], "%s\t%i\t%i\t%i\t%" PRIu32 "\t%" PRIu32 "\n", \
+            hdr->target_name[tid], pos, pos+1, (int) (1000.0 * ((double) nmethyl)/(nmethyl+nunmethyl)), nmethyl, nunmethyl);
     }
 
     bam_hdr_destroy(hdr);
