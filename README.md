@@ -3,7 +3,7 @@ PileOMeth (a temporary name derived due to it using a PILEup to extract METHylat
 Prerequisites
 =============
 
-PileOMeth requires HTSlib version 1.1 or newer (version 1.0 is currently unsupported).
+PileOMeth requires HTSlib version 1.1 or newer (version 1.0 is currently unsupported). As HTSlib is a submodule of this repository, this prerequisite should be automatically dealt with.
 
 Compilation
 ===========
