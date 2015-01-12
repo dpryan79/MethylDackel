@@ -2,6 +2,7 @@
 #include <ctype.h>
 #include <limits.h>
 #include "htslib/kseq.h"
+#include <assert.h>
 KSTREAM_INIT(gzFile, gzread, 8192)
 
 //returns <0 if region0 comes before region1
@@ -20,7 +21,7 @@ inline int64_t compareRegions(int32_t tid0, int32_t start0, int32_t end0, int32_
 //This should eventually be modified to use a hash
 int spanOverlapsBED(int32_t tid, int32_t start, int32_t end, bedRegions *regs, int *idx) {
     bedRegion *reg = regs->region;
-    int64_t rv;
+    int64_t rv = 2;
     int i;
 
     //First, test the last position we probed.
@@ -36,6 +37,7 @@ int spanOverlapsBED(int32_t tid, int32_t start, int32_t end, bedRegions *regs, i
         }
         if(rv < 0) rv = -1;
     }
+    assert(rv!=2);
     return rv;
 }
 

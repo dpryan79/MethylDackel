@@ -8,17 +8,12 @@ PileOMeth requires HTSlib version 1.1 or newer (version 1.0 is currently unsuppo
 Compilation
 ===========
 
-PileOMeth can either dynamically link to HTSlib or statically incorporate it. To compile for dynamic linkage, use:
+Compilation and installation can be performed via:
 
-`gcc -Wall -O3 -I/path/to/headers -L/path/to/libhts.so -o PileOMeth bed.c PileOMeth.c -lhts -lz -lpthread`
+    make
+    make install path=/some/installation/path
 
-If your HTSlib headers are under ~/include/htslib then use `-I~/include`.
-
-If you prefer to statically incorporate HTSlib (e.g., due to this being the only program needing it), compile HTSlib and then use the following:
-
-`gcc -Wall -O3 -I/path/to/htslib/compilation -o PileOMeth bed.c PileOMeth.c /path/to/htslib/compilation/libhts.a -lz -lpthread`
-
-If you downloaded and compiled HTSlib in ~/Downloads/htslib-1.1, then `/path/to/htslib/compilation` is `~/Downloads/htslib-1.1`.
+As HTSlib is now a submodule of this repository, you no longer need to manually download and compile it.
 
 Usage
 =====
@@ -37,7 +32,6 @@ To do list
 ==========
 
  * Enable trimming based on M-bias
- * The -D option seems to only be approximate. Is the an htslib issue?
+ * The -D option seems to only be approximate. Is this an htslib issue?
  * Is the output format the most convenient (it's what Bison uses, so converters have already been written)? It makes more sense to output a predefined VCF format, which would allow processing multiple samples at once. This would require a spec., which should have pretty broad input.
  * Need to finish restructuring things to allow easy library incorporation
- * Test to ensure that the results are correct!

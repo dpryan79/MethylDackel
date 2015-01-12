@@ -87,7 +87,10 @@ int updateMetrics(Config *config, const bam_pileup1_t *plp) {
     uint8_t base = bam_seqi(bam_get_seq(plp->b), plp->qpos);
     int strand = getStrand(plp->b); //1=OT, 2=OB, 3=CTOT, 4=CTOB
 
-    assert(("Can't determine the strand of a read!", strand != 0));
+    if(strand==0) {
+        fprintf(stderr, "Can't determine the strand of a read!\n");
+        assert(strand != 0);
+    }
 
     //Is the phred score even high enough?
     if(bam_get_qual(plp->b)[plp->qpos] < config->minPhred) return 0;
