@@ -6,6 +6,8 @@ OPTS = -Wall -g -O3
 
 .SUFFIXES:.c .o
 
+OBJS = bed.o svg.o
+
 all: PileOMeth MBias
 
 .c.o:
@@ -14,11 +16,11 @@ all: PileOMeth MBias
 htslib: 
 	$(MAKE) -C htslib
 
-PileOMeth: htslib bed.o
+PileOMeth: htslib $(OBJS)
 	$(CC) $(OPTS) -Ihtslib -o PileOMeth PileOMeth.c bed.o htslib/libhts.a -lz -lpthread
 
-MBias: htslib svg.o
-	$(CC) $(OPTS) -Ihtslib -o MBias MBias.c svg.o htslib/libhts.a -lm -lz -lpthread
+MBias: htslib $(OBJS)
+	$(CC) $(OPTS) -Ihtslib -o MBias MBias.c $(OBJS) htslib/libhts.a -lm -lz -lpthread
 
 clean:
 	rm -f *.o PileOMeth MBias

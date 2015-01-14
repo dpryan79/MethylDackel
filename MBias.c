@@ -105,7 +105,8 @@ int updateMetrics(Config *config, const bam_pileup1_t *plp) {
 
 //This will need to be restructured to handle multiple input files
 int filter_func(void *data, bam1_t *b) {
-    int rv, NH;
+    int rv, NH, overlap;
+    static int32_t idxBED = 0;
     mplp_data *ldata = (mplp_data *) data;
     uint8_t *p;
 
@@ -125,6 +126,14 @@ int filter_func(void *data, bam1_t *b) {
         if(!ldata->config->keepSingleton && (b->core.flag & 0x9) == 0x9) continue; //Singleton
         if(!ldata->config->keepDiscordant && (b->core.flag & 0x3) == 0x1) continue; //Discordant
         if((b->core.flag & 0x9) == 0x1) b->core.flag |= 0x2; //Discordant pairs can cause double counts
+        if(ldata->config->bed) { //Prefilter reads overlapping a BED file (N.B., strand independent).
+            overlap = spanOverlapsBED(b->core.tid, b->core.pos, bam_endpos(b), ldata->config->bed, &idxBED);
+            if(overlap == 0) continue;
+            if(overlap < 0) {
+                rv = -1;
+                break;
+            }
+        }
         break;
     }
     return rv;
@@ -157,10 +166,12 @@ strandMeth *growStrandMeth(strandMeth *s, int32_t l) {
 void extractCalls(Config *config, char *opref, int SVG, int txt) {
     bam_hdr_t *hdr = sam_hdr_read(config->fp);
     bam_mplp_t iter;
-    int ret, tid, pos, i, seqlen, rv;
+    int ret, tid, pos, i, seqlen, rv, o = 0;
+    int beg0 = 0, end0 = 1u<<29;
     int strand;
     int n_plp; //This will need to be modified for multiple input files
     int ctid = -1; //The tid of the contig whose sequence is stored in "seq"
+    int idxBED = 0;
     const bam_pileup1_t **plp = NULL;
     char *seq = NULL, base;
     mplp_data *data = NULL;
@@ -190,6 +201,11 @@ void extractCalls(Config *config, char *opref, int SVG, int txt) {
     bam_mplp_init_overlaps(iter);
     bam_mplp_set_maxcnt(iter, config->maxDepth);
     while((ret = bam_mplp_auto(iter, &tid, &pos, &n_plp, plp)) > 0) {
+        //Do we need to process this position?
+        if (config->reg){
+            beg0 = data->iter->beg, end0 = data->iter->end;
+            if ((pos < beg0 || pos >= end0)) continue; // out of the region requested
+        }
         if(tid != ctid) {
             if(seq != NULL) free(seq);
             seq = faidx_fetch_seq(config->fai, hdr->target_name[tid], 0, faidx_seq_len(config->fai, hdr->target_name[tid]), &seqlen);
@@ -200,6 +216,11 @@ void extractCalls(Config *config, char *opref, int SVG, int txt) {
                 return;
             }
             ctid = tid;
+        }
+
+        if(config->bed) { //Handle -l
+            while((o = posOverlapsBED(tid, pos, config->bed, idxBED)) == -1) idxBED++;
+            if(o == 0) continue; //Wrong strand
         }
 
         if(isCpG(seq, pos, seqlen)) {
@@ -214,6 +235,7 @@ void extractCalls(Config *config, char *opref, int SVG, int txt) {
 
         base = *(seq+pos);
         for(i=0; i<n_plp; i++) {
+            if(config->bed) if(!readStrandOverlapsBED(plp[0][i].b, config->bed->region[idxBED])) continue;
             strand = getStrand((plp[0]+i)->b);
             if(strand & 1) {
                 if(base != 'C' && base != 'c') continue;
@@ -275,6 +297,13 @@ void usage(char *prog) {
 " -p INT           Minimum Phred threshold to include a base (default 10). This\n"
 "                  must be >0.\n"
 " -D INT Maximum per-base depth (default 2000)\n"
+" -r STR           Region string in which to extract methylation\n"
+" -l FILE          A BED file listing regions for inclusion. Note that unlike\n"
+"                  samtools mpileup, this option will utilize the strand column\n"
+"                  (column 6) if present. Thus, if a region has a '+' in this\n"
+"                  column, then only metrics from the top strand will be\n"
+"                  output. Note that the -r option can be used to limit the\n"
+"                  regions of -l.\n"
 " --keepDupes      By default, any alignment marked as a duplicate is ignored.\n"
 "                  This option causes them to be incorporated.\n"
 " --keepSingleton  By default, if only one read in a pair aligns (a singleton)\n"
@@ -320,13 +349,19 @@ int main(int argc, char *argv[]) {
         {"noSVG",        0, NULL,   8},
         {"help",         0, NULL, 'h'}
     };
-    while((c = getopt_long(argc, argv, "q:p:D:", lopts,NULL)) >= 0) {
+    while((c = getopt_long(argc, argv, "q:p:r:l:D:", lopts,NULL)) >= 0) {
         switch(c) {
         case 'h' :
             usage(argv[0]);
             return 0;
         case 'D' :
             config.maxDepth = atoi(optarg);
+            break;
+        case 'r':
+            config.reg = strdup(optarg);
+            break;
+        case 'l' :
+            config.bedName = optarg;
             break;
         case 1 :
             config.keepCpG = 0;
@@ -424,6 +459,7 @@ int main(int argc, char *argv[]) {
     hts_close(config.fp);
     fai_destroy(config.fai);
     hts_idx_destroy(config.bai);
+    if(config.reg) free(config.reg);
 
     return 0;
 }
