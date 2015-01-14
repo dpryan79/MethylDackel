@@ -125,7 +125,6 @@ int filter_func(void *data, bam1_t *b) {
         if(!ldata->config->keepSingleton && (b->core.flag & 0x9) == 0x9) continue; //Singleton
         if(!ldata->config->keepDiscordant && (b->core.flag & 0x3) == 0x1) continue; //Discordant
         if((b->core.flag & 0x9) == 0x1) b->core.flag |= 0x2; //Discordant pairs can cause double counts
-        if(b->core.tid != 0) rv = -1; //DEBUG
         break;
     }
     return rv;

@@ -29,15 +29,15 @@ double getMaxY(strandMeth *m) {
 
     for(i=0; i<m->l; i++) {
         if(m->meth1[i]+m->unmeth1[i]) {
-            val = CI(m->unmeth1[i], m->meth1[i], 0);
+            val = CI(m->unmeth1[i], m->meth1[i], 1);
             maximum = (val > maximum) ? val : maximum;
         }
         if(m->meth2[i]+m->unmeth2[i]) {
-            val = CI(m->unmeth2[i], m->meth2[i], 0);
+            val = CI(m->unmeth2[i], m->meth2[i], 1);
             maximum = (val > maximum) ? val : maximum;
         }
     }
-    maximum *= 1.05; //Allow some buffer
+    maximum += 0.03; //Allow some buffer
 
     //ceil() to nearest multiple of 0.05
     if(5*(((int)ceil(100*maximum))/5)-(int)ceil(100*maximum)) {
@@ -58,15 +58,15 @@ double getMinY(strandMeth *m) {
 
     for(i=0; i<m->l; i++) {
         if(m->meth1[i]+m->unmeth1[i]) {
-            val = CI(m->unmeth1[i], m->meth1[i], 1);
+            val = CI(m->unmeth1[i], m->meth1[i], 0);
             minimum = (val < minimum) ? val : minimum;
         }
         if(m->meth1[i]+m->unmeth1[i]) {
-            val = CI(m->unmeth1[i], m->meth1[i], 1);
+            val = CI(m->unmeth1[i], m->meth1[i], 0);
             minimum = (val < minimum) ? val : minimum;
         }
     }
-    minimum -= 0.05*minimum; //Allow some buffer
+    minimum -= 0.03; //Allow some buffer
 
     //floor() to nearest multiple of 0.05
     minimum = 0.01*(5*(((int) (100*minimum))/5));
@@ -128,7 +128,7 @@ double *getYTicks(double minY, double maxY, int *n) {
     double *o, span = maxY-minY;
     int i;
 
-    *n = (int) (1+span/0.05);
+    *n = (int) (1+ceil(span/0.05));
     if(span < 0.05) *n = 2; //Just show the bounds
 
     o = malloc(sizeof(double) * (*n));
@@ -175,7 +175,7 @@ void plotCI(FILE *of, int minX, strandMeth *m, int which, char *col, int buffer,
             fprintf(of, "  L %f %f\n", remapX(i+1, m->l, buffer,dim), remapY(val, minY, maxY, buffer, dim));
         }
     }
-    fprintf(of, "Z\" fill=\"%s\" fill-opacity=\"0.5\"/>\n", col);
+    fprintf(of, "Z\" fill=\"%s\" fill-opacity=\"0.2\"/>\n", col);
 }
 
 void plotVals(FILE *of, int minX, strandMeth *m, int which, char *col, int buffer, int dim, double minY, double maxY) {
@@ -204,6 +204,73 @@ void plotVals(FILE *of, int minX, strandMeth *m, int which, char *col, int buffe
     fprintf(of, "\" stroke=\"%s\" stroke-width=\"2\" fill-opacity=\"0\"/>\n", col);
 }
 
+//Determine inclusion threshold suggestions. The general algorithm is as follows:
+// (1) Get the average methylation of the middle 60% of the array
+// (2) Determine the min/max of the confidence intervals of the middle 60%
+// (3) Flag any point for exclusion if 
+//     (A) Its lower/upper CI is above/below #1
+//     (B) Its value is above/below #2
+//     (C) Its absolute difference from #1 is at least 0.05
+// (4) Moving from the middle of the array out, stop at the first found position matching the above
+// (5) If no position is found, the bounds are 0 (bounds are 1-based)
+void getThresholds(strandMeth *m, int which, int *lthresh, int *rthresh) {
+    uint32_t *meth, *umeth;
+    int i, total = 0, middle = m->l/2;
+    double average = 0.0, minCI = 1.0, maxCI = 0.0, tmp, tmp2;
+
+    if(which==1) {
+        meth = m->meth1;
+        umeth = m->unmeth1;
+    } else {
+        meth = m->meth2;
+        umeth = m->unmeth2;
+    }
+
+    //Step 1 & 2
+    for(i=(int) (0.2*m->l); i<=(int) (0.8*m->l); i++) {
+        if(meth[i] || umeth[i]) {
+            total++;
+            average += ((double) meth[i])/((double)(meth[i]+umeth[i]));
+            tmp = CI(umeth[i], meth[i], 1);
+            if(minCI > tmp) minCI = tmp;
+            tmp = CI(umeth[i], meth[i], 0);
+            if(maxCI < tmp) maxCI = tmp;
+        }
+    }
+    if(total) average /= total;
+    else {
+        *lthresh = 0;
+        *rthresh = 0;
+         return;
+    }
+
+    //lthresh
+    for(i=middle; i>=0; i--) {
+        if(meth[i] || umeth[i]) {
+            tmp = ((double) meth[i])/((double)(meth[i]+umeth[i]));
+            tmp2 = CI(umeth[i], meth[i], 1);
+            if(tmp2 < average && tmp < minCI && fabs(tmp-average) > 0.05) break;
+            tmp2 = CI(umeth[i], meth[i], 0);
+            if(tmp2 > average && tmp > maxCI && fabs(tmp-average) > 0.05) break;
+        }
+    }
+    if(i>=0) *lthresh = i+2;
+    else *lthresh = 0;
+
+    //rthresh
+    for(i=middle+1; i<m->l; i++) {
+        if(meth[i] || umeth[i]) {
+            tmp = ((double) meth[i])/((double)(meth[i]+umeth[i]));
+            tmp2 = CI(umeth[i], meth[i], 1);
+            if(tmp2 < average && tmp < minCI && fabs(tmp-average) > 0.05) break;
+            tmp2 = CI(umeth[i], meth[i], 0);
+            if(tmp2 > average && tmp > maxCI && fabs(tmp-average) > 0.05) break;
+        }
+    }
+    if(i<m->l) *rthresh = i;
+    else *rthresh = 0;
+}
+
 void makeSVGs(char *opref, strandMeth **meths) {
     double minY = 1.0, maxY = 0.0;
     int minX1 = -1, minX2 = -1, maxX = 0, hasRead1 = 0, hasRead2 = 0;
@@ -212,9 +279,12 @@ void makeSVGs(char *opref, strandMeth **meths) {
     char *titles[4] = {"Original Top", "Original Bottom",
                        "Complementary to the Original Top", "Complementary to the Original Bottom"};
     char *abbrevs[4] = {"OT", "OB", "CTOT", "CTOB"};
+    char *col1 = "rgb(248,118,109)";
+    char *col2 = "rgb(0,191,196)";
     FILE *of;
     double *yTicks;
-    int *xTicks;
+    int *xTicks, lthresh1, lthresh2, rthresh1, rthresh2;
+    int alreadyPrinting = 0;
 
     for(i=0; i<4; i++) {
         if(meths[i]->l) {
@@ -224,7 +294,7 @@ void makeSVGs(char *opref, strandMeth **meths) {
             minX1 = getMinX(meths[i], 1);
             minX2 = getMinX(meths[i], 2);
             maxX = getMaxX(meths[i]);
-            xTicks = getXTicks(maxX, &nXTicks);
+            xTicks = getXTicks(maxX+1, &nXTicks);
             yTicks = getYTicks(minY, maxY, &nYTicks);
 
             //Basic plot setup
@@ -241,8 +311,8 @@ void makeSVGs(char *opref, strandMeth **meths) {
             fprintf(of,"<line x1=\"%i\" y1=\"%i\" x2=\"%i\" y2=\"%i\" stroke=\"black\" />\n", buffer, buffer+dim, buffer+dim, buffer+dim);
 
             //Ticks and labels
-            fprintf(of,"<text x=\"15\" y=\"%i\" transform=\"rotate(270 15, %i)\" text-anchor=\"middle\" dominant-baseline=\"text-before-edge\">%% Methylation</text>\n", buffer+(dim>>1), buffer+(dim>>1));
-            fprintf(of,"<text x=\"%i\" y=\"%i\" text-anchor=\"middle\">Position</text>\n", buffer+(dim>>1), buffer+dim+40);
+            fprintf(of,"<text x=\"15\" y=\"%i\" transform=\"rotate(270 15, %i)\" text-anchor=\"middle\" dominant-baseline=\"text-before-edge\">Methylation %%</text>\n", buffer+(dim>>1), buffer+(dim>>1));
+            fprintf(of,"<text x=\"%i\" y=\"%i\" text-anchor=\"middle\">Position along mapped read (5'->3' of + strand)</text>\n", buffer+(dim>>1), buffer+dim+40);
             fprintf(of,"<line x1=\"%i\" y1=\"%i\" x2=\"%i\" y2=\"%i\" stroke=\"black\" />\n", \
                 buffer, buffer+dim, buffer, buffer+dim+5);
             fprintf(of,"<text x=\"%i\" y=\"%i\" text-anchor=\"middle\">%i</text>\n", \
@@ -270,23 +340,44 @@ void makeSVGs(char *opref, strandMeth **meths) {
             }
 
             //Draw the lines
-            if(hasRead1) plotCI(of, minX1, meths[i], 1, "rgb(248,118,109)", buffer, dim, minY, maxY);
-            if(hasRead2) plotCI(of, minX2, meths[i], 2, "rgb(0,191,196)", buffer, dim, minY, maxY);
-            if(hasRead1) plotVals(of, minX1, meths[i], 1, "rgb(248,118,109)", buffer, dim, minY, maxY);
-            if(hasRead2) plotVals(of, minX2, meths[i], 2, "rgb(0,191,196)", buffer, dim, minY, maxY);
+            if(hasRead1) plotCI(of, minX1, meths[i], 1, col1, buffer, dim, minY, maxY);
+            if(hasRead2) plotCI(of, minX2, meths[i], 2, col2, buffer, dim, minY, maxY);
+            if(hasRead1) plotVals(of, minX1, meths[i], 1, col1, buffer, dim, minY, maxY);
+            if(hasRead2) plotVals(of, minX2, meths[i], 2, col2, buffer, dim, minY, maxY);
+
+            //Get cutting threshold suggestions
+            getThresholds(meths[i], 1, &lthresh1, &rthresh1);
+            getThresholds(meths[i], 2, &lthresh2, &rthresh2);
+            fprintf(of, "<text x=\"%i\" y=\"%i\" text-anchor=\"end\">--%s %i,%i,%i,%i</text>\n", \
+                2*buffer+dim-10, 2*buffer+dim-10, abbrevs[i], lthresh1, rthresh1, lthresh2, rthresh2);
+            if(lthresh1) fprintf(of, "<line x1=\"%f\" y1=\"%i\" x2=\"%f\" y2=\"%i\" stroke-dasharray=\"5 1\" stroke=\"%s\" stroke-width=\"1\" />\n", \
+                remapX(lthresh1, maxX, buffer, dim), dim+buffer, remapX(lthresh1, maxX, buffer, dim), buffer, col1);
+            if(rthresh1) fprintf(of, "<line x1=\"%f\" y1=\"%i\" x2=\"%f\" y2=\"%i\" stroke-dasharray=\"5 1\" stroke=\"%s\" stroke-width=\"1\" />\n", \
+                remapX(rthresh1, maxX, buffer, dim), dim+buffer, remapX(rthresh1, maxX, buffer, dim), buffer, col1);
+            if(lthresh2) fprintf(of, "<line x1=\"%f\" y1=\"%i\" x2=\"%f\" y2=\"%i\" stroke-dasharray=\"5 1\" stroke=\"%s\" stroke-width=\"1\" />\n", \
+                remapX(lthresh2, maxX, buffer, dim), dim+buffer, remapX(lthresh2, maxX, buffer, dim), buffer, col2);
+            if(rthresh2) fprintf(of, "<line x1=\"%f\" y1=\"%i\" x2=\"%f\" y2=\"%i\" stroke-dasharray=\"5 1\" stroke=\"%s\" stroke-width=\"1\" />\n", \
+                remapX(rthresh2, maxX, buffer, dim), dim+buffer, remapX(rthresh2, maxX, buffer, dim), buffer, col2);
 
             //Add some legend boxes on the right
             if(hasRead1) {
-                fprintf(of, "<rect x=\"%i\" y=\"%i\" width=\"20\" height=\"20\" fill=\"rgb(248,118,109)\" />\n", dim+buffer+10, (dim>>1)+buffer-20);
-                fprintf(of, "<text x=\"%i\" y=\"%i\" text-anchor=\"left\" dominant-baseline=\"middle\">#1</text>\n", dim+buffer+35, (dim>>1)+buffer-10);
+                fprintf(of, "<rect x=\"%i\" y=\"%i\" width=\"20\" height=\"20\" fill=\"%s\" />\n", dim+buffer+10, (dim>>1)+buffer-20, col1);
+                fprintf(of, "<text x=\"%i\" y=\"%i\" text-anchor=\"start\" dominant-baseline=\"middle\">#1</text>\n", dim+buffer+35, (dim>>1)+buffer-10);
             }
             if(hasRead2) {
-                fprintf(of, "<rect x=\"%i\" y=\"%i\" width=\"20\" height=\"20\" fill=\"rgb(0,191,196)\" />\n", dim+buffer+10, (dim>>1)+buffer);
-                fprintf(of, "<text x=\"%i\" y=\"%i\" text-anchor=\"left\" dominant-baseline=\"middle\">#1</text>\n", dim+buffer+35, (dim>>1)+buffer+10);
+                fprintf(of, "<rect x=\"%i\" y=\"%i\" width=\"20\" height=\"20\" fill=\"%s\" />\n", dim+buffer+10, (dim>>1)+buffer, col2);
+                fprintf(of, "<text x=\"%i\" y=\"%i\" text-anchor=\"start\" dominant-baseline=\"middle\">#2</text>\n", dim+buffer+35, (dim>>1)+buffer+10);
             }
 
             //Finish the image
             fprintf(of, "</svg>\n");
+
+            //Print the trimming options to stderr if applicable
+            if(lthresh1 + rthresh1 + lthresh2 + rthresh2) {
+                if(!alreadyPrinting) fprintf(stderr, "Recommended inclusion options:");
+                fprintf(stderr, " --%s %i,%i,%i,%i", abbrevs[i], lthresh1,rthresh1,lthresh2,rthresh2);
+                alreadyPrinting=1;
+            }
 
             //Clean up
             fclose(of);
@@ -296,6 +387,7 @@ void makeSVGs(char *opref, strandMeth **meths) {
             hasRead2 = 0;
         }
     }
+    if(alreadyPrinting) fprintf(stderr, "\n");
     free(oname);
 }
 
