@@ -193,7 +193,6 @@ void plotVals(FILE *of, int minX, strandMeth *m, int which, char *col, int buffe
     assert(minX>=0);
 
     //Start the path
-    fprintf(stderr, "[plotVals] minX is %i\n", minX);
     val = meth[minX]/((double) (meth[minX]+umeth[minX]));
     fprintf(of, "<path d=\"M %f %f\n", remapX(minX+1, m->l, buffer,dim), remapY(val, minY, maxY, buffer, dim));
     for(i=minX+1; i<m->l; i++) {
