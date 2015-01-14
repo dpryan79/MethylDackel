@@ -79,9 +79,26 @@ typedef struct {
 */
 int getStrand(bam1_t *b);
 
+/*! @typedef
+ @abstract	Positional methylation metrics for a single strand
+ @field l	Current length
+ @field m	Maximum length
+ @field unmeth	Number of unmethylated observations for each position.
+ @field meth	Number of methylated observations for each position.
+*/
+typedef struct {
+    int32_t l, m;
+    uint32_t *unmeth1, *unmeth2;
+    uint32_t *meth1, *meth2;
+} strandMeth;
+
+//bed.c
 int posOverlapsBED(int32_t tid, int32_t pos, bedRegions *regions, int idxBED);
 int spanOverlapsBED(int32_t tid, int32_t start, int32_t end, bedRegions *regions, int *idx);
 int readStrandOverlapsBED(bam1_t *b, bedRegion region);
 void sortBED(bedRegions *regions);
 void destroyBED(bedRegions *regions);
 bedRegions *parseBED(char *fn, bam_hdr_t *hdr);
+
+//svg.c
+void makeSVGs(char *opref, strandMeth **meths);
