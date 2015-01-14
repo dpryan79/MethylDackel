@@ -155,7 +155,7 @@ strandMeth *growStrandMeth(strandMeth *s, int32_t l) {
     return s;
 }
 
-void extractCalls(Config *config, char *opref) {
+void extractCalls(Config *config, char *opref, int SVG, int txt) {
     bam_hdr_t *hdr = sam_hdr_read(config->fp);
     bam_mplp_t iter;
     int ret, tid, pos, i, seqlen, rv;
@@ -248,7 +248,8 @@ void extractCalls(Config *config, char *opref) {
     }
 
     //Report some output
-    makeSVGs(opref, meths);
+    if(SVG) makeSVGs(opref, meths);
+    if(txt) makeTXT(meths);
 
     //Clean up
     bam_hdr_destroy(hdr);
@@ -283,6 +284,11 @@ void usage(char *prog) {
 "                  unset in the FLAG field are ignored. Note that the definition\n"
 "                  of concordant and discordant is based on your aligner\n"
 "                  settings.\n"
+" --txt            Output tab separated metrics to the screen. These can be\n"
+"                  imported into R or another program for manual plotting and\n"
+"                  analysis.\n"
+" --noSVG          Don't produce the SVG files. This option implies --txt. Note\n"
+"                  that an output prefix is no longer required with this option.\n"
 " --noCpG          Do not output CpG methylation metrics\n"
 " --CHG            Output CHG methylation metrics\n"
 " --CHH            Output CHH methylation metrics\n");
@@ -290,7 +296,7 @@ void usage(char *prog) {
 
 int main(int argc, char *argv[]) {
     char *opref = NULL;
-    int c;
+    int c, SVG = 1, txt = 0;
     Config config;
 
     //Defaults
@@ -311,6 +317,8 @@ int main(int argc, char *argv[]) {
         {"keepDupes",    0, NULL,   4},
         {"keepSingleton",  0, NULL,   5},
         {"keepDiscordant", 0, NULL,   6},
+        {"txt",          0, NULL,   7},
+        {"noSVG",        0, NULL,   8},
         {"help",         0, NULL, 'h'}
     };
     while((c = getopt_long(argc, argv, "q:p:D:", lopts,NULL)) >= 0) {
@@ -339,6 +347,13 @@ int main(int argc, char *argv[]) {
         case 6 :
             config.keepDiscordant = 1;
             break;
+        case 7 :
+            txt = 1;
+            break;
+        case 8 :
+            SVG = 0;
+            txt = 1;
+            break;
         case 'q' :
             config.minMapq = atoi(optarg);
             break;
@@ -356,7 +371,7 @@ int main(int argc, char *argv[]) {
         usage(argv[0]);
         return 0;
     }
-    if(argc-optind != 3) {
+    if((SVG && argc-optind != 3) || (!SVG && argc-optind < 2)) {
         fprintf(stderr, "You must supply a reference genome in fasta format, an input BAM file, and an output prefix!!!\n");
         usage(argv[0]);
         return -1;
@@ -401,10 +416,10 @@ int main(int argc, char *argv[]) {
     }
 
     //Output files (this needs to be filled in)
-    opref = argv[optind+2];
+    if(SVG) opref = argv[optind+2];
 
     //Run the pileup
-    extractCalls(&config, opref);
+    extractCalls(&config, opref, SVG, txt);
 
     //Close things up
     hts_close(config.fp);

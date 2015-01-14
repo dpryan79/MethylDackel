@@ -207,7 +207,7 @@ void plotVals(FILE *of, int minX, strandMeth *m, int which, char *col, int buffe
 void makeSVGs(char *opref, strandMeth **meths) {
     double minY = 1.0, maxY = 0.0;
     int minX1 = -1, minX2 = -1, maxX = 0, hasRead1 = 0, hasRead2 = 0;
-    int i, j, buffer = 40, dim = 500, nXTicks, nYTicks;
+    int i, j, buffer = 80, dim = 500, nXTicks, nYTicks;
     char *oname = malloc(sizeof(char) *(strlen(opref)+strlen("_CTOT.svg ")));
     char *titles[4] = {"Original Top", "Original Bottom",
                        "Complementary to the Original Top", "Complementary to the Original Bottom"};
@@ -241,8 +241,8 @@ void makeSVGs(char *opref, strandMeth **meths) {
             fprintf(of,"<line x1=\"%i\" y1=\"%i\" x2=\"%i\" y2=\"%i\" stroke=\"black\" />\n", buffer, buffer+dim, buffer+dim, buffer+dim);
 
             //Ticks and labels
-            fprintf(of,"<text x=\"10\" y=\"%i\" transform=\"rotate(270 10, %i)\" text-anchor=\"middle\" dominant-baseline=\"text-before-edge\">%% Methylation</text>\n", buffer+(dim>>1), buffer+(dim>>1));
-            fprintf(of,"<text x=\"%i\" y=\"%i\" text-anchor=\"middle\">Position</text>\n", buffer+(dim>>1), 2*buffer+dim);
+            fprintf(of,"<text x=\"15\" y=\"%i\" transform=\"rotate(270 15, %i)\" text-anchor=\"middle\" dominant-baseline=\"text-before-edge\">%% Methylation</text>\n", buffer+(dim>>1), buffer+(dim>>1));
+            fprintf(of,"<text x=\"%i\" y=\"%i\" text-anchor=\"middle\">Position</text>\n", buffer+(dim>>1), buffer+dim+40);
             fprintf(of,"<line x1=\"%i\" y1=\"%i\" x2=\"%i\" y2=\"%i\" stroke=\"black\" />\n", \
                 buffer, buffer+dim, buffer, buffer+dim+5);
             fprintf(of,"<text x=\"%i\" y=\"%i\" text-anchor=\"middle\">%i</text>\n", \
@@ -255,13 +255,11 @@ void makeSVGs(char *opref, strandMeth **meths) {
                 fprintf(of,"<text x=\"%f\" y=\"%i\" text-anchor=\"middle\">%i</text>\n", \
                     remapX(xTicks[j], maxX, buffer, dim), buffer+dim+20, xTicks[j]);
             }
-            fprintf(of,"<text x=\"%i\" y=\"%i\" text-anchor=\"middle\" dominant-baseline=\"middle\">%g</text>\n", \
-                buffer-20, buffer+dim, minY);
-            fprintf(of,"<text x=\"%i\" y=\"%i\" text-anchor=\"middle\" dominant-baseline=\"middle\">%g</text>\n", \
-                buffer-20, buffer, maxY);
             for(j=0; j<nYTicks; j++) {
                 fprintf(of,"<line x1=\"%i\" y1=\"%f\" x2=\"%i\" y2=\"%f\" stroke=\"black\" />\n", \
                     buffer, remapY(yTicks[j], minY, maxY, buffer, dim), buffer-5, remapY(yTicks[j], minY, maxY, buffer, dim));
+                fprintf(of,"<text x=\"%i\" y=\"%f\" text-anchor=\"middle\" dominant-baseline=\"middle\">%4.2f</text>\n", \
+                    buffer-25, remapY(yTicks[j], minY, maxY, buffer, dim), yTicks[j]);
             }
 
             //Values
@@ -277,6 +275,16 @@ void makeSVGs(char *opref, strandMeth **meths) {
             if(hasRead1) plotVals(of, minX1, meths[i], 1, "rgb(248,118,109)", buffer, dim, minY, maxY);
             if(hasRead2) plotVals(of, minX2, meths[i], 2, "rgb(0,191,196)", buffer, dim, minY, maxY);
 
+            //Add some legend boxes on the right
+            if(hasRead1) {
+                fprintf(of, "<rect x=\"%i\" y=\"%i\" width=\"20\" height=\"20\" fill=\"rgb(248,118,109)\" />\n", dim+buffer+10, (dim>>1)+buffer-20);
+                fprintf(of, "<text x=\"%i\" y=\"%i\" text-anchor=\"left\" dominant-baseline=\"middle\">#1</text>\n", dim+buffer+35, (dim>>1)+buffer-10);
+            }
+            if(hasRead2) {
+                fprintf(of, "<rect x=\"%i\" y=\"%i\" width=\"20\" height=\"20\" fill=\"rgb(0,191,196)\" />\n", dim+buffer+10, (dim>>1)+buffer);
+                fprintf(of, "<text x=\"%i\" y=\"%i\" text-anchor=\"left\" dominant-baseline=\"middle\">#1</text>\n", dim+buffer+35, (dim>>1)+buffer+10);
+            }
+
             //Finish the image
             fprintf(of, "</svg>\n");
 
@@ -289,4 +297,21 @@ void makeSVGs(char *opref, strandMeth **meths) {
         }
     }
     free(oname);
+}
+
+void makeTXT(strandMeth **m) {
+    char *abbrevs[4] = {"OT", "OB", "CTOT", "CTOB"};
+    int i, j;
+
+    printf("Strand\tRead\tPosition\tnMethylated\tnUnmethylated\n");
+    for(i=0; i<4; i++) {
+        if(m[i]->l) {
+            for(j=0; j<m[i]->l; j++) {
+                if(m[i]->meth1[j] || m[i]->unmeth1[j])
+                    printf("%s\t1\t%i\t%"PRIu32"\t%"PRIu32"\n", abbrevs[i], j+1, m[i]->meth1[j], m[i]->unmeth1[j]);
+                if(m[i]->meth2[j] || m[i]->unmeth2[j])
+                    printf("%s\t2\t%i\t%"PRIu32"\t%"PRIu32"\n", abbrevs[i], j+1, m[i]->meth2[j], m[i]->unmeth2[j]);
+            }
+        }
+    }
 }
