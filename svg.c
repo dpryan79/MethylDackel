@@ -91,8 +91,14 @@ int getMinX(strandMeth *m, int which) {
 int getMaxX(strandMeth *m) {
     int i;
     for(i=m->l-1; i>=0; i--) {
-        if(m->unmeth1[i]+m->meth1[i]) return i+1;
-        if(m->unmeth2[i]+m->meth2[i]) return i+1;
+        if(m->unmeth1[i]+m->meth1[i]) break;
+        if(m->unmeth2[i]+m->meth2[i]) break;
+    }
+    if(i>=0) {
+        i++;
+        //Round to the next multiple of 5
+        i += 5-(i%5);
+        return i;
     }
     fprintf(stderr, "[getMaxX] There were apparently no methylation calls for this strand!.\n");
     assert(1==0);
@@ -271,7 +277,11 @@ void getThresholds(strandMeth *m, int which, int *lthresh, int *rthresh) {
     else *rthresh = 0;
 }
 
-void makeSVGs(char *opref, strandMeth **meths) {
+//"which" denotes where the methylation metrics came from:
+// bit 0: CpG
+// bit 1: CHG
+// bit 2: CHH
+void makeSVGs(char *opref, strandMeth **meths, int which) {
     double minY = 1.0, maxY = 0.0;
     int minX1 = -1, minX2 = -1, maxX = 0, hasRead1 = 0, hasRead2 = 0;
     int i, j, buffer = 80, dim = 500, nXTicks, nYTicks;
@@ -284,7 +294,7 @@ void makeSVGs(char *opref, strandMeth **meths) {
     FILE *of;
     double *yTicks;
     int *xTicks, lthresh1, lthresh2, rthresh1, rthresh2;
-    int alreadyPrinting = 0;
+    int alreadyPrinting = 0, doingLabel = 0;
 
     for(i=0; i<4; i++) {
         if(meths[i]->l) {
@@ -294,7 +304,7 @@ void makeSVGs(char *opref, strandMeth **meths) {
             minX1 = getMinX(meths[i], 1);
             minX2 = getMinX(meths[i], 2);
             maxX = getMaxX(meths[i]);
-            xTicks = getXTicks(maxX+1, &nXTicks);
+            xTicks = getXTicks(maxX, &nXTicks);
             yTicks = getYTicks(minY, maxY, &nYTicks);
 
             //Basic plot setup
@@ -311,7 +321,24 @@ void makeSVGs(char *opref, strandMeth **meths) {
             fprintf(of,"<line x1=\"%i\" y1=\"%i\" x2=\"%i\" y2=\"%i\" stroke=\"black\" />\n", buffer, buffer+dim, buffer+dim, buffer+dim);
 
             //Ticks and labels
-            fprintf(of,"<text x=\"15\" y=\"%i\" transform=\"rotate(270 15, %i)\" text-anchor=\"middle\" dominant-baseline=\"text-before-edge\">Methylation %%</text>\n", buffer+(dim>>1), buffer+(dim>>1));
+            fprintf(of,"<text x=\"15\" y=\"%i\" transform=\"rotate(270 15, %i)\" text-anchor=\"middle\" dominant-baseline=\"text-before-edge\">", buffer+(dim>>1), buffer+(dim>>1));
+            doingLabel = 0;
+            if(which&1) {
+                doingLabel = 1;
+                fprintf(of, "CpG");
+            }
+            if(which&2) {
+                if(doingLabel) fprintf(of, "/CHG");
+                else fprintf(of, "CHG");
+                doingLabel = 1;
+            }
+            if(which&4) {
+                if(doingLabel) fprintf(of, "/CHH");
+                else fprintf(of, "CHH");
+                doingLabel = 1;
+            }
+            if(doingLabel) fprintf(of, " ");
+            fprintf(of, "Methylation %%</text>\n");
             fprintf(of,"<text x=\"%i\" y=\"%i\" text-anchor=\"middle\">Position along mapped read (5'->3' of + strand)</text>\n", buffer+(dim>>1), buffer+dim+40);
             fprintf(of,"<line x1=\"%i\" y1=\"%i\" x2=\"%i\" y2=\"%i\" stroke=\"black\" />\n", \
                 buffer, buffer+dim, buffer, buffer+dim+5);
@@ -348,16 +375,18 @@ void makeSVGs(char *opref, strandMeth **meths) {
             //Get cutting threshold suggestions
             getThresholds(meths[i], 1, &lthresh1, &rthresh1);
             getThresholds(meths[i], 2, &lthresh2, &rthresh2);
-            fprintf(of, "<text x=\"%i\" y=\"%i\" text-anchor=\"end\">--%s %i,%i,%i,%i</text>\n", \
-                2*buffer+dim-10, 2*buffer+dim-10, abbrevs[i], lthresh1, rthresh1, lthresh2, rthresh2);
-            if(lthresh1) fprintf(of, "<line x1=\"%f\" y1=\"%i\" x2=\"%f\" y2=\"%i\" stroke-dasharray=\"5 1\" stroke=\"%s\" stroke-width=\"1\" />\n", \
-                remapX(lthresh1, maxX, buffer, dim), dim+buffer, remapX(lthresh1, maxX, buffer, dim), buffer, col1);
-            if(rthresh1) fprintf(of, "<line x1=\"%f\" y1=\"%i\" x2=\"%f\" y2=\"%i\" stroke-dasharray=\"5 1\" stroke=\"%s\" stroke-width=\"1\" />\n", \
-                remapX(rthresh1, maxX, buffer, dim), dim+buffer, remapX(rthresh1, maxX, buffer, dim), buffer, col1);
-            if(lthresh2) fprintf(of, "<line x1=\"%f\" y1=\"%i\" x2=\"%f\" y2=\"%i\" stroke-dasharray=\"5 1\" stroke=\"%s\" stroke-width=\"1\" />\n", \
-                remapX(lthresh2, maxX, buffer, dim), dim+buffer, remapX(lthresh2, maxX, buffer, dim), buffer, col2);
-            if(rthresh2) fprintf(of, "<line x1=\"%f\" y1=\"%i\" x2=\"%f\" y2=\"%i\" stroke-dasharray=\"5 1\" stroke=\"%s\" stroke-width=\"1\" />\n", \
-                remapX(rthresh2, maxX, buffer, dim), dim+buffer, remapX(rthresh2, maxX, buffer, dim), buffer, col2);
+            if(lthresh1+lthresh2+rthresh1+rthresh2) {
+                fprintf(of, "<text x=\"%i\" y=\"%i\" text-anchor=\"end\">--%s %i,%i,%i,%i</text>\n", \
+                    2*buffer+dim-10, 2*buffer+dim-10, abbrevs[i], lthresh1, rthresh1, lthresh2, rthresh2);
+                if(lthresh1) fprintf(of, "<line x1=\"%f\" y1=\"%i\" x2=\"%f\" y2=\"%i\" stroke-dasharray=\"5 1\" stroke=\"%s\" stroke-width=\"1\" />\n", \
+                    remapX(lthresh1, maxX, buffer, dim), dim+buffer, remapX(lthresh1, maxX, buffer, dim), buffer, col1);
+                if(rthresh1) fprintf(of, "<line x1=\"%f\" y1=\"%i\" x2=\"%f\" y2=\"%i\" stroke-dasharray=\"5 1\" stroke=\"%s\" stroke-width=\"1\" />\n", \
+                    remapX(rthresh1, maxX, buffer, dim), dim+buffer, remapX(rthresh1, maxX, buffer, dim), buffer, col1);
+                if(lthresh2) fprintf(of, "<line x1=\"%f\" y1=\"%i\" x2=\"%f\" y2=\"%i\" stroke-dasharray=\"5 1\" stroke=\"%s\" stroke-width=\"1\" />\n", \
+                    remapX(lthresh2, maxX, buffer, dim), dim+buffer, remapX(lthresh2, maxX, buffer, dim), buffer, col2);
+                if(rthresh2) fprintf(of, "<line x1=\"%f\" y1=\"%i\" x2=\"%f\" y2=\"%i\" stroke-dasharray=\"5 1\" stroke=\"%s\" stroke-width=\"1\" />\n", \
+                    remapX(rthresh2, maxX, buffer, dim), dim+buffer, remapX(rthresh2, maxX, buffer, dim), buffer, col2);
+            }
 
             //Add some legend boxes on the right
             if(hasRead1) {
@@ -374,7 +403,7 @@ void makeSVGs(char *opref, strandMeth **meths) {
 
             //Print the trimming options to stderr if applicable
             if(lthresh1 + rthresh1 + lthresh2 + rthresh2) {
-                if(!alreadyPrinting) fprintf(stderr, "Recommended inclusion options:");
+                if(!alreadyPrinting) fprintf(stderr, "Suggested inclusion options:");
                 fprintf(stderr, " --%s %i,%i,%i,%i", abbrevs[i], lthresh1,rthresh1,lthresh2,rthresh2);
                 alreadyPrinting=1;
             }

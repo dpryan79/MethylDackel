@@ -280,7 +280,7 @@ void extractCalls(Config *config, char *opref, int SVG, int txt) {
     }
 
     //Report some output
-    if(SVG) makeSVGs(opref, meths);
+    if(SVG) makeSVGs(opref, meths, config->keepCpG + 2*config->keepCHG + 4*config->keepCHH);
     if(txt) makeTXT(meths);
 
     //Clean up
