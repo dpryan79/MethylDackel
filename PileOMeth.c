@@ -8,6 +8,7 @@
 #include <inttypes.h>
 #include <assert.h>
 #include <errno.h>
+#include <limits.h>
 #include "PileOMeth.h"
 
 inline int isCpG(char *seq, int pos, int seqlen) {
