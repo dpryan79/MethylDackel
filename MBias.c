@@ -189,6 +189,17 @@ void extractCalls(Config *config, char *opref, int SVG, int txt) {
     }
     data->config = config;
     data->hdr = hdr;
+    if (config->reg) {
+        if((data->iter = sam_itr_querys(config->bai, hdr, config->reg)) == 0){
+            fprintf(stderr, "failed to parse regions %s", config->reg);
+            return;
+        }
+    }
+    if(config->bedName) {
+        config->bed = parseBED(config->bedName, hdr);
+        if(config->bed == NULL) return;
+    }
+
 
     plp = calloc(1, sizeof(bam_pileup1_t *)); //This will have to be modified for multiple input files
     if(plp == NULL) {
