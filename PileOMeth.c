@@ -7,6 +7,7 @@
 #include <string.h>
 #include <inttypes.h>
 #include <assert.h>
+#include <errno.h>
 #include "PileOMeth.h"
 
 inline int isCpG(char *seq, int pos, int seqlen) {
@@ -145,7 +146,7 @@ void extractCalls(Config *config) {
     int beg0 = 0, end0 = 1u<<29;
     int n_plp; //This will need to be modified for multiple input files
     int ctid = -1; //The tid of the contig whose sequence is stored in "seq"
-    int idxBED = 0;
+    int idxBED = 0, strand;
     uint32_t nmethyl, nunmethyl;
     const bam_pileup1_t **plp = NULL;
     char *seq = NULL, base;
@@ -219,10 +220,19 @@ void extractCalls(Config *config) {
         base = *(seq+pos);
         for(i=0; i<n_plp; i++) {
             if(config->bed) if(!readStrandOverlapsBED(plp[0][i].b, config->bed->region[idxBED])) continue;
-            if(getStrand((plp[0]+i)->b) & 1) {
+            strand = getStrand((plp[0]+i)->b);
+            if(strand & 1) {
                 if(base != 'C' && base != 'c') continue;
             } else {
                 if(base != 'G' && base != 'g') continue;
+            }
+            //Inclusion bounds
+            if(!((plp[i]+i)->b->core.flag & BAM_FREAD2)) {
+                if(config->bounds[4*i]) if((plp[i]+i)->qpos <= config->bounds[4*i]) continue;
+                if(config->bounds[4*i+1]) if((plp[i]+i)->qpos >= config->bounds[4*i+1]) continue;
+            } else {
+                if(config->bounds[4*i+2]) if((plp[i]+i)->qpos <= config->bounds[4*i+2]) continue;
+                if(config->bounds[4*i+3]) if((plp[i]+i)->qpos >= config->bounds[4*i+3]) continue;
             }
             rv = updateMetrics(config, plp[0]+i);
             if(rv > 0) nmethyl++;
@@ -239,6 +249,33 @@ void extractCalls(Config *config) {
     free(data);
     free(plp);
     if(seq != NULL) free(seq);
+}
+
+void parseBounds(char *s2, int *vals, int mult) {
+    char *p, *s = strdup(s2), *end;
+    int i, v;
+
+    p = strtok(s, ",");
+    v = strtol(p, &end, 10);
+    if((errno == ERANGE && (v == LONG_MAX || v == LONG_MIN)) || (errno != 0 && v == 0) || end == p) v = -1;
+    if(v>=0) vals[4*mult] = v;
+    else {
+        fprintf(stderr, "Invalid bounds string, %s\n", s2);
+        free(s);
+        return;
+    }
+    for(i=1; i<4; i++) {
+        p = strtok(NULL, ",");
+        v = strtol(p, &end, 10);
+        if((errno == ERANGE && (v == LONG_MAX || v == LONG_MIN)) || (errno != 0 && v == 0) || end == p) v = -1;
+        if(v>=0) vals[4*mult+i] = v;
+        else {
+            fprintf(stderr, "Invalid bounds string, %s\n", s2);
+            free(s);
+            return;
+        }
+    }
+    free(s);
 }
 
 void usage(char *prog) {
@@ -269,12 +306,28 @@ void usage(char *prog) {
 "                  settings.\n"
 " --noCpG          Do not output CpG methylation metrics\n"
 " --CHG            Output CHG methylation metrics\n"
-" --CHH            Output CHH methylation metrics\n");
+" --CHH            Output CHH methylation metrics\n"
+" --OT INT,INT,INT,INT Inclusion bounds for methylation calls from reads/pairs\n"
+"                  origination from the original top strand. Suggested values can\n"
+"                  be obtained from the MBias program. Each integer represents a\n"
+"                  1-based position on a read. For example --OT A,B,C,D\n"
+"                  translates to, \"Include calls at positions from A through B\n"
+"                  on read #1 and C through D on read #2\". If a 0 is used a any\n"
+"                  position then that is translated to mean start/end of the\n"
+"                  alignment, as appropriate. For example, --OT 5,0,0,0 would\n"
+"                  include all but the first 4 bases on read #1. Users are\n"
+"                  strongly advised to consult a methylation bias plot, for\n"
+"                  example by using the MBias program.\n"
+" --OB INT,INT,INT,INT\n"
+" --CTOT INT,INT,INT,INT\n"
+" --CTOB INT,INT,INT,INT As with --OT, but for the original bottom, complementary\n"
+"                  to the original top, and complementary to the original bottom\n"
+"                  strands, respectively.\n");
 }
 
 int main(int argc, char *argv[]) {
     char *opref = NULL, *oname, *p;
-    int c;
+    int c, i;
     Config config;
 
     //Defaults
@@ -288,6 +341,7 @@ int main(int argc, char *argv[]) {
     config.reg = NULL;
     config.bedName = NULL;
     config.bed = NULL;
+    for(i=0; i<16; i++) config.bounds[i] = 0;
 
     static struct option lopts[] = {
         {"opref",        1, NULL, 'o'},
@@ -295,8 +349,12 @@ int main(int argc, char *argv[]) {
         {"CHG",          0, NULL,   2},
         {"CHH",          0, NULL,   3},
         {"keepDupes",    0, NULL,   4},
-        {"keepSingleton",  0, NULL,   5},
-        {"keepDiscordant", 0, NULL,   6},
+        {"keepSingleton",0, NULL,   5},
+        {"keepDiscordant",0,NULL,   6},
+        {"OT",           1, NULL,   7},
+        {"OB",           1, NULL,   8},
+        {"CTOT",         1, NULL,   9},
+        {"CTOB",         1, NULL,  10},
         {"help",         0, NULL, 'h'}
     };
     while((c = getopt_long(argc, argv, "q:p:r:l:o:D:", lopts,NULL)) >= 0) {
@@ -333,6 +391,18 @@ int main(int argc, char *argv[]) {
             break;
         case 6 :
             config.keepDiscordant = 1;
+            break;
+        case 7 :
+            parseBounds(optarg, config.bounds, 0);
+            break;
+        case 8 :
+            parseBounds(optarg, config.bounds, 1);
+            break;
+        case 9 :
+            parseBounds(optarg, config.bounds, 2);
+            break;
+        case 10 :
+            parseBounds(optarg, config.bounds, 3);
             break;
         case 'q' :
             config.minMapq = atoi(optarg);

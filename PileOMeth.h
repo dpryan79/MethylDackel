@@ -63,6 +63,7 @@ typedef struct {
     char *bedName;
     bedRegions *bed;
     faidx_t *fai;
+    int bounds[16];
 } Config;
 
 /*! @function
