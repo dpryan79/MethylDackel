@@ -284,8 +284,8 @@ void usage(char *prog) {
     fprintf(stderr,
 "\n"
 "Options:\n"
-" -q INT           Minimum MAPQ threshold to include an alignment (default 5)\n"
-" -p INT           Minimum Phred threshold to include a base (default 10). This\n"
+" -q INT           Minimum MAPQ threshold to include an alignment (default 10)\n"
+" -p INT           Minimum Phred threshold to include a base (default 5). This\n"
 "                  must be >0.\n"
 " -D INT           Maximum per-base depth (default 2000)\n"
 " -r STR           Region string in which to extract methylation\n"
@@ -333,7 +333,7 @@ int main(int argc, char *argv[]) {
 
     //Defaults
     config.keepCpG = 1; config.keepCHG = 0; config.keepCHH = 0;
-    config.minMapq = 5; config.minPhred = 10; config.keepDupes = 0;
+    config.minMapq = 10; config.minPhred = 5; config.keepDupes = 0;
     config.keepSingleton = 0, config.keepDiscordant = 0;
     config.maxDepth = 2000;
     config.fai = NULL;

@@ -209,7 +209,6 @@ void extractCalls(Config *config, char *opref, int SVG, int txt) {
 
     //Start the pileup
     iter = bam_mplp_init(1, filter_func, (void **) &data);
-    bam_mplp_init_overlaps(iter);
     bam_mplp_set_maxcnt(iter, config->maxDepth);
     while((ret = bam_mplp_auto(iter, &tid, &pos, &n_plp, plp)) > 0) {
         //Do we need to process this position?
@@ -257,7 +256,7 @@ void extractCalls(Config *config, char *opref, int SVG, int txt) {
             if(rv != 0) {
                 if((plp[0]+i)->qpos >= meths[strand-1]->m)
                     meths[strand-1] = growStrandMeth(meths[strand-1], (plp[0]+i)->qpos);
-                if(rv > 0) {
+                if(rv < 0) {
                     if((plp[0]+i)->b->core.flag & BAM_FREAD2) {
                         assert((meths[strand-1]->unmeth2[(plp[0]+i)->qpos]) < 0xFFFFFFFF);
                         meths[strand-1]->unmeth2[(plp[0]+i)->qpos]++;
@@ -274,7 +273,7 @@ void extractCalls(Config *config, char *opref, int SVG, int txt) {
                         meths[strand-1]->meth1[(plp[0]+i)->qpos]++;
                     }
                 }
-                if((plp[0]+i)->qpos > meths[strand-1]->l) meths[strand-1]->l = (plp[0]+i)->qpos;
+                if((plp[0]+i)->qpos+1 > meths[strand-1]->l) meths[strand-1]->l = (plp[0]+i)->qpos+1;
             }
         }
     }
@@ -304,8 +303,8 @@ void usage(char *prog) {
     fprintf(stderr,
 "\n"
 "Options:\n"
-" -q INT           Minimum MAPQ threshold to include an alignment (default 5)\n"
-" -p INT           Minimum Phred threshold to include a base (default 10). This\n"
+" -q INT           Minimum MAPQ threshold to include an alignment (default 10)\n"
+" -p INT           Minimum Phred threshold to include a base (default 5). This\n"
 "                  must be >0.\n"
 " -D INT Maximum per-base depth (default 2000)\n"
 " -r STR           Region string in which to extract methylation\n"
@@ -340,7 +339,7 @@ int main(int argc, char *argv[]) {
 
     //Defaults
     config.keepCpG = 1; config.keepCHG = 0; config.keepCHH = 0;
-    config.minMapq = 5; config.minPhred = 10; config.keepDupes = 0;
+    config.minMapq = 10; config.minPhred = 5; config.keepDupes = 0;
     config.keepSingleton = 0, config.keepDiscordant = 0;
     config.fai = NULL;
     config.fp = NULL;

@@ -95,9 +95,8 @@ int getMaxX(strandMeth *m) {
         if(m->unmeth2[i]+m->meth2[i]) break;
     }
     if(i>=0) {
-        i++;
         //Round to the next multiple of 5
-        i += 5-(i%5);
+        if(i%5) i += 5-(i%5);
         return i;
     }
     fprintf(stderr, "[getMaxX] There were apparently no methylation calls for this strand!.\n");
