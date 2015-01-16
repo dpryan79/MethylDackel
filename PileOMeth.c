@@ -228,12 +228,12 @@ void extractCalls(Config *config) {
                 if(base != 'G' && base != 'g') continue;
             }
             //Inclusion bounds
-            if(!((plp[i]+i)->b->core.flag & BAM_FREAD2)) {
-                if(config->bounds[4*i]) if((plp[i]+i)->qpos <= config->bounds[4*i]) continue;
-                if(config->bounds[4*i+1]) if((plp[i]+i)->qpos >= config->bounds[4*i+1]) continue;
+            if(!((plp[0]+i)->b->core.flag & BAM_FREAD2)) {
+                if(config->bounds[4*strand]) if((plp[0]+i)->qpos <= config->bounds[4*strand]) continue;
+                if(config->bounds[4*strand+1]) if((plp[0]+i)->qpos >= config->bounds[4*strand+1]) continue;
             } else {
-                if(config->bounds[4*i+2]) if((plp[i]+i)->qpos <= config->bounds[4*i+2]) continue;
-                if(config->bounds[4*i+3]) if((plp[i]+i)->qpos >= config->bounds[4*i+3]) continue;
+                if(config->bounds[4*strand+2]) if((plp[0]+i)->qpos <= config->bounds[4*strand+2]) continue;
+                if(config->bounds[4*strand+3]) if((plp[0]+i)->qpos >= config->bounds[4*strand+3]) continue;
             }
             rv = updateMetrics(config, plp[0]+i);
             if(rv > 0) nmethyl++;

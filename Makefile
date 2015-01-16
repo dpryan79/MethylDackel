@@ -1,6 +1,6 @@
 PREFIX = /usr/local/bin #This can be changed!
 CC = gcc
-OPTS = -Wall -g -O3
+OPTS = -Wall -g
 
 .PHONY: all clean htslib install clean-all
 
