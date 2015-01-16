@@ -104,6 +104,42 @@ int updateMetrics(Config *config, const bam_pileup1_t *plp) {
     return 0;
 }
 
+//Convert bases outside of the bounds to N and their phred scores to 0
+bam1_t *trimAlignment(bam1_t *b, int bounds[16]) {
+    int strand = getStrand(b);
+    int i, lb, rb;
+    uint8_t *qual = bam_get_qual(b);
+    uint8_t *seq = bam_get_seq(b);
+
+    if(b->core.flag & BAM_FREAD2) {
+        lb = bounds[4*strand+2];
+        rb = bounds[4*strand+3];
+    } else {
+        lb = bounds[4*strand];
+        rb = bounds[4*strand+1];
+    }
+    lb = (lb<b->core.l_qseq) ? lb : b->core.l_qseq;
+
+    //trim on the left
+    if(lb) {
+        for(i=0; i<lb; i++) {
+            qual[i] = 0;
+            if(i&1) seq[i>>1] |= 0xf;
+            else seq[i>>1] |= 0xf0;
+        }
+    }
+    //trim on the right
+    if(rb) {
+        for(i=rb; i<b->core.l_qseq; i++) {
+            qual[i] = 0;
+            if(i&1) seq[i>>1] |= 0xf;
+            else seq[i>>1] |= 0xf0;
+        }
+    }
+
+    return b;
+}
+
 //This will need to be restructured to handle multiple input files
 int filter_func(void *data, bam1_t *b) {
     int rv, NH, overlap;
@@ -135,6 +171,20 @@ int filter_func(void *data, bam1_t *b) {
                 break;
             }
         }
+
+        /***********************************************************************
+        *
+        * Deal with bounds inclusion (--OT, --OB, etc.)
+        * If we don't do this now, then the dealing with this after the overlap
+        * detection will result in losing a lot of calls that we actually should
+        * keep (i.e., if a call is in an overlapping region near an end of read
+        * #1 and that region is excluded in that read then we lose the call).
+        * The overlap detection will only decrement read #2's phred score by 20%
+        * (instead of to 0) if there's a base mismatch and read #2 has the
+        * higher phred score at that position.
+        *
+        ***********************************************************************/
+        b = trimAlignment(b, ldata->config->bounds);
         break;
     }
     return rv;
@@ -226,14 +276,6 @@ void extractCalls(Config *config) {
                 if(base != 'C' && base != 'c') continue;
             } else {
                 if(base != 'G' && base != 'g') continue;
-            }
-            //Inclusion bounds
-            if(!((plp[0]+i)->b->core.flag & BAM_FREAD2)) {
-                if(config->bounds[4*strand]) if((plp[0]+i)->qpos <= config->bounds[4*strand]) continue;
-                if(config->bounds[4*strand+1]) if((plp[0]+i)->qpos >= config->bounds[4*strand+1]) continue;
-            } else {
-                if(config->bounds[4*strand+2]) if((plp[0]+i)->qpos <= config->bounds[4*strand+2]) continue;
-                if(config->bounds[4*strand+3]) if((plp[0]+i)->qpos >= config->bounds[4*strand+3]) continue;
             }
             rv = updateMetrics(config, plp[0]+i);
             if(rv > 0) nmethyl++;

@@ -3,4 +3,4 @@ tests/*.bedGraph
 *.o
 *.swp
 PileOMeth
-MBias
+PileOMethMBias
