@@ -179,7 +179,7 @@ void extractCalls(Config *config) {
     iter = bam_mplp_init(1, filter_func, (void **) &data);
     bam_mplp_init_overlaps(iter);
     bam_mplp_set_maxcnt(iter, config->maxDepth);
-    while((ret = bam_mplp_auto(iter, &tid, &pos, &n_plp, plp)) > 0) {
+    while((ret = cust_mplp_auto(iter, &tid, &pos, &n_plp, plp)) > 0) {
         //Do we need to process this position?
 	if (config->reg){
 	    beg0 = data->iter->beg, end0 = data->iter->end;
