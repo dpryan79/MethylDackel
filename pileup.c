@@ -5,10 +5,6 @@
 #include "htslib/khash.h"
 #include "htslib/sam.h"
 
-/*
-wtf is g_cstate_null?!?!
-*/
-
 int getStrand(bam1_t *b);
 
 /**********************************************
@@ -168,16 +164,18 @@ static void cust_overlap_push(bam_plp_t iter, lbnode_t *node)
     // mapped mates only
     if ( node->b.core.flag&BAM_FMUNMAP ) return;
 
-    //If the first read ends before the second begins, then skip
-    if((&node->b)->core.isize > 0) {
+    //Same chromosomes only
+    if((&node->b)->core.tid != (&node->b)->core.mtid) return;
+
+    //Overlap impossible
+    if((&node->b)->core.pos < (&node->b)->core.mpos) {
         if(bam_endpos(&node->b) < (&node->b)->core.mpos) return;
     }
 
     khiter_t kitr = kh_get(olap_hash, iter->overlaps, bam_get_qname(&node->b));
     if ( kitr==kh_end(iter->overlaps) )
     {
-        if((&node->b)->core.isize < 0) return; //The mate should be here, but isn't
-        if((&node->b)->core.tid != (&node->b)->core.mtid) return; //Different chromosomes
+        if((&node->b)->core.pos > (&node->b)->core.mpos) return; //The mate should be here, but isn't
         int ret;
         kitr = kh_put(olap_hash, iter->overlaps, bam_get_qname(&node->b), &ret);
         kh_value(iter->overlaps, kitr) = node;
