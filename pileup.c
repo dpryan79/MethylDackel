@@ -84,7 +84,7 @@ int32_t *calculate_positions(bam1_t *read) {
             } else if(op == 2 || op == 3) { //D, N
                 previous_position++;
             } else { //P
-                printf("We encountered a CIGAR operation that we're not ready to deal with in %s\n", bam_get_qname(read));
+                fprintf(stderr, "[calculate_positions] We encountered a CIGAR operation that we're not ready to deal with in %s\n", bam_get_qname(read));
             }
         }
     }
