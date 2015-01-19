@@ -218,6 +218,8 @@ void extractCalls(Config *config) {
         nmethyl = nunmethyl = 0;
         base = *(seq+pos);
         for(i=0; i<n_plp; i++) {
+            if(plp[0][i].is_del) continue;
+            if(plp[0][i].is_refskip) continue;
             if(config->bed) if(!readStrandOverlapsBED(plp[0][i].b, config->bed->region[idxBED])) continue;
             if(getStrand((plp[0]+i)->b) & 1) {
                 if(base != 'C' && base != 'c') continue;
