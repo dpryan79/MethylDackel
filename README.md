@@ -32,6 +32,5 @@ To do list
 ==========
 
  * Enable trimming based on M-bias
- * The -D option seems to only be approximate. Is this an htslib issue?
  * Is the output format the most convenient (it's what Bison uses, so converters have already been written)? It makes more sense to output a predefined VCF format, which would allow processing multiple samples at once. This would require a spec., which should have pretty broad input.
  * Need to finish restructuring things to allow easy library incorporation
