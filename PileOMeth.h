@@ -101,6 +101,9 @@ void sortBED(bedRegions *regions);
 void destroyBED(bedRegions *regions);
 bedRegions *parseBED(char *fn, bam_hdr_t *hdr);
 
+//pileup.c
+int cust_mplp_auto(bam_mplp_t iter, int *_tid, int *_pos, int *n_plp, const bam_pileup1_t **plp);
+
 //svg.c
 /*! @function
  @abstract Create the actual SVG files that the user can view

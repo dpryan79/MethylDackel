@@ -231,7 +231,7 @@ void extractCalls(Config *config) {
     iter = bam_mplp_init(1, filter_func, (void **) &data);
     bam_mplp_init_overlaps(iter);
     bam_mplp_set_maxcnt(iter, config->maxDepth);
-    while((ret = bam_mplp_auto(iter, &tid, &pos, &n_plp, plp)) > 0) {
+    while((ret = cust_mplp_auto(iter, &tid, &pos, &n_plp, plp)) > 0) {
         //Do we need to process this position?
 	if (config->reg){
 	    beg0 = data->iter->beg, end0 = data->iter->end;
@@ -270,6 +270,8 @@ void extractCalls(Config *config) {
         nmethyl = nunmethyl = 0;
         base = *(seq+pos);
         for(i=0; i<n_plp; i++) {
+            if(plp[0][i].is_del) continue;
+            if(plp[0][i].is_refskip) continue;
             if(config->bed) if(!readStrandOverlapsBED(plp[0][i].b, config->bed->region[idxBED])) continue;
             strand = getStrand((plp[0]+i)->b);
             if(strand & 1) {

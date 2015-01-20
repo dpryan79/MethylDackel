@@ -44,7 +44,5 @@ If you have paired-end data, both reads in the pair will be shown separately, as
 To do list
 ==========
 
- * The -D option seems to only be approximate. Is this an htslib issue?
  * Is the output format the most convenient (it's what Bison uses, so converters have already been written)? It makes more sense to output a predefined VCF format, which would allow processing multiple samples at once. This would require a spec., which should have pretty broad input.
  * Need to finish restructuring things to allow easy library incorporation
- * Pileup-based overlap detection doesn't actually work correctly in many cases. We're currently getting around that by modifying base calls and phred scores when doing trimming (--OT, --OB, etc.), but even when not doing that there are issues. In many cases read #2 is trimmed quit a bit and the insert size is then more than twice its length. In those cases, htslib will exclude the pair from overlap tweaking. How many read pairs are affected by this will very by library, but in either case this shouldn't occur. Relatedly, to get around this, we end up with penalized phred scores when they really shouldn't be. The best way around this is to simply keep the current trimming method but rewrite most of bam_mplp_auto through tweak_overlap_quality. This will need to include: bam_mplp_auto, bam_plp_auto, bam_plp_push, overlap_pus, tweak_overlap_quality, overlap_remove, and probably mp_alloc(). Many of these can just be made extern.
