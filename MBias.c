@@ -7,8 +7,6 @@
 #include <string.h>
 #include <inttypes.h>
 #include <assert.h>
-#include <errno.h>
-#include <limits.h>
 #include "PileOMeth.h"
 
 inline int isCpG(char *seq, int pos, int seqlen) {
@@ -85,6 +83,7 @@ int getStrand(bam1_t *b) {
     }
 }
 
+//Returns 1 if methylated, -1 if unmethylated and 0 otherwise
 int updateMetrics(Config *config, const bam_pileup1_t *plp) {
     uint8_t base = bam_seqi(bam_get_seq(plp->b), plp->qpos);
     int strand = getStrand(plp->b); //1=OT, 2=OB, 3=CTOT, 4=CTOB
@@ -102,42 +101,6 @@ int updateMetrics(Config *config, const bam_pileup1_t *plp) {
     else if(base == 4 && (strand & 2)) return 1; //G on an OB/CTOB alignment
     else if(base == 1 && (strand & 2)) return -1; //A on an OB/CTOB alignment
     return 0;
-}
-
-//Convert bases outside of the bounds to N and their phred scores to 0
-bam1_t *trimAlignment(bam1_t *b, int bounds[16]) {
-    int strand = getStrand(b);
-    int i, lb, rb;
-    uint8_t *qual = bam_get_qual(b);
-    uint8_t *seq = bam_get_seq(b);
-
-    if(b->core.flag & BAM_FREAD2) {
-        lb = bounds[4*strand+2];
-        rb = bounds[4*strand+3];
-    } else {
-        lb = bounds[4*strand];
-        rb = bounds[4*strand+1];
-    }
-    lb = (lb<b->core.l_qseq) ? lb : b->core.l_qseq;
-
-    //trim on the left
-    if(lb) {
-        for(i=0; i<lb; i++) {
-            qual[i] = 0;
-            if(i&1) seq[i>>1] |= 0xf;
-            else seq[i>>1] |= 0xf0;
-        }
-    }
-    //trim on the right
-    if(rb) {
-        for(i=rb; i<b->core.l_qseq; i++) {
-            qual[i] = 0;
-            if(i&1) seq[i>>1] |= 0xf;
-            else seq[i>>1] |= 0xf0;
-        }
-    }
-
-    return b;
 }
 
 //This will need to be restructured to handle multiple input files
@@ -171,37 +134,53 @@ int filter_func(void *data, bam1_t *b) {
                 break;
             }
         }
-
-        /***********************************************************************
-        *
-        * Deal with bounds inclusion (--OT, --OB, etc.)
-        * If we don't do this now, then the dealing with this after the overlap
-        * detection will result in losing a lot of calls that we actually should
-        * keep (i.e., if a call is in an overlapping region near an end of read
-        * #1 and that region is excluded in that read then we lose the call).
-        * The overlap detection will only decrement read #2's phred score by 20%
-        * (instead of to 0) if there's a base mismatch and read #2 has the
-        * higher phred score at that position.
-        *
-        ***********************************************************************/
-        b = trimAlignment(b, ldata->config->bounds);
         break;
     }
     return rv;
 }
 
-void extractCalls(Config *config) {
+strandMeth *growStrandMeth(strandMeth *s, int32_t l) {
+    int32_t m = kroundup32(l);
+    int i;
+    if(m==0) m=32; //Enforce a minimum length
+
+    s->unmeth1 = realloc(s->unmeth1, sizeof(uint32_t)*m);
+    s->meth1 = realloc(s->meth1, sizeof(uint32_t)*m);
+    s->unmeth2 = realloc(s->unmeth2, sizeof(uint32_t)*m);
+    s->meth2 = realloc(s->meth2, sizeof(uint32_t)*m);
+    assert(s->unmeth1);
+    assert(s->unmeth2);
+    assert(s->meth1);
+    assert(s->meth2);
+
+    for(i=s->m; i<m; i++) {
+        s->unmeth1[i] = 0;
+        s->meth1[i] = 0;
+        s->unmeth2[i] = 0;
+        s->meth2[i] = 0;
+    }
+    s->m = m;
+    return s;
+}
+
+void extractCalls(Config *config, char *opref, int SVG, int txt) {
     bam_hdr_t *hdr = sam_hdr_read(config->fp);
     bam_mplp_t iter;
-    int ret, tid, pos, i, seqlen, type, rv, o = 0;
+    int ret, tid, pos, i, seqlen, rv, o = 0;
     int beg0 = 0, end0 = 1u<<29;
+    int strand;
     int n_plp; //This will need to be modified for multiple input files
     int ctid = -1; //The tid of the contig whose sequence is stored in "seq"
-    int idxBED = 0, strand;
-    uint32_t nmethyl, nunmethyl;
+    int idxBED = 0;
     const bam_pileup1_t **plp = NULL;
     char *seq = NULL, base;
     mplp_data *data = NULL;
+    strandMeth *meths[4];
+
+    for(i=0; i<4; i++) {
+        meths[i] = calloc(1, sizeof(strandMeth));
+        assert(meths[i]);
+    }
 
     data = calloc(1,sizeof(mplp_data));
     if(data == NULL) {
@@ -221,6 +200,7 @@ void extractCalls(Config *config) {
         if(config->bed == NULL) return;
     }
 
+
     plp = calloc(1, sizeof(bam_pileup1_t *)); //This will have to be modified for multiple input files
     if(plp == NULL) {
         fprintf(stderr, "Couldn't allocate space for the plp structure in extractCalls()!\n");
@@ -229,14 +209,13 @@ void extractCalls(Config *config) {
 
     //Start the pileup
     iter = bam_mplp_init(1, filter_func, (void **) &data);
-    bam_mplp_init_overlaps(iter);
     bam_mplp_set_maxcnt(iter, config->maxDepth);
-    while((ret = cust_mplp_auto(iter, &tid, &pos, &n_plp, plp)) > 0) {
+    while((ret = bam_mplp_auto(iter, &tid, &pos, &n_plp, plp)) > 0) {
         //Do we need to process this position?
-	if (config->reg){
-	    beg0 = data->iter->beg, end0 = data->iter->end;
-	    if ((pos < beg0 || pos >= end0)) continue; // out of the region requested
-	}
+        if (config->reg){
+            beg0 = data->iter->beg, end0 = data->iter->end;
+            if ((pos < beg0 || pos >= end0)) continue; // out of the region requested
+        }
         if(tid != ctid) {
             if(seq != NULL) free(seq);
             seq = faidx_fetch_seq(config->fai, hdr->target_name[tid], 0, faidx_seq_len(config->fai, hdr->target_name[tid]), &seqlen);
@@ -256,22 +235,16 @@ void extractCalls(Config *config) {
 
         if(isCpG(seq, pos, seqlen)) {
             if(!config->keepCpG) continue;
-            type = 0;
         } else if(isCHG(seq, pos, seqlen)) {
             if(!config->keepCHG) continue;
-            type = 1;
         } else if(isCHH(seq, pos, seqlen)) {
             if(!config->keepCHH) continue;
-            type = 2;
         } else {
             continue;
         }
 
-        nmethyl = nunmethyl = 0;
         base = *(seq+pos);
         for(i=0; i<n_plp; i++) {
-            if(plp[0][i].is_del) continue;
-            if(plp[0][i].is_refskip) continue;
             if(config->bed) if(!readStrandOverlapsBED(plp[0][i].b, config->bed->region[idxBED])) continue;
             strand = getStrand((plp[0]+i)->b);
             if(strand & 1) {
@@ -280,58 +253,60 @@ void extractCalls(Config *config) {
                 if(base != 'G' && base != 'g') continue;
             }
             rv = updateMetrics(config, plp[0]+i);
-            if(rv > 0) nmethyl++;
-            else if(rv<0) nunmethyl++;
+            if(rv != 0) {
+                if((plp[0]+i)->qpos >= meths[strand-1]->m)
+                    meths[strand-1] = growStrandMeth(meths[strand-1], (plp[0]+i)->qpos);
+                if(rv < 0) {
+                    if((plp[0]+i)->b->core.flag & BAM_FREAD2) {
+                        assert((meths[strand-1]->unmeth2[(plp[0]+i)->qpos]) < 0xFFFFFFFF);
+                        meths[strand-1]->unmeth2[(plp[0]+i)->qpos]++;
+                    } else {
+                        assert((meths[strand-1]->unmeth1[(plp[0]+i)->qpos]) < 0xFFFFFFFF);
+                        meths[strand-1]->unmeth1[(plp[0]+i)->qpos]++;
+                    }
+                } else {
+                    if((plp[0]+i)->b->core.flag & BAM_FREAD2) {
+                        assert((meths[strand-1]->meth2[(plp[0]+i)->qpos]) < 0xFFFFFFFF);
+                        meths[strand-1]->meth2[(plp[0]+i)->qpos]++;
+                    } else {
+                        assert((meths[strand-1]->meth1[(plp[0]+i)->qpos]) < 0xFFFFFFFF);
+                        meths[strand-1]->meth1[(plp[0]+i)->qpos]++;
+                    }
+                }
+                if((plp[0]+i)->qpos+1 > meths[strand-1]->l) meths[strand-1]->l = (plp[0]+i)->qpos+1;
+            }
         }
-
-        if(nmethyl+nunmethyl) fprintf(config->output_fp[type], "%s\t%i\t%i\t%i\t%" PRIu32 "\t%" PRIu32 "\n", \
-            hdr->target_name[tid], pos, pos+1, (int) (1000.0 * ((double) nmethyl)/(nmethyl+nunmethyl)), nmethyl, nunmethyl);
     }
 
+    //Report some output
+    if(SVG) makeSVGs(opref, meths, config->keepCpG + 2*config->keepCHG + 4*config->keepCHH);
+    if(txt) makeTXT(meths);
+
+    //Clean up
     bam_hdr_destroy(hdr);
     if(data->iter) hts_itr_destroy(data->iter);
     bam_mplp_destroy(iter);
     free(data);
     free(plp);
     if(seq != NULL) free(seq);
-}
-
-void parseBounds(char *s2, int *vals, int mult) {
-    char *p, *s = strdup(s2), *end;
-    int i, v;
-
-    p = strtok(s, ",");
-    v = strtol(p, &end, 10);
-    if((errno == ERANGE && (v == LONG_MAX || v == LONG_MIN)) || (errno != 0 && v == 0) || end == p) v = -1;
-    if(v>=0) vals[4*mult] = v;
-    else {
-        fprintf(stderr, "Invalid bounds string, %s\n", s2);
-        free(s);
-        return;
+    for(i=0; i<4; i++) {
+        if(meths[i]->meth1) free(meths[i]->meth1);
+        if(meths[i]->unmeth1) free(meths[i]->unmeth1);
+        if(meths[i]->meth2) free(meths[i]->meth2);
+        if(meths[i]->unmeth2) free(meths[i]->unmeth2);
+        free(meths[i]);
     }
-    for(i=1; i<4; i++) {
-        p = strtok(NULL, ",");
-        v = strtol(p, &end, 10);
-        if((errno == ERANGE && (v == LONG_MAX || v == LONG_MIN)) || (errno != 0 && v == 0) || end == p) v = -1;
-        if(v>=0) vals[4*mult+i] = v;
-        else {
-            fprintf(stderr, "Invalid bounds string, %s\n", s2);
-            free(s);
-            return;
-        }
-    }
-    free(s);
 }
 
 void usage(char *prog) {
-    fprintf(stderr, "\nUsage: %s [OPTIONS] reference.fa file.bam\n", prog);
+    fprintf(stderr, "\nUsage: %s [OPTIONS] reference.fa file.bam prefix\n", prog);
     fprintf(stderr,
 "\n"
 "Options:\n"
 " -q INT           Minimum MAPQ threshold to include an alignment (default 10)\n"
 " -p INT           Minimum Phred threshold to include a base (default 5). This\n"
 "                  must be >0.\n"
-" -D INT           Maximum per-base depth (default 2000)\n"
+" -D INT Maximum per-base depth (default 2000)\n"
 " -r STR           Region string in which to extract methylation\n"
 " -l FILE          A BED file listing regions for inclusion. Note that unlike\n"
 "                  samtools mpileup, this option will utilize the strand column\n"
@@ -339,8 +314,6 @@ void usage(char *prog) {
 "                  column, then only metrics from the top strand will be\n"
 "                  output. Note that the -r option can be used to limit the\n"
 "                  regions of -l.\n"
-" -o, --opref STR  Output filename prefix. CpG/CHG/CHH metrics will be\n"
-"                  output to STR_CpG.bedGraph and so on.\n"
 " --keepDupes      By default, any alignment marked as a duplicate is ignored.\n"
 "                  This option causes them to be incorporated.\n"
 " --keepSingleton  By default, if only one read in a pair aligns (a singleton)\n"
@@ -349,73 +322,54 @@ void usage(char *prog) {
 "                  unset in the FLAG field are ignored. Note that the definition\n"
 "                  of concordant and discordant is based on your aligner\n"
 "                  settings.\n"
+" --txt            Output tab separated metrics to the screen. These can be\n"
+"                  imported into R or another program for manual plotting and\n"
+"                  analysis.\n"
+" --noSVG          Don't produce the SVG files. This option implies --txt. Note\n"
+"                  that an output prefix is no longer required with this option.\n"
 " --noCpG          Do not output CpG methylation metrics\n"
 " --CHG            Output CHG methylation metrics\n"
-" --CHH            Output CHH methylation metrics\n"
-" --OT INT,INT,INT,INT Inclusion bounds for methylation calls from reads/pairs\n"
-"                  origination from the original top strand. Suggested values can\n"
-"                  be obtained from the MBias program. Each integer represents a\n"
-"                  1-based position on a read. For example --OT A,B,C,D\n"
-"                  translates to, \"Include calls at positions from A through B\n"
-"                  on read #1 and C through D on read #2\". If a 0 is used a any\n"
-"                  position then that is translated to mean start/end of the\n"
-"                  alignment, as appropriate. For example, --OT 5,0,0,0 would\n"
-"                  include all but the first 4 bases on read #1. Users are\n"
-"                  strongly advised to consult a methylation bias plot, for\n"
-"                  example by using the MBias program.\n"
-" --OB INT,INT,INT,INT\n"
-" --CTOT INT,INT,INT,INT\n"
-" --CTOB INT,INT,INT,INT As with --OT, but for the original bottom, complementary\n"
-"                  to the original top, and complementary to the original bottom\n"
-"                  strands, respectively.\n");
+" --CHH            Output CHH methylation metrics\n");
 }
 
 int main(int argc, char *argv[]) {
-    char *opref = NULL, *oname, *p;
-    int c, i;
+    char *opref = NULL;
+    int c, SVG = 1, txt = 0;
     Config config;
 
     //Defaults
     config.keepCpG = 1; config.keepCHG = 0; config.keepCHH = 0;
     config.minMapq = 10; config.minPhred = 5; config.keepDupes = 0;
     config.keepSingleton = 0, config.keepDiscordant = 0;
-    config.maxDepth = 2000;
     config.fai = NULL;
     config.fp = NULL;
     config.bai = NULL;
     config.reg = NULL;
     config.bedName = NULL;
     config.bed = NULL;
-    for(i=0; i<16; i++) config.bounds[i] = 0;
 
     static struct option lopts[] = {
-        {"opref",        1, NULL, 'o'},
         {"noCpG",        0, NULL,   1},
         {"CHG",          0, NULL,   2},
         {"CHH",          0, NULL,   3},
         {"keepDupes",    0, NULL,   4},
-        {"keepSingleton",0, NULL,   5},
-        {"keepDiscordant",0,NULL,   6},
-        {"OT",           1, NULL,   7},
-        {"OB",           1, NULL,   8},
-        {"CTOT",         1, NULL,   9},
-        {"CTOB",         1, NULL,  10},
+        {"keepSingleton",  0, NULL,   5},
+        {"keepDiscordant", 0, NULL,   6},
+        {"txt",          0, NULL,   7},
+        {"noSVG",        0, NULL,   8},
         {"help",         0, NULL, 'h'}
     };
-    while((c = getopt_long(argc, argv, "q:p:r:l:o:D:", lopts,NULL)) >= 0) {
+    while((c = getopt_long(argc, argv, "q:p:r:l:D:", lopts,NULL)) >= 0) {
         switch(c) {
         case 'h' :
             usage(argv[0]);
             return 0;
-        case 'o' :
-            opref = strdup(optarg);
-            break;
         case 'D' :
             config.maxDepth = atoi(optarg);
             break;
-	case 'r':
-	    config.reg = strdup(optarg);
-	    break;
+        case 'r':
+            config.reg = strdup(optarg);
+            break;
         case 'l' :
             config.bedName = optarg;
             break;
@@ -438,16 +392,11 @@ int main(int argc, char *argv[]) {
             config.keepDiscordant = 1;
             break;
         case 7 :
-            parseBounds(optarg, config.bounds, 0);
+            txt = 1;
             break;
         case 8 :
-            parseBounds(optarg, config.bounds, 1);
-            break;
-        case 9 :
-            parseBounds(optarg, config.bounds, 2);
-            break;
-        case 10 :
-            parseBounds(optarg, config.bounds, 3);
+            SVG = 0;
+            txt = 1;
             break;
         case 'q' :
             config.minMapq = atoi(optarg);
@@ -466,8 +415,8 @@ int main(int argc, char *argv[]) {
         usage(argv[0]);
         return 0;
     }
-    if(argc-optind != 2) {
-        fprintf(stderr, "You must supply a reference genome in fasta format and an input BAM file!!!\n");
+    if((SVG && argc-optind != 3) || (!SVG && argc-optind < 2)) {
+        fprintf(stderr, "You must supply a reference genome in fasta format, an input BAM file, and an output prefix!!!\n");
         usage(argv[0]);
         return -1;
     }
@@ -510,58 +459,17 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    //Output files
-    config.output_fp = malloc(sizeof(FILE *) * 3);
-    if(opref == NULL) {
-        opref = strdup(argv[optind+1]);
-        p = strrchr(opref, '.');
-        if(p != NULL) *p = '\0';
-        fprintf(stderr, "writing to prefix:'%s'\n", opref);
-    }
-    oname = malloc(sizeof(char) * (strlen(opref)+14));
-    if(config.keepCpG) {
-        sprintf(oname, "%s_CpG.bedGraph", opref);
-        config.output_fp[0] = fopen(oname, "w");
-        if(config.output_fp[0] == NULL) {
-            fprintf(stderr, "Couldn't open the output CpG metrics file for writing! Insufficient permissions?\n");
-            return -3;
-        }
-        fprintf(config.output_fp[0], "track type=\"bedGraph\" description=\"%s CpG methylation levels\"\n", opref);
-    }
-    if(config.keepCHG) {
-        sprintf(oname, "%s_CHG.bedGraph", opref);
-        config.output_fp[1] = fopen(oname, "w");
-        if(config.output_fp[1] == NULL) {
-            fprintf(stderr, "Couldn't open the output CHG metrics file for writing! Insufficient permissions?\n");
-            return -3;
-        }
-        fprintf(config.output_fp[1], "track type=\"bedGraph\" description=\"%s CHG methylation levels\"\n", opref);
-    }
-    if(config.keepCHH) {
-        sprintf(oname, "%s_CHH.bedGraph", opref);
-        config.output_fp[2] = fopen(oname, "w");
-        if(config.output_fp[2] == NULL) {
-            fprintf(stderr, "Couldn't open the output CHH metrics file for writing! Insufficient permissions?\n");
-            return -3;
-        }
-        fprintf(config.output_fp[2], "track type=\"bedGraph\" description=\"%s CHH methylation levels\"\n", opref);
-    }
+    //Output files (this needs to be filled in)
+    if(SVG) opref = argv[optind+2];
 
     //Run the pileup
-    extractCalls(&config);
+    extractCalls(&config, opref, SVG, txt);
 
     //Close things up
     hts_close(config.fp);
     fai_destroy(config.fai);
-    if(config.keepCpG) fclose(config.output_fp[0]);
-    if(config.keepCHG) fclose(config.output_fp[1]);
-    if(config.keepCHH) fclose(config.output_fp[2]);
     hts_idx_destroy(config.bai);
-    free(opref);
     if(config.reg) free(config.reg);
-    if(config.bed) destroyBED(config.bed);
-    free(oname);
-    free(config.output_fp);
 
     return 0;
 }
