@@ -41,7 +41,7 @@ In an ideal experiment, we expect that the probability of observing a methylated
 
 That command will create a methylation bias (mbias for short) plot for each of the strands for which there are valid alignments. The command can take almost all of the same options as `PileOMeth`, so if you're interested in looking at only a single region or only CHH and CHG metrics then you can do that (run `PileOMethMBias -h` for the full list of options). The resulting mbias graphs are in SVG format and can be viewed in most modern web browsers:
 
-![An example SVG image](https://rawgit.com/dpryan79/PileOMeth/DevonMBiasPlot/example_OT.svg)
+![An example SVG image](https://rawgit.com/dpryan79/PileOMeth/master/example_OT.svg)
 
 If you have paired-end data, both reads in the pair will be shown separately, as is the case above. The program will suggest regions for inclusion ("--OT 2,0,0,98" above) and mark them on the plot, if applicable. The format of this output is described in `PileOMeth -h`. These suggestions should not be accepted blindly; users are strongly encouraged to have a look for themselves and tweak the actual bounds as appropriate. The lines indicate the average methylation percentage at a given position and the shaded regions the 99.9% confidence interval around it. This is useful in gauging how many methylation calls a given position has relative to its neighbors. Note the spike in methylation at the end of read #2 and the corresponding dip at the beginning of read #1. This is common and these regions can be ignored with the suggested trimming bounds. Note also that the numbers refer to the first and last base that should be included during methylation extraction, not the last and first base to ignore!.
 
