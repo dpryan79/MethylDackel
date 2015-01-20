@@ -22,7 +22,7 @@ PileOMeth: htslib $(OBJS)
 	$(CC) $(OPTS) -Ihtslib -o PileOMeth PileOMeth.c bed.o pileup.o htslib/libhts.a -lz -lpthread
 
 PileOMethMBias: htslib $(OBJS)
-	$(CC) $(OPTS) -Ihtslib -o PileOMethMBias MBias.c svg.o htslib/libhts.a -lm -lz -lpthread
+	$(CC) $(OPTS) -Ihtslib -o PileOMethMBias MBias.c svg.o bed.o htslib/libhts.a -lm -lz -lpthread
 
 clean:
 	rm -f *.o PileOMeth PileOMethMBias
