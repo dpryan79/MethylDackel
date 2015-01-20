@@ -63,6 +63,7 @@ typedef struct {
     char *bedName;
     bedRegions *bed;
     faidx_t *fai;
+    int bounds[16];
 } Config;
 
 /*! @function
@@ -79,9 +80,38 @@ typedef struct {
 */
 int getStrand(bam1_t *b);
 
+/*! @typedef
+ @abstract	Positional methylation metrics for a single strand
+ @field l	Current length
+ @field m	Maximum length
+ @field unmeth	Number of unmethylated observations for each position.
+ @field meth	Number of methylated observations for each position.
+*/
+typedef struct {
+    int32_t l, m;
+    uint32_t *unmeth1, *unmeth2;
+    uint32_t *meth1, *meth2;
+} strandMeth;
+
+//bed.c
 int posOverlapsBED(int32_t tid, int32_t pos, bedRegions *regions, int idxBED);
 int spanOverlapsBED(int32_t tid, int32_t start, int32_t end, bedRegions *regions, int *idx);
 int readStrandOverlapsBED(bam1_t *b, bedRegion region);
 void sortBED(bedRegions *regions);
 void destroyBED(bedRegions *regions);
 bedRegions *parseBED(char *fn, bam_hdr_t *hdr);
+
+//svg.c
+/*! @function
+ @abstract Create the actual SVG files that the user can view
+ @param opref	The output filename prefix (files will be opref_OT.svg and so on).
+ @param meths	The struct holding the methylation metrics for each of the 4 strands. If a strand is not present, it's length (->l) should be 0
+ @param which   Denotes which types of Cytosines were used to generate the methylation metric. Bit 0: CpG, bit 1: CHG, bit 2: CHH (these can be combined)
+*/
+void makeSVGs(char *opref, strandMeth **meths, int which);
+
+/*! @function
+ @abstract Print tab-separated methylation metrics to the command line. These can be manually analyzed.
+ @param meths	The struct holding the methylation metrics for each of the 4 strands. If a strand is not present, it's length (->l) should be 0
+*/
+void makeTXT(strandMeth **meths);

@@ -1,29 +1,32 @@
-PREFIX = /usr/local/bin #This can be changed"
+PREFIX = /usr/local/bin #This can be changed!
 CC = gcc
-OPTS = -Wall -g -O3
-
-OBJS = alignmentHeap.o bloomFilter.o graph.o murmur3.o TargetCreator.o realigner.o SemiGlobal.o threads.o
+OPTS = -Wall -g
 
 .PHONY: all clean htslib install clean-all
 
 .SUFFIXES:.c .o
 
-all: PileOMeth
+OBJS = bed.o svg.o
+
+all: PileOMeth PileOMethMBias
 
 .c.o:
-	$(CC) -c $(OPTS) -I$(INCLUDE_DIRS) $< -o $@
+	$(CC) -c $(OPTS) -Ihtslib $< -o $@
 
 htslib: 
 	$(MAKE) -C htslib
 
-PileOMeth: htslib
-	$(CC) $(OPTS) -Ihtslib -o PileOMeth bed.c PileOMeth.c htslib/libhts.a -lz -lpthread
+PileOMeth: htslib $(OBJS)
+	$(CC) $(OPTS) -Ihtslib -o PileOMeth PileOMeth.c bed.o htslib/libhts.a -lz -lpthread
+
+PileOMethMBias: htslib $(OBJS)
+	$(CC) $(OPTS) -Ihtslib -o PileOMethMBias MBias.c $(OBJS) htslib/libhts.a -lm -lz -lpthread
 
 clean:
-	rm -f *.o PileOMeth
+	rm -f *.o PileOMeth PileOMethMBias
 
 clean-all: clean
 	make --directory=htslib clean
 
 install: PileOMeth
-	install PileOMeth $(PREFIX)
+	install PileOMeth PileOMethMBias $(PREFIX)
