@@ -10,6 +10,10 @@ Compilation
 
 Compilation and installation can be performed via:
 
+    git clone https://github.com/dpryan79/PileOMeth.git
+    cd PileOMeth
+    git submodule init
+    git submodule update
     make
     make install path=/some/installation/path
 
