@@ -169,7 +169,7 @@ void extractMBias(Config *config, char *opref, int SVG, int txt) {
 }
 
 void mbias_usage() {
-    fprintf(stderr, "\nUsage: PileOMeth mbias [OPTIONS] reference.fa file.bam prefix\n");
+    fprintf(stderr, "\nUsage: PileOMeth mbias [OPTIONS] <ref.fa> <sorted_alignments.bam> <output.prefix>\n");
     fprintf(stderr,
 "\n"
 "Options:\n"

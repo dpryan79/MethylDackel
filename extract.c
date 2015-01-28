@@ -145,7 +145,7 @@ void parseBounds(char *s2, int *vals, int mult) {
 }
 
 void extract_usage() {
-    fprintf(stderr, "\nUsage: PileOMeth extract [OPTIONS] reference.fa file.bam\n");
+    fprintf(stderr, "\nUsage: PileOMeth extract [OPTIONS] <ref.fa> <sorted_alignments.bam>\n");
     fprintf(stderr,
 "\n"
 "Options:\n"
