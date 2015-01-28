@@ -24,7 +24,7 @@ Usage
 
 The most basic usage of PileOMeth is as follows:
 
-    PileOMeth reference_genome.fa alignments.bam
+    PileOMeth extract reference_genome.fa alignments.bam
 
 This will calculate per-base CpG metrics and output them to `alignments_CpG.bedGraph`, which is a standard bedGraph file with column 4 being the number of reads/read pairs with evidence for a methylated C at a given position and column 5 the equivalent for an unmethylated C. An alternate output filename prefix can be specified with the `-o some_new_prefix` option.
 
@@ -37,7 +37,7 @@ Methylation bias plotting and correction
 
 In an ideal experiment, we expect that the probability of observing a methylated C is constant across the length of any given read. In practice, however, there are often increases/decreases in observed methylation rate at the ends of reads and/or more global changes. These are termed methylation bias and including such regions in the extracted methylation metrics will result in noisier and less accurate data. For this reason, users are strongly encouraged to make a methylation bias plot. PileOMeth comes with a program called PileOMethMBias for just this purpose:
 
-    PileOMethMBias reference_genome.fa alignments.sorted.bam output_prefix
+    PileOMeth mbias reference_genome.fa alignments.sorted.bam output_prefix
 
 That command will create a methylation bias (mbias for short) plot for each of the strands for which there are valid alignments. The command can take almost all of the same options as `PileOMeth`, so if you're interested in looking at only a single region or only CHH and CHG metrics then you can do that (run `PileOMethMBias -h` for the full list of options). The resulting mbias graphs are in SVG format and can be viewed in most modern web browsers:
 
