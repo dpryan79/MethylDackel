@@ -49,5 +49,3 @@ To do list
 ==========
 
  - [ ] Is the output format the most convenient (it's what Bison uses, so converters have already been written)? It makes more sense to output a predefined VCF format, which would allow processing multiple samples at once. This would require a spec., which should have pretty broad input.
- - [ ] Need to finish restructuring things to allow easy library incorporation
- - [ ] Merge all executables behind a single front-end (*a la* samtools).
