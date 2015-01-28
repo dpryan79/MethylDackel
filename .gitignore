@@ -1,6 +1,7 @@
 tests/*.fa.*
 tests/*.bedGraph
 *.o
+*.a
 *.swp
 PileOMeth
 PileOMethMBias

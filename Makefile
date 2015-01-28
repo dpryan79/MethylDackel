@@ -1,16 +1,25 @@
 prefix= /usr/local/bin #This can be changed"
 CC = gcc
+AR = ar
+RANLIB = ranlib
 OPTS = -Wall -g -O3
 
-OBJS = pileup.o bed.o
-
-.PHONY: all clean htslib install clean-all
+.PHONY: all clean htslib install clean-all version.h
 
 .SUFFIXES:.c .o
 
-OBJS = bed.o svg.o pileup.o
+all: lib PileOMeth
 
-all: PileOMeth PileOMethMBias
+OBJS = common.o bed.o svg.o pileup.o extract.o MBias.o
+VERSION = 0.1.0
+
+#If we're building from a git repo, then append the most recent tag
+ifneq "$(wildcard .git)" ""
+VERSION := $(VERSION)-$(shell git describe --always --dirty)
+endif
+
+version.h:
+	echo '#define VERSION "$(VERSION)"' > $@
 
 .c.o:
 	$(CC) -c $(OPTS) -Ihtslib $< -o $@
@@ -18,17 +27,20 @@ all: PileOMeth PileOMethMBias
 htslib: 
 	$(MAKE) -C htslib
 
-PileOMeth: htslib $(OBJS)
-	$(CC) $(OPTS) -Ihtslib -o PileOMeth PileOMeth.c bed.o pileup.o htslib/libhts.a -lz -lpthread
+libPileOMeth.a: version.h $(OBJS)
+	-@rm -f $@
+	$(AR) -rcs $@ $(OBJS)
 
-PileOMethMBias: htslib $(OBJS)
-	$(CC) $(OPTS) -Ihtslib -o PileOMethMBias MBias.c svg.o bed.o htslib/libhts.a -lm -lz -lpthread
+lib: libPileOMeth.a
+
+PileOMeth: htslib version.h libPileOMeth.a
+	$(CC) $(OPTS) -Ihtslib -o PileOMeth main.c libPileOMeth.a htslib/libhts.a -lm -lz -lpthread
 
 clean:
-	rm -f *.o PileOMeth PileOMethMBias
+	rm -f *.o PileOMeth libPileOMeth.a
 
 clean-all: clean
 	make --directory=htslib clean
 
 install: PileOMeth
-	install PileOMeth PileOMethMBias $(prefix)
+	install PileOMeth $(prefix)

@@ -66,6 +66,18 @@ typedef struct {
     int bounds[16];
 } Config;
 
+/*! @typedef
+ @abstract Structure given to the pileup filtering function
+ @field	config:	The Config* structure containing the settings
+ @field hdr:	The input header
+ @field iter:	The alignment iterator that should be traversed.
+*/
+typedef struct {
+    Config *config;
+    bam_hdr_t *hdr;
+    hts_itr_t *iter;
+} mplp_data;
+
 /*! @function
  @abstract Determine the strand from which a read arose
  @param	b	Pointer to an alignment
@@ -118,3 +130,38 @@ void makeSVGs(char *opref, strandMeth **meths, int which);
  @param meths	The struct holding the methylation metrics for each of the 4 strands. If a strand is not present, it's length (->l) should be 0
 */
 void makeTXT(strandMeth **meths);
+
+//common.c
+/*! @function
+ @abstract Return 1 if the base is part of a CpG/CHG/CHH
+ @param seq	The genomic sequence
+ @param pos	The index within the sequence
+ @param seqlen	The length of the sequence
+*/
+inline int isCpG(char *seq, int pos, int seqlen);
+inline int isCHG(char *seq, int pos, int seqlen);
+inline int isCHH(char *seq, int pos, int seqlen);
+
+/*! @function
+ @abstract Determine what strand an alignment originated from
+ @param b	The alignment in question.
+ @returns	1: original top, 2: original bottom, 3: complementary to
+		original top, 4: complementary to original bottom
+ @discussion	This function will optionally use the XR and XG auxiliary tags
+		if they're present. Without them, non-directional libraries
+		(those producing CTOT and CTOB alignments) can't be processed,
+		since they're otherwise indistinguishable from OT and OB
+		alignments.
+*/
+int getStrand(bam1_t *b);
+
+/*! @function
+ @abstract The filter function used by all of the internal pileup methods
+ @param data	An mplp_data struct
+ @param b	An alignment
+ @discussion	This is actually described in the HTSlib documentation
+*/
+int filter_func(void *data, bam1_t *b);
+
+//Used internally by the pileup-based functions
+int updateMetrics(Config *config, const bam_pileup1_t *plp);
