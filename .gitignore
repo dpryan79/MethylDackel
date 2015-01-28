@@ -1,7 +1,7 @@
 tests/*.fa.*
 tests/*.bedGraph
 *.o
-*.a
 *.swp
+libPileOMeth.a
 PileOMeth
-PileOMethMBias
+version.h
