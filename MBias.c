@@ -204,7 +204,7 @@ void mbias_usage() {
 
 int mbias_main(int argc, char *argv[]) {
     char *opref = NULL;
-    int c, SVG = 1, txt = 0;
+    int c, i, SVG = 1, txt = 0;
     Config config;
 
     //Defaults
@@ -217,6 +217,7 @@ int mbias_main(int argc, char *argv[]) {
     config.reg = NULL;
     config.bedName = NULL;
     config.bed = NULL;
+    for(i=0; i<16; i++) config.bounds[i] = 0;
 
     static struct option lopts[] = {
         {"noCpG",        0, NULL,   1},

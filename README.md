@@ -35,11 +35,11 @@ PileOMeth can filter reads and bases according to MAPQ and Phred score, respecti
 Methylation bias plotting and correction
 ========================================
 
-In an ideal experiment, we expect that the probability of observing a methylated C is constant across the length of any given read. In practice, however, there are often increases/decreases in observed methylation rate at the ends of reads and/or more global changes. These are termed methylation bias and including such regions in the extracted methylation metrics will result in noisier and less accurate data. For this reason, users are strongly encouraged to make a methylation bias plot. PileOMeth comes with a program called PileOMethMBias for just this purpose:
+In an ideal experiment, we expect that the probability of observing a methylated C is constant across the length of any given read. In practice, however, there are often increases/decreases in observed methylation rate at the ends of reads and/or more global changes. These are termed methylation bias and including such regions in the extracted methylation metrics will result in noisier and less accurate data. For this reason, users are strongly encouraged to make a methylation bias plot. PileOMeth comes with a function for just this purpose:
 
     PileOMeth mbias reference_genome.fa alignments.sorted.bam output_prefix
 
-That command will create a methylation bias (mbias for short) plot for each of the strands for which there are valid alignments. The command can take almost all of the same options as `PileOMeth`, so if you're interested in looking at only a single region or only CHH and CHG metrics then you can do that (run `PileOMethMBias -h` for the full list of options). The resulting mbias graphs are in SVG format and can be viewed in most modern web browsers:
+That command will create a methylation bias (mbias for short) plot for each of the strands for which there are valid alignments. The command can take almost all of the same options as `PileOMeth extract`, so if you're interested in looking at only a single region or only CHH and CHG metrics then you can do that (run `PileOMeth mbias-h` for the full list of options). The resulting mbias graphs are in SVG format and can be viewed in most modern web browsers:
 
 ![An example SVG image](https://rawgit.com/dpryan79/PileOMeth/master/example_OT.svg)
 
