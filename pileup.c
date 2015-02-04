@@ -100,7 +100,9 @@ static void cust_tweak_overlap_quality(bam1_t *a, bam1_t *b) {
     uint8_t *a_seq  = bam_get_seq(a), *b_seq = bam_get_seq(b);
 
     //If alignments are on opposite strands then exit
-    if((getStrand(a) | getStrand(b)) == 3) goto quit;
+    int sa = getStrand(a);
+    int sb = getStrand(b);
+    if(((sa-sb)&1) == 1) goto quit;
 
     //Go to the first mapped position
     while(posa[ia]<0 && ia<na) ia++;

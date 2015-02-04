@@ -80,16 +80,16 @@ int updateMetrics(Config *config, const bam_pileup1_t *plp) {
     //Is the phred score even high enough?
     if(bam_get_qual(plp->b)[plp->qpos] < config->minPhred) return 0;
 
-    if(base == 2 && (strand & 1)) return 1; //C on an OT/CTOT alignment
-    else if(base == 8 && (strand & 1)) return -1; //T on an OT/CTOT alignment
-    else if(base == 4 && (strand & 2)) return 1; //G on an OB/CTOB alignment
-    else if(base == 1 && (strand & 2)) return -1; //A on an OB/CTOB alignment
+    if(base == 2 && (strand==1 || strand==3)) return 1; //C on an OT/CTOT alignment
+    else if(base == 8 && (strand==1 || strand==3)) return -1; //T on an OT/CTOT alignment
+    else if(base == 4 && (strand==2 || strand==4)) return 1; //G on an OB/CTOB alignment
+    else if(base == 1 && (strand==2 || strand==4)) return -1; //A on an OB/CTOB alignment
     return 0;
 }
 
 //Convert bases outside of the bounds to N and their phred scores to 0
 bam1_t *trimAlignment(bam1_t *b, int bounds[16]) {
-    int strand = getStrand(b);
+    int strand = getStrand(b)-1;
     int i, lb, rb;
     uint8_t *qual = bam_get_qual(b);
     uint8_t *seq = bam_get_seq(b);

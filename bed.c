@@ -55,7 +55,12 @@ int posOverlapsBED(int32_t tid, int32_t pos, bedRegions *regions, int idx) {
 
 //Return 1 on overlap, otherwise 0
 int readStrandOverlapsBED(bam1_t *b, bedRegion region) {
-    if(region.strand) return getStrand(b) & region.strand;
+    int s = getStrand(b);
+    if(region.strand) {
+        if(region.strand == 1 && (s==1 || s==3)) return 1;
+        if(region.strand == 2 && (s==2 || s==4)) return 1;
+        return 0;
+    }
     return 1;
 }
 
