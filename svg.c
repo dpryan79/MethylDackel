@@ -90,9 +90,9 @@ int getMinX(strandMeth *m, int which) {
 
 int getMaxX(strandMeth *m) {
     int i;
-    for(i=m->l-1; i>=0; i--) {
-        if(m->unmeth1[i]+m->meth1[i]) break;
-        if(m->unmeth2[i]+m->meth2[i]) break;
+    for(i=m->l; i>0; i--) {
+        if(m->unmeth1[i-1]+m->meth1[i-1]) break;
+        if(m->unmeth2[i-1]+m->meth2[i-1]) break;
     }
     if(i>=0) {
         //Round to the next multiple of 5
@@ -104,7 +104,7 @@ int getMaxX(strandMeth *m) {
 }
 
 int *getXTicks(int maxX, int *n) {
-    int *o, maxN = 7, i;
+    int *o, maxN = 7, i, span;
 
     /***************************************************************************
      *
@@ -113,18 +113,33 @@ int *getXTicks(int maxX, int *n) {
      *
     ***************************************************************************/
     *n = maxX/5;
-    if(*n > maxN) *n = maxX/10;
-    if(*n > maxN) *n = maxX/25;
-    if(*n > maxN) *n = maxX/50;
-    if(*n > maxN) *n = maxX/100;
-    if(*n > maxN) *n = maxX/250;
-    if(*n > maxN) *n = maxX/500;
-    if(*n > maxN) *n = maxX/1000;
+    if(*n > maxN) {
+        span = 10;
+        *n = maxX/span;
+    } else if(*n > maxN) {
+        span = 25;
+        *n = maxX/span;
+    } else if(*n > maxN) {
+        span = 50;
+        *n = maxX/span;
+    } else if(*n > maxN) {
+        span = 100;
+        *n = maxX/span;
+    } else if(*n > maxN) {
+        span = 250;
+        *n = maxX/span;
+    } else if(*n > maxN) {
+        span = 500;
+        *n = maxX/span;
+    } else if(*n > maxN) {
+        span = 1000;
+        *n = maxX/span;
+    }
 
     o = malloc((*n) * sizeof(int));
     assert(o);
 
-    for(i=0; i<*n; i++) o[i] = (i+1)*maxX/(*n);
+    for(i=0; i<*n; i++) o[i] = (i+1)*span;
 
     return o;
 }
@@ -152,7 +167,7 @@ double remapX(int orig, int maxX, int buffer, int dim) {
     return buffer + ((double) dim)*orig/((double) maxX);
 }
 
-void plotCI(FILE *of, int minX, strandMeth *m, int which, char *col, int buffer, int dim, double minY, double maxY) {
+void plotCI(FILE *of, int minX, int maxX, strandMeth *m, int which, char *col, int buffer, int dim, double minY, double maxY) {
     uint32_t *meth, *umeth;
     int32_t i;
     double val;
@@ -167,23 +182,23 @@ void plotCI(FILE *of, int minX, strandMeth *m, int which, char *col, int buffer,
 
     //Start the path
     val = CI(umeth[minX], meth[minX], 0);
-    fprintf(of, "<path d=\"M %f %f\n", remapX(minX+1, m->l, buffer,dim), remapY(val, minY, maxY, buffer, dim));
-    for(i=minX+1; i<m->l; i++) {
+    fprintf(of, "<path d=\"M %f %f\n", remapX(minX+1, maxX, buffer,dim), remapY(val, minY, maxY, buffer, dim));
+    for(i=minX+1; i<=m->l; i++) {
         if(meth[i]||umeth[i]) {
             val = CI(umeth[i], meth[i], 0);
-            fprintf(of, "  L %f %f\n", remapX(i+1, m->l, buffer,dim), remapY(val, minY, maxY, buffer, dim));
+            fprintf(of, "  L %f %f\n", remapX(i+1, maxX, buffer,dim), remapY(val, minY, maxY, buffer, dim));
         }
     }
     for(i=m->l-1; i>=0; i--) {
         if(meth[i]||umeth[i]) {
             val = CI(umeth[i], meth[i], 1);
-            fprintf(of, "  L %f %f\n", remapX(i+1, m->l, buffer,dim), remapY(val, minY, maxY, buffer, dim));
+            fprintf(of, "  L %f %f\n", remapX(i+1, maxX, buffer,dim), remapY(val, minY, maxY, buffer, dim));
         }
     }
     fprintf(of, "Z\" fill=\"%s\" fill-opacity=\"0.2\"/>\n", col);
 }
 
-void plotVals(FILE *of, int minX, strandMeth *m, int which, char *col, int buffer, int dim, double minY, double maxY) {
+void plotVals(FILE *of, int minX, int maxX, strandMeth *m, int which, char *col, int buffer, int dim, double minY, double maxY) {
     uint32_t *meth, *umeth;
     int32_t i;
     double val;
@@ -199,11 +214,11 @@ void plotVals(FILE *of, int minX, strandMeth *m, int which, char *col, int buffe
 
     //Start the path
     val = meth[minX]/((double) (meth[minX]+umeth[minX]));
-    fprintf(of, "<path d=\"M %f %f\n", remapX(minX+1, m->l, buffer,dim), remapY(val, minY, maxY, buffer, dim));
-    for(i=minX+1; i<m->l; i++) {
+    fprintf(of, "<path d=\"M %f %f\n", remapX(minX+1, maxX, buffer,dim), remapY(val, minY, maxY, buffer, dim));
+    for(i=minX+1; i<=m->l; i++) {
         if(meth[i]||umeth[i]) {
             val = meth[i]/((double) (meth[i]+umeth[i]));
-            fprintf(of, "  L %f %f\n", remapX(i+1, m->l, buffer,dim), remapY(val, minY, maxY, buffer, dim));
+            fprintf(of, "  L %f %f\n", remapX(i+1, maxX, buffer,dim), remapY(val, minY, maxY, buffer, dim));
         }
     }
     fprintf(of, "\" stroke=\"%s\" stroke-width=\"2\" fill-opacity=\"0\"/>\n", col);
@@ -366,10 +381,10 @@ void makeSVGs(char *opref, strandMeth **meths, int which) {
             }
 
             //Draw the lines
-            if(hasRead1) plotCI(of, minX1, meths[i], 1, col1, buffer, dim, minY, maxY);
-            if(hasRead2) plotCI(of, minX2, meths[i], 2, col2, buffer, dim, minY, maxY);
-            if(hasRead1) plotVals(of, minX1, meths[i], 1, col1, buffer, dim, minY, maxY);
-            if(hasRead2) plotVals(of, minX2, meths[i], 2, col2, buffer, dim, minY, maxY);
+            if(hasRead1) plotCI(of, minX1, maxX, meths[i], 1, col1, buffer, dim, minY, maxY);
+            if(hasRead2) plotCI(of, minX2, maxX, meths[i], 2, col2, buffer, dim, minY, maxY);
+            if(hasRead1) plotVals(of, minX1, maxX, meths[i], 1, col1, buffer, dim, minY, maxY);
+            if(hasRead2) plotVals(of, minX2, maxX, meths[i], 2, col2, buffer, dim, minY, maxY);
 
             //Get cutting threshold suggestions
             getThresholds(meths[i], 1, &lthresh1, &rthresh1);

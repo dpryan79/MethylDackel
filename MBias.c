@@ -10,9 +10,11 @@
 #include "PileOMeth.h"
 
 strandMeth *growStrandMeth(strandMeth *s, int32_t l) {
-    int32_t m = kroundup32(l);
+    int32_t m;
     int i;
-    if(m==0) m=32; //Enforce a minimum length
+    l++;
+    m = kroundup32(l);
+    if(m<32) m=32; //Enforce a minimum length
 
     s->unmeth1 = realloc(s->unmeth1, sizeof(uint32_t)*m);
     s->meth1 = realloc(s->meth1, sizeof(uint32_t)*m);
@@ -176,7 +178,7 @@ void mbias_usage() {
 " -q INT           Minimum MAPQ threshold to include an alignment (default 10)\n"
 " -p INT           Minimum Phred threshold to include a base (default 5). This\n"
 "                  must be >0.\n"
-" -D INT Maximum per-base depth (default 2000)\n"
+" -D INT           Maximum per-base depth (default 2000)\n"
 " -r STR           Region string in which to extract methylation\n"
 " -l FILE          A BED file listing regions for inclusion. Note that unlike\n"
 "                  samtools mpileup, this option will utilize the strand column\n"
