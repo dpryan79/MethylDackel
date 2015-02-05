@@ -104,7 +104,7 @@ int getMaxX(strandMeth *m) {
 }
 
 int *getXTicks(int maxX, int *n) {
-    int *o, maxN = 7, i, span;
+    int *o, maxN = 7, i, span = 5;
 
     /***************************************************************************
      *
