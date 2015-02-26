@@ -1,8 +1,8 @@
-prefix= /usr/local/bin #This can be changed"
+prefix= /usr/local/bin #This can be changed
 CC = gcc
 AR = ar
 RANLIB = ranlib
-OPTS = -Wall -g
+OPTS = -Wall -g -O3
 
 .PHONY: all clean htslib install clean-all version.h
 
@@ -11,7 +11,7 @@ OPTS = -Wall -g
 all: lib PileOMeth
 
 OBJS = common.o bed.o svg.o pileup.o extract.o MBias.o
-VERSION = 0.1.0
+VERSION = 0.1.1
 
 #If we're building from a git repo, then append the most recent tag
 ifneq "$(wildcard .git)" ""

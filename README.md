@@ -32,6 +32,28 @@ By default, PileOMeth will only calculate CpG metrics, but CHG and CHH metrics a
 
 PileOMeth can filter reads and bases according to MAPQ and Phred score, respectively. The default minimums are MAPQ >= 10 and Phred >= 5, though these can be changed with the -q and -p options. PileOMeth can also account for methylation bias (described below) with the `--OT`, `--OB`, `--CTOT`, and `--CTOB` options.
 
+Output
+======
+
+The `PileOMeth extract` produces a variant of [bedGraph](http://genome.ucsc.edu/goldenpath/help/bedgraph.html) that similar to the "coverage" file produced by [Bismark](http://www.bioinformatics.babraham.ac.uk/projects/bismark/) and [Bison](https://github.com/dpryan79/bison). In short, each line consists of 6 tab separated columns:
+
+1. The chromosome/contig/scaffold name
+2. The start coordinate
+3. The end coordinate
+4. The methylation percentage rounded to an integer
+5. The number of alignments/pairs reporting methylated bases
+6. The number of alignments/pairs reporting unmethylated bases
+
+All coordinates are 0-based half open, which conforms to the bedGraph definition. When paired-end reads are aligned, it can often occur that their alignments overlap. In such cases, PileOMeth will not count both reads of the pair in its output as doing so would lead to incorrect downstream statistical results.
+
+An example of the output is below:
+
+> track type="bedGraph" description="SRR1182519.sorted CpG methylation levels"
+> 1	25115	25116	100	3	0
+> 1	29336	29337	50	1	1
+
+Note the header line, which starts with "track". This is optional for bedGraph files but produced by PileOMeth. The "description" field is used as a label in programs such as [IGV](http://www.broadinstitute.org/igv/). Each of the subsequent lines describe single Cytosines, the 25116th and 29337th base on chromosome 1, respectively. The first position has 3 alignments indicating methylation and 0 unmethylation (100% methylation) and the second position 1 alignment each supporting methylation and unmethylation (50% methylation).
+
 Methylation bias plotting and correction
 ========================================
 

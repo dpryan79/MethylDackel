@@ -106,7 +106,7 @@ void extractCalls(Config *config) {
         }
 
         if(nmethyl+nunmethyl) fprintf(config->output_fp[type], "%s\t%i\t%i\t%i\t%" PRIu32 "\t%" PRIu32 "\n", \
-            hdr->target_name[tid], pos, pos+1, (int) (1000.0 * ((double) nmethyl)/(nmethyl+nunmethyl)), nmethyl, nunmethyl);
+            hdr->target_name[tid], pos, pos+1, (int) (100.0 * ((double) nmethyl)/(nmethyl+nunmethyl)), nmethyl, nunmethyl);
     }
 
     bam_hdr_destroy(hdr);
