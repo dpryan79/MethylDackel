@@ -11,6 +11,35 @@
 #include <limits.h>
 #include "PileOMeth.h"
 
+//N.B., a tid of -1 means that the lastCall was written
+struct lastCall{
+    int32_t tid, pos;
+    uint32_t nmethyl, nunmethyl;
+};
+
+void processLast(FILE *of, struct lastCall *last, bam_hdr_t *hdr, int32_t tid, int32_t pos, int width, uint32_t nmethyl, uint32_t nunmethyl) {
+    if(last->tid == tid && last->pos == pos) {
+        nmethyl += last->nmethyl;
+        nunmethyl += last->nunmethyl;
+        fprintf(of, "%s\t%i\t%i\t%i\t%" PRIu32 "\t%" PRIu32 "\n", \
+            hdr->target_name[tid], pos, pos+width,
+            (int) (100.0 * ((double) nmethyl)/(nmethyl+nunmethyl)),
+            nmethyl, nunmethyl);
+        last->tid = -1;
+    } else {
+        if(last->tid != -1) {
+            fprintf(of, "%s\t%i\t%i\t%i\t%" PRIu32 "\t%" PRIu32 "\n", \
+                hdr->target_name[last->tid], last->pos, last->pos+width,
+                (int) (100.0 * ((double) last->nmethyl)/(last->nmethyl+last->nunmethyl)),
+                last->nmethyl, last->nunmethyl);
+        }
+        last->tid = tid;
+        last->pos = pos;
+        last->nmethyl = nmethyl;
+        last->nunmethyl = nunmethyl;
+    }
+}
+
 void extractCalls(Config *config) {
     bam_hdr_t *hdr = sam_hdr_read(config->fp);
     bam_mplp_t iter;
@@ -23,6 +52,21 @@ void extractCalls(Config *config) {
     const bam_pileup1_t **plp = NULL;
     char *seq = NULL, base;
     mplp_data *data = NULL;
+    struct lastCall *lastCpG = NULL;
+    struct lastCall *lastCHG = NULL;
+
+    if(config->merge) {
+        if(config->keepCpG) {
+            lastCpG = calloc(1, sizeof(struct lastCall));
+            assert(lastCpG);
+            lastCpG->tid = -1;
+        }
+        if(config->keepCHG) {
+            lastCHG = calloc(1, sizeof(struct lastCall));
+            assert(lastCHG);
+            lastCHG->tid = -1;
+        }
+    }
 
     data = calloc(1,sizeof(mplp_data));
     if(data == NULL) {
@@ -105,8 +149,35 @@ void extractCalls(Config *config) {
             else if(rv<0) nunmethyl++;
         }
 
-        if(nmethyl+nunmethyl) fprintf(config->output_fp[type], "%s\t%i\t%i\t%i\t%" PRIu32 "\t%" PRIu32 "\n", \
-            hdr->target_name[tid], pos, pos+1, (int) (100.0 * ((double) nmethyl)/(nmethyl+nunmethyl)), nmethyl, nunmethyl);
+        if(!config->merge || type==2) {
+            if(nmethyl+nunmethyl) fprintf(config->output_fp[type], "%s\t%i\t%i\t%i\t%" PRIu32 "\t%" PRIu32 "\n", \
+                hdr->target_name[tid], pos, pos+1, (int) (100.0 * ((double) nmethyl)/(nmethyl+nunmethyl)), nmethyl, nunmethyl);
+        } else {
+            //Merge into per-CpG/CHG metrics
+            if(type==0) {
+                if(base=='G' || base=='g') pos--;
+                processLast(config->output_fp[0], lastCpG, hdr, tid, pos, 2, nmethyl, nunmethyl);
+            } else {
+                if(base=='G' || base=='g') pos-=2;
+                processLast(config->output_fp[1], lastCHG, hdr, tid, pos, 3, nmethyl, nunmethyl);
+            }
+        }
+    }
+
+    //Don't forget the last CpG/CHG
+    if(config->merge) {
+        if(config->keepCpG && lastCpG->tid != -1) {
+            fprintf(config->output_fp[0], "%s\t%i\t%i\t%i\t%" PRIu32 "\t%" PRIu32 "\n", \
+                hdr->target_name[lastCpG->tid], lastCpG->pos, lastCpG->pos+2,
+                (int) (100.0 * ((double) lastCpG->nmethyl)/(lastCpG->nmethyl+lastCpG->nunmethyl)),
+                lastCpG->nmethyl, lastCpG->nunmethyl);
+        }
+        if(config->keepCHG && lastCHG->tid != -1) {
+            fprintf(config->output_fp[1], "%s\t%i\t%i\t%i\t%" PRIu32 "\t%" PRIu32 "\n", \
+                hdr->target_name[lastCHG->tid], lastCHG->pos, lastCHG->pos+3,
+                (int) (100.0 * ((double) lastCHG->nmethyl)/(lastCHG->nmethyl+lastCHG->nunmethyl)),
+                lastCHG->nmethyl, lastCHG->nunmethyl);
+        }
     }
 
     bam_hdr_destroy(hdr);
@@ -160,7 +231,9 @@ void extract_usage() {
 "                  column, then only metrics from the top strand will be\n"
 "                  output. Note that the -r option can be used to limit the\n"
 "                  regions of -l.\n"
-" -o, --opref STR  Output filename prefix. CpG/CHG/CHH metrics will be\n"
+" --merge          Merge per-Cytosine metrics from CpG and CHG contexts into\n"
+"                  per-CPG or per-CHG metrics.\n"
+" -o, --opref STR  Output filename prefix. CpG/CHG/CHH context metrics will be\n"
 "                  output to STR_CpG.bedGraph and so on.\n"
 " --keepDupes      By default, any alignment marked as a duplicate is ignored.\n"
 "                  This option causes them to be incorporated.\n"
@@ -170,9 +243,9 @@ void extract_usage() {
 "                  unset in the FLAG field are ignored. Note that the definition\n"
 "                  of concordant and discordant is based on your aligner\n"
 "                  settings.\n"
-" --noCpG          Do not output CpG methylation metrics\n"
-" --CHG            Output CHG methylation metrics\n"
-" --CHH            Output CHH methylation metrics\n"
+" --noCpG          Do not output CpG context methylation metrics\n"
+" --CHG            Output CHG context methylation metrics\n"
+" --CHH            Output CHH context methylation metrics\n"
 " --OT INT,INT,INT,INT Inclusion bounds for methylation calls from reads/pairs\n"
 "                  origination from the original top strand. Suggested values can\n"
 "                  be obtained from the MBias program. Each integer represents a\n"
@@ -200,6 +273,7 @@ int extract_main(int argc, char *argv[]) {
     config.keepCpG = 1; config.keepCHG = 0; config.keepCHH = 0;
     config.minMapq = 10; config.minPhred = 5; config.keepDupes = 0;
     config.keepSingleton = 0, config.keepDiscordant = 0;
+    config.merge = 0;
     config.maxDepth = 2000;
     config.fai = NULL;
     config.fp = NULL;
@@ -221,6 +295,7 @@ int extract_main(int argc, char *argv[]) {
         {"OB",           1, NULL,   8},
         {"CTOT",         1, NULL,   9},
         {"CTOB",         1, NULL,  10},
+        {"merge",        0, NULL,  11},
         {"help",         0, NULL, 'h'}
     };
     while((c = getopt_long(argc, argv, "q:p:r:l:o:D:", lopts,NULL)) >= 0) {
@@ -269,6 +344,9 @@ int extract_main(int argc, char *argv[]) {
             break;
         case 10 :
             parseBounds(optarg, config.bounds, 3);
+            break;
+        case 11 :
+            config.merge = 1;
             break;
         case 'q' :
             config.minMapq = atoi(optarg);
@@ -347,7 +425,7 @@ int extract_main(int argc, char *argv[]) {
             fprintf(stderr, "Couldn't open the output CpG metrics file for writing! Insufficient permissions?\n");
             return -3;
         }
-        fprintf(config.output_fp[0], "track type=\"bedGraph\" description=\"%s CpG methylation levels\"\n", opref);
+        fprintf(config.output_fp[0], "track type=\"bedGraph\" description=\"%s CpG %smethylation levels\"\n", opref, config.merge?"merged ":"");
     }
     if(config.keepCHG) {
         sprintf(oname, "%s_CHG.bedGraph", opref);
@@ -356,7 +434,7 @@ int extract_main(int argc, char *argv[]) {
             fprintf(stderr, "Couldn't open the output CHG metrics file for writing! Insufficient permissions?\n");
             return -3;
         }
-        fprintf(config.output_fp[1], "track type=\"bedGraph\" description=\"%s CHG methylation levels\"\n", opref);
+        fprintf(config.output_fp[1], "track type=\"bedGraph\" description=\"%s CHG %smethylation levels\"\n", opref, config.merge?"merged ":"");
     }
     if(config.keepCHH) {
         sprintf(oname, "%s_CHH.bedGraph", opref);

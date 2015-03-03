@@ -19,6 +19,11 @@ Compilation and installation can be performed via:
 
 As HTSlib is now a submodule of this repository, you no longer need to manually download and compile it.
 
+Methylation Context
+===================
+
+PileOMeth groups all Cytosines into one of three sequence contexts: [CpG](http://en.wikipedia.org/wiki/CpG_site), CHG, and CHH. Here, H is the IUPAC ambiguity code for any nucleotide other than G. If an N is encountered in the reference sequence, then the context will be assigned to CHG or CHH, as appropriate (e.g., CNG would be categorized as in a CHG context and CNC as in a CHH context). If a Cytosine is close enough to the end of a chromosome/contig such that its context can't be inferred, then it is categorized as CHH (e.g., a Cytosine as the last base of a chromosome is considered as being in a CHH context).
+
 Usage
 =====
 
@@ -28,7 +33,7 @@ The most basic usage of PileOMeth is as follows:
 
 This will calculate per-base CpG metrics and output them to `alignments_CpG.bedGraph`, which is a standard bedGraph file with column 4 being the number of reads/read pairs with evidence for a methylated C at a given position and column 5 the equivalent for an unmethylated C. An alternate output filename prefix can be specified with the `-o some_new_prefix` option.
 
-By default, PileOMeth will only calculate CpG metrics, but CHG and CHH metrics are supported as well (see the --CHH and --CHG options). If you would like to ignore CpG, metrics, simply specify --noCpG. Each type of metric is output to a different file.
+By default, PileOMeth will only calculate metrics for Cytosines in a CpG context, but metrics for those in CHG and CHH contexts are supported as well (see the --CHH and --CHG options). If you would like to ignore Cytosines in CpGs, simply specify --noCpG. Each type of metric is output to a different file. For per-CpG and/or per-CHG rather than per-Cytosine metrics, see "Per-CpG/CHG metrics", below.
 
 PileOMeth can filter reads and bases according to MAPQ and Phred score, respectively. The default minimums are MAPQ >= 10 and Phred >= 5, though these can be changed with the -q and -p options. PileOMeth can also account for methylation bias (described below) with the `--OT`, `--OB`, `--CTOT`, and `--CTOB` options.
 
@@ -54,6 +59,22 @@ An example of the output is below:
 
 Note the header line, which starts with "track". This is optional for bedGraph files but produced by PileOMeth. The "description" field is used as a label in programs such as [IGV](http://www.broadinstitute.org/igv/). Each of the subsequent lines describe single Cytosines, the 25116th and 29337th base on chromosome 1, respectively. The first position has 3 alignments indicating methylation and 0 unmethylation (100% methylation) and the second position 1 alignment each supporting methylation and unmethylation (50% methylation).
 
+Per-CpG/CHG metrics
+-------------------
+
+In many circumstances, it's desireable for metrics from individual Cytosines in a CpG to be merged, producing per-CpG metrics rather than per-Cytosine metrics. This can be accomplished with the `--merge` option. If this is used, then this output:
+
+> track type="bedGraph" description="SRR1182519.sorted CpG methylation levels"
+> 1	25114	25115	100	2	1
+> 1	25115	25116	100	3	0
+
+to this:
+
+> track type="bedGraph" description="SRR1182519.sorted merged CpG methylation levels"
+> 1	25114	25116	100	5	1
+
+This also works for CHG-level metrics. If bedGraph files containing per-Cytosine metrics already exist, they can be converted to instead contain per-CpG/CHG metrics with `PileOMeth merge`.
+
 Methylation bias plotting and correction
 ========================================
 
@@ -70,4 +91,7 @@ If you have paired-end data, both reads in the pair will be shown separately, as
 To do list
 ==========
 
+ - [X] Allow users to easily merge per-C metrics into per-CpG/per-CHG metrics.
+ - [X] Test above and restructure into multiple functions.
+ - [ ] Add a stand-alone mergeContext function that will merge single-C bedGraph files into per-CpG/CHG bedGraph files.
  - [ ] Is the output format the most convenient (it's what Bison uses, so converters have already been written)? It makes more sense to output a predefined VCF format, which would allow processing multiple samples at once. This would require a spec., which should have pretty broad input.

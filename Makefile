@@ -1,4 +1,4 @@
-prefix= /usr/local/bin #This can be changed
+path= /usr/local/bin #This can be changed
 CC = gcc
 AR = ar
 RANLIB = ranlib
@@ -11,7 +11,7 @@ OPTS = -Wall -g -O3
 all: lib PileOMeth
 
 OBJS = common.o bed.o svg.o pileup.o extract.o MBias.o
-VERSION = 0.1.1
+VERSION = 0.1.2
 
 #If we're building from a git repo, then append the most recent tag
 ifneq "$(wildcard .git)" ""
@@ -43,4 +43,4 @@ clean-all: clean
 	make --directory=htslib clean
 
 install: PileOMeth
-	install PileOMeth $(prefix)
+	install PileOMeth $(path)
