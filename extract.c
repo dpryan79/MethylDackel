@@ -232,7 +232,7 @@ void extract_usage() {
 "                  column, then only metrics from the top strand will be\n"
 "                  output. Note that the -r option can be used to limit the\n"
 "                  regions of -l.\n"
-" --merge          Merge per-Cytosine metrics from CpG and CHG contexts into\n"
+" --mergeContext   Merge per-Cytosine metrics from CpG and CHG contexts into\n"
 "                  per-CPG or per-CHG metrics.\n"
 " -o, --opref STR  Output filename prefix. CpG/CHG/CHH context metrics will be\n"
 "                  output to STR_CpG.bedGraph and so on.\n"
@@ -296,7 +296,7 @@ int extract_main(int argc, char *argv[]) {
         {"OB",           1, NULL,   8},
         {"CTOT",         1, NULL,   9},
         {"CTOB",         1, NULL,  10},
-        {"merge",        0, NULL,  11},
+        {"mergeContext", 0, NULL,  11},
         {"help",         0, NULL, 'h'}
     };
     while((c = getopt_long(argc, argv, "q:p:r:l:o:D:", lopts,NULL)) >= 0) {

@@ -37,10 +37,10 @@ By default, PileOMeth will only calculate metrics for Cytosines in a CpG context
 
 PileOMeth can filter reads and bases according to MAPQ and Phred score, respectively. The default minimums are MAPQ >= 10 and Phred >= 5, though these can be changed with the -q and -p options. PileOMeth can also account for methylation bias (described below) with the `--OT`, `--OB`, `--CTOT`, and `--CTOB` options.
 
-Output
-======
+Single Cytosine methylation metrics extraction
+==============================================
 
-The `PileOMeth extract` produces a variant of [bedGraph](http://genome.ucsc.edu/goldenpath/help/bedgraph.html) that similar to the "coverage" file produced by [Bismark](http://www.bioinformatics.babraham.ac.uk/projects/bismark/) and [Bison](https://github.com/dpryan79/bison). In short, each line consists of 6 tab separated columns:
+`PileOMeth extract` produces a variant of [bedGraph](http://genome.ucsc.edu/goldenpath/help/bedgraph.html) that's similar to the "coverage" file produced by [Bismark](http://www.bioinformatics.babraham.ac.uk/projects/bismark/) and [Bison](https://github.com/dpryan79/bison). In short, each line consists of 6 tab separated columns:
 
 1. The chromosome/contig/scaffold name
 2. The start coordinate
@@ -49,7 +49,7 @@ The `PileOMeth extract` produces a variant of [bedGraph](http://genome.ucsc.edu/
 5. The number of alignments/pairs reporting methylated bases
 6. The number of alignments/pairs reporting unmethylated bases
 
-All coordinates are 0-based half open, which conforms to the bedGraph definition. When paired-end reads are aligned, it can often occur that their alignments overlap. In such cases, PileOMeth will not count both reads of the pair in its output as doing so would lead to incorrect downstream statistical results.
+All coordinates are 0-based half open, which conforms to the bedGraph definition. When paired-end reads are aligned, it can often occur that their alignments overlap. In such cases, PileOMeth will not count both reads of the pair in its output, as doing so would lead to incorrect downstream statistical results.
 
 An example of the output is below:
 
@@ -57,23 +57,23 @@ An example of the output is below:
     1	25115	25116	100	3	0
     1	29336	29337	50	1	1
 
-Note the header line, which starts with "track". This is optional for bedGraph files but produced by PileOMeth. The "description" field is used as a label in programs such as [IGV](http://www.broadinstitute.org/igv/). Each of the subsequent lines describe single Cytosines, the 25116th and 29337th base on chromosome 1, respectively. The first position has 3 alignments indicating methylation and 0 unmethylation (100% methylation) and the second position 1 alignment each supporting methylation and unmethylation (50% methylation).
+Note the header line, which starts with "track". The "description" field is used as a label in programs such as [IGV](http://www.broadinstitute.org/igv/). Each of the subsequent lines describe single Cytosines, the 25116th and 29337th base on chromosome 1, respectively. The first position has 3 alignments (or pairs of alignments) indicating methylation and 0 indicating unmethylation (100% methylation) and the second position has 1 alignment each supporting methylation and unmethylation (50% methylation).
 
 Per-CpG/CHG metrics
--------------------
+===================
 
-In many circumstances, it's desireable for metrics from individual Cytosines in a CpG to be merged, producing per-CpG metrics rather than per-Cytosine metrics. This can be accomplished with the `--merge` option. If this is used, then this output:
+In many circumstances, it's desireable for metrics from individual Cytosines in a CpG to be merged, producing per-CpG metrics rather than per-Cytosine metrics. This can be accomplished with the `--mergeContext` option in `PileOMeth extract`. If this is used, then this output:
 
     track type="bedGraph" description="SRR1182519.sorted CpG methylation levels"
     1	25114	25115	100	2	1
     1	25115	25116	100	3	0
 
-to this:
+is changed to this:
 
-> track type="bedGraph" description="SRR1182519.sorted merged CpG methylation levels"
-> 1	25114	25116	100	5	1
+    track type="bedGraph" description="SRR1182519.sorted merged CpG methylation levels"
+    1	25114	25116	100	5	1
 
-This also works for CHG-level metrics. If bedGraph files containing per-Cytosine metrics already exist, they can be converted to instead contain per-CpG/CHG metrics with `PileOMeth merge`.
+This also works for CHG-level metrics. If bedGraph files containing per-Cytosine metrics already exist, they can be converted to instead contain per-CpG/CHG metrics with `PileOMeth mergeContext`.
 
 Methylation bias plotting and correction
 ========================================
@@ -93,5 +93,5 @@ To do list
 
  - [X] Allow users to easily merge per-C metrics into per-CpG/per-CHG metrics.
  - [X] Test above and restructure into multiple functions.
- - [ ] Add a stand-alone mergeContext function that will merge single-C bedGraph files into per-CpG/CHG bedGraph files.
+ - [X] Add a stand-alone mergeContext function that will merge single-C bedGraph files into per-CpG/CHG bedGraph files.
  - [ ] Is the output format the most convenient (it's what Bison uses, so converters have already been written)? It makes more sense to output a predefined VCF format, which would allow processing multiple samples at once. This would require a spec., which should have pretty broad input.
