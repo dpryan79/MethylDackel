@@ -10,7 +10,7 @@ OPTS = -Wall -g -O3
 
 all: lib PileOMeth
 
-OBJS = common.o bed.o svg.o pileup.o extract.o MBias.o
+OBJS = common.o bed.o svg.o pileup.o extract.o MBias.o mergeContext.o
 VERSION = 0.1.2
 
 #If we're building from a git repo, then append the most recent tag

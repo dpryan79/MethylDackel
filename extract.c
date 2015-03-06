@@ -149,8 +149,9 @@ void extractCalls(Config *config) {
             else if(rv<0) nunmethyl++;
         }
 
+        if(nmethyl+nunmethyl==0) continue;
         if(!config->merge || type==2) {
-            if(nmethyl+nunmethyl) fprintf(config->output_fp[type], "%s\t%i\t%i\t%i\t%" PRIu32 "\t%" PRIu32 "\n", \
+            fprintf(config->output_fp[type], "%s\t%i\t%i\t%i\t%" PRIu32 "\t%" PRIu32 "\n", \
                 hdr->target_name[tid], pos, pos+1, (int) (100.0 * ((double) nmethyl)/(nmethyl+nunmethyl)), nmethyl, nunmethyl);
         } else {
             //Merge into per-CpG/CHG metrics

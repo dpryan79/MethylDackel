@@ -53,9 +53,9 @@ All coordinates are 0-based half open, which conforms to the bedGraph definition
 
 An example of the output is below:
 
-> track type="bedGraph" description="SRR1182519.sorted CpG methylation levels"
-> 1	25115	25116	100	3	0
-> 1	29336	29337	50	1	1
+    track type="bedGraph" description="SRR1182519.sorted CpG methylation levels"
+    1	25115	25116	100	3	0
+    1	29336	29337	50	1	1
 
 Note the header line, which starts with "track". This is optional for bedGraph files but produced by PileOMeth. The "description" field is used as a label in programs such as [IGV](http://www.broadinstitute.org/igv/). Each of the subsequent lines describe single Cytosines, the 25116th and 29337th base on chromosome 1, respectively. The first position has 3 alignments indicating methylation and 0 unmethylation (100% methylation) and the second position 1 alignment each supporting methylation and unmethylation (50% methylation).
 
@@ -64,9 +64,9 @@ Per-CpG/CHG metrics
 
 In many circumstances, it's desireable for metrics from individual Cytosines in a CpG to be merged, producing per-CpG metrics rather than per-Cytosine metrics. This can be accomplished with the `--merge` option. If this is used, then this output:
 
-> track type="bedGraph" description="SRR1182519.sorted CpG methylation levels"
-> 1	25114	25115	100	2	1
-> 1	25115	25116	100	3	0
+    track type="bedGraph" description="SRR1182519.sorted CpG methylation levels"
+    1	25114	25115	100	2	1
+    1	25115	25116	100	3	0
 
 to this:
 
