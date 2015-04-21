@@ -15,7 +15,7 @@ Compilation and installation can be performed via:
     git submodule init
     git submodule update
     make
-    make install path=/some/installation/path
+    make install prefix=/some/installation/path
 
 As HTSlib is now a submodule of this repository, you no longer need to manually download and compile it.
 
