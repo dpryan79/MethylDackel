@@ -9,7 +9,12 @@
 #include <assert.h>
 #include <errno.h>
 #include <limits.h>
+#include <math.h>
 #include "PileOMeth.h"
+
+inline double logit(double p) { 
+    return(log(p) - log(1 - p)); 
+}
 
 void extractCalls(Config *config) {
     bam_hdr_t *hdr = sam_hdr_read(config->fp);
@@ -105,8 +110,40 @@ void extractCalls(Config *config) {
             else if(rv<0) nunmethyl++;
         }
 
-        if(nmethyl+nunmethyl) fprintf(config->output_fp[type], "%s\t%i\t%i\t%i\t%" PRIu32 "\t%" PRIu32 "\n", \
-            hdr->target_name[tid], pos, pos+1, (int) (100.0 * ((double) nmethyl)/(nmethyl+nunmethyl)), nmethyl, nunmethyl);
+        // the nut of it all 
+        if(nmethyl+nunmethyl) {
+            if (!config->fraction && !config->logit && !config->counts) {
+                fprintf(config->output_fp[type], \
+                        "%s\t%i\t%i\t%i\t%" PRIu32 "\t%" PRIu32 "\n", \
+                        hdr->target_name[tid], \
+                        pos, \
+                        pos+1, \
+                        (int) (100.0*((double) nmethyl)/(nmethyl+nunmethyl)),\
+                        nmethyl, \
+                        nunmethyl);
+            } else if(config->fraction) {
+                fprintf(config->output_fp[type], \
+                        "%s\t%i\t%i\t%f\n", \
+                        hdr->target_name[tid], \
+                        pos, \
+                        pos+1, \
+                        ((double) nmethyl)/(nmethyl+nunmethyl));
+            } else if(config->counts) {
+                fprintf(config->output_fp[type], \
+                        "%s\t%i\t%i\t%i\n", \
+                        hdr->target_name[tid], \
+                        pos, \
+                        pos+1, \
+                        nmethyl+nunmethyl);
+            } else if(config->logit) {
+                fprintf(config->output_fp[type], \
+                        "%s\t%i\t%i\t%f\n", \
+                        hdr->target_name[tid], \
+                        pos, \
+                        pos+1, \
+                        logit(((double) nmethyl)/(nmethyl+nunmethyl)));
+            }
+        }
     }
 
     bam_hdr_destroy(hdr);
@@ -173,6 +210,9 @@ void extract_usage() {
 " --noCpG          Do not output CpG methylation metrics\n"
 " --CHG            Output CHG methylation metrics\n"
 " --CHH            Output CHH methylation metrics\n"
+" --fraction       Extract fractional methylation (only) at each position\n"
+" --counts         Extract base counts (only) at each position\n"
+" --logit          Extract logit(M/(M+U)) (only) at each position\n"
 " --OT INT,INT,INT,INT Inclusion bounds for methylation calls from reads/pairs\n"
 "                  origination from the original top strand. Suggested values can\n"
 "                  be obtained from the MBias program. Each integer represents a\n"
@@ -207,10 +247,16 @@ int extract_main(int argc, char *argv[]) {
     config.reg = NULL;
     config.bedName = NULL;
     config.bed = NULL;
+    config.fraction = 0;
+    config.counts = 0;
+    config.logit = 0;
     for(i=0; i<16; i++) config.bounds[i] = 0;
 
     static struct option lopts[] = {
         {"opref",        1, NULL, 'o'},
+        {"fraction",     0, NULL, 'f'},
+        {"counts",       0, NULL, 'c'},
+        {"logit",        0, NULL, 'm'},
         {"noCpG",        0, NULL,   1},
         {"CHG",          0, NULL,   2},
         {"CHH",          0, NULL,   3},
@@ -223,7 +269,7 @@ int extract_main(int argc, char *argv[]) {
         {"CTOB",         1, NULL,  10},
         {"help",         0, NULL, 'h'}
     };
-    while((c = getopt_long(argc, argv, "q:p:r:l:o:D:", lopts,NULL)) >= 0) {
+    while((c = getopt_long(argc, argv, "q:p:r:l:o:D:f:c:m:", lopts,NULL)) >=0){
         switch(c) {
         case 'h' :
             extract_usage();
@@ -276,6 +322,15 @@ int extract_main(int argc, char *argv[]) {
         case 'p' :
             config.minPhred = atoi(optarg);
             break;
+        case 'm' :
+            config.logit = 1;
+            break;
+        case 'f' :
+            config.fraction = 1;
+            break;
+        case 'c' :
+            config.counts = 1;
+            break;
         default :
             fprintf(stderr, "Invalid option '%c'\n", c);
             extract_usage();
@@ -301,6 +356,12 @@ int extract_main(int argc, char *argv[]) {
     if(config.minMapq < 0) {
         fprintf(stderr, "-q %i is invalid. Resetting to 0, which is the lowest possible value.\n", config.minMapq);
         config.minMapq = 0;
+    }
+
+    //Has more than one output format been requested?
+    if(config.fraction + config.counts + config.logit > 1) {
+        fprintf(stderr, "You may specify AT MOST one of -c/--counts, -f/--fraction, or -m/--logit.\n");
+        return -6;
     }
 
     //Is there still a metric to output?
@@ -339,9 +400,25 @@ int extract_main(int argc, char *argv[]) {
         if(p != NULL) *p = '\0';
         fprintf(stderr, "writing to prefix:'%s'\n", opref);
     }
-    oname = malloc(sizeof(char) * (strlen(opref)+14));
+    if(config.fraction) { 
+      oname = malloc(sizeof(char) * (strlen(opref)+19));
+    } else if(config.counts) {
+      oname = malloc(sizeof(char) * (strlen(opref)+21));
+    } else if(config.logit) {
+      oname = malloc(sizeof(char) * (strlen(opref)+20));
+    } else { 
+      oname = malloc(sizeof(char) * (strlen(opref)+14));
+    }
     if(config.keepCpG) {
-        sprintf(oname, "%s_CpG.bedGraph", opref);
+        if(config.fraction) { 
+          sprintf(oname, "%s_CpG.meth.bedGraph", opref);
+        } else if(config.counts) {
+          sprintf(oname, "%s_CpG.counts.bedGraph", opref);
+        } else if(config.logit) {
+          sprintf(oname, "%s_CpG.logit.bedGraph", opref);
+        } else { 
+          sprintf(oname, "%s_CpG.bedGraph", opref);
+        }
         config.output_fp[0] = fopen(oname, "w");
         if(config.output_fp[0] == NULL) {
             fprintf(stderr, "Couldn't open the output CpG metrics file for writing! Insufficient permissions?\n");
@@ -350,7 +427,15 @@ int extract_main(int argc, char *argv[]) {
         fprintf(config.output_fp[0], "track type=\"bedGraph\" description=\"%s CpG methylation levels\"\n", opref);
     }
     if(config.keepCHG) {
-        sprintf(oname, "%s_CHG.bedGraph", opref);
+        if(config.fraction) { 
+          sprintf(oname, "%s_CHG.meth.bedGraph", opref);
+        } else if(config.counts) {
+          sprintf(oname, "%s_CHG.counts.bedGraph", opref);
+        } else if(config.logit) {
+          sprintf(oname, "%s_CHG.logit.bedGraph", opref);
+        } else { 
+          sprintf(oname, "%s_CHG.bedGraph", opref);
+        }
         config.output_fp[1] = fopen(oname, "w");
         if(config.output_fp[1] == NULL) {
             fprintf(stderr, "Couldn't open the output CHG metrics file for writing! Insufficient permissions?\n");
@@ -359,7 +444,15 @@ int extract_main(int argc, char *argv[]) {
         fprintf(config.output_fp[1], "track type=\"bedGraph\" description=\"%s CHG methylation levels\"\n", opref);
     }
     if(config.keepCHH) {
-        sprintf(oname, "%s_CHH.bedGraph", opref);
+        if(config.fraction) { 
+          sprintf(oname, "%s_CHH.meth.bedGraph", opref);
+        } else if(config.counts) {
+          sprintf(oname, "%s_CHH.counts.bedGraph", opref);
+        } else if(config.logit) {
+          sprintf(oname, "%s_CHH.logit.bedGraph", opref);
+        } else { 
+          sprintf(oname, "%s_CHH.bedGraph", opref);
+        }
         config.output_fp[2] = fopen(oname, "w");
         if(config.output_fp[2] == NULL) {
             fprintf(stderr, "Couldn't open the output CHH metrics file for writing! Insufficient permissions?\n");
