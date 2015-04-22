@@ -210,9 +210,12 @@ void extract_usage() {
 " --noCpG          Do not output CpG methylation metrics\n"
 " --CHG            Output CHG methylation metrics\n"
 " --CHH            Output CHH methylation metrics\n"
-" --fraction       Extract fractional methylation (only) at each position\n"
-" --counts         Extract base counts (only) at each position\n"
-" --logit          Extract logit(M/(M+U)) (only) at each position\n"
+" --fraction       Extract fractional methylation (only) at each position. This\n"
+"                  produces a file with a .meth.bedGraph extension.\n"
+" --counts         Extract base counts (only) at each position. This produces a\n"
+"                  file with a .counts.bedGraph extension.\n"
+" --logit          Extract logit(M/(M+U)) (only) at each position. This produces\n"
+"                  a file with a .logit.bedGraph extension.\n"
 " --OT INT,INT,INT,INT Inclusion bounds for methylation calls from reads/pairs\n"
 "                  origination from the original top strand. Suggested values can\n"
 "                  be obtained from the MBias program. Each integer represents a\n"
@@ -228,7 +231,8 @@ void extract_usage() {
 " --CTOT INT,INT,INT,INT\n"
 " --CTOB INT,INT,INT,INT As with --OT, but for the original bottom, complementary\n"
 "                  to the original top, and complementary to the original bottom\n"
-"                  strands, respectively.\n");
+"                  strands, respectively.\n"
+"\nNote that --fraction, --counts, and --logit are mutually exclusive!\n");
 }
 
 int extract_main(int argc, char *argv[]) {
@@ -357,6 +361,11 @@ int extract_main(int argc, char *argv[]) {
         fprintf(stderr, "-q %i is invalid. Resetting to 0, which is the lowest possible value.\n", config.minMapq);
         config.minMapq = 0;
     }
+    if(config.fraction+config.counts+config.logit > 1) {
+        fprintf(stderr, "More than one of --fraction, --counts, and --logit were specified. These are mutually exclusive.\n");
+        extract_usage();
+        return 1;
+    }
 
     //Has more than one output format been requested?
     if(config.fraction + config.counts + config.logit > 1) {
@@ -394,8 +403,10 @@ int extract_main(int argc, char *argv[]) {
 
     //Output files
     config.output_fp = malloc(sizeof(FILE *) * 3);
+    assert(config.output_fp);
     if(opref == NULL) {
         opref = strdup(argv[optind+1]);
+        assert(opref);
         p = strrchr(opref, '.');
         if(p != NULL) *p = '\0';
         fprintf(stderr, "writing to prefix:'%s'\n", opref);
@@ -409,6 +420,7 @@ int extract_main(int argc, char *argv[]) {
     } else { 
       oname = malloc(sizeof(char) * (strlen(opref)+14));
     }
+    assert(oname);
     if(config.keepCpG) {
         if(config.fraction) { 
           sprintf(oname, "%s_CpG.meth.bedGraph", opref);
