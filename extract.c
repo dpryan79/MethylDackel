@@ -9,7 +9,12 @@
 #include <assert.h>
 #include <errno.h>
 #include <limits.h>
+#include <math.h>
 #include "PileOMeth.h"
+
+inline double logit(double p) { 
+    return(log(p) - log(1 - p)); 
+}
 
 //N.B., a tid of -1 means that the lastCall was written
 struct lastCall{
@@ -17,21 +22,49 @@ struct lastCall{
     uint32_t nmethyl, nunmethyl;
 };
 
-void processLast(FILE *of, struct lastCall *last, bam_hdr_t *hdr, int32_t tid, int32_t pos, int width, uint32_t nmethyl, uint32_t nunmethyl) {
+void writeCall(FILE *of, Config *config, char *chrom, int32_t pos, int32_t width, uint32_t nmethyl, uint32_t nunmethyl) { 
+    if (!config->fraction && !config->logit && !config->counts) {
+        fprintf(of, \
+            "%s\t%i\t%i\t%i\t%" PRIu32 "\t%" PRIu32 "\n", \
+            chrom, \
+            pos, \
+            pos+width, \
+            (int) (100.0*((double) nmethyl)/(nmethyl+nunmethyl)),\
+            nmethyl, \
+            nunmethyl);
+    } else if(config->fraction) {
+        fprintf(of, \
+            "%s\t%i\t%i\t%f\n", \
+            chrom, \
+            pos, \
+            pos+width, \
+            ((double) nmethyl)/(nmethyl+nunmethyl));
+    } else if(config->counts) {
+        fprintf(of, \
+            "%s\t%i\t%i\t%i\n", \
+            chrom, \
+            pos, \
+            pos+width, \
+            nmethyl+nunmethyl);
+    } else if(config->logit) {
+        fprintf(of, \
+            "%s\t%i\t%i\t%f\n", \
+            chrom, \
+            pos, \
+            pos+width, \
+            logit(((double) nmethyl)/(nmethyl+nunmethyl)));
+    }
+}
+
+void processLast(FILE *of, Config *config, struct lastCall *last, bam_hdr_t *hdr, int32_t tid, int32_t pos, int width, uint32_t nmethyl, uint32_t nunmethyl) {
     if(last->tid == tid && last->pos == pos) {
         nmethyl += last->nmethyl;
         nunmethyl += last->nunmethyl;
-        fprintf(of, "%s\t%i\t%i\t%i\t%" PRIu32 "\t%" PRIu32 "\n", \
-            hdr->target_name[tid], pos, pos+width,
-            (int) (100.0 * ((double) nmethyl)/(nmethyl+nunmethyl)),
-            nmethyl, nunmethyl);
+        writeCall(of, config, hdr->target_name[tid], pos, width, nmethyl, nunmethyl);
         last->tid = -1;
     } else {
         if(last->tid != -1) {
-            fprintf(of, "%s\t%i\t%i\t%i\t%" PRIu32 "\t%" PRIu32 "\n", \
-                hdr->target_name[last->tid], last->pos, last->pos+width,
-                (int) (100.0 * ((double) last->nmethyl)/(last->nmethyl+last->nunmethyl)),
-                last->nmethyl, last->nunmethyl);
+            writeCall(of, config, hdr->target_name[tid], pos, width, last->nmethyl+nmethyl, last->nunmethyl+nunmethyl);
         }
         last->tid = tid;
         last->pos = pos;
@@ -48,7 +81,7 @@ void extractCalls(Config *config) {
     int n_plp; //This will need to be modified for multiple input files
     int ctid = -1; //The tid of the contig whose sequence is stored in "seq"
     int idxBED = 0, strand;
-    uint32_t nmethyl, nunmethyl;
+    uint32_t nmethyl = 0, nunmethyl = 0;
     const bam_pileup1_t **plp = NULL;
     char *seq = NULL, base;
     mplp_data *data = NULL;
@@ -151,16 +184,15 @@ void extractCalls(Config *config) {
 
         if(nmethyl+nunmethyl==0) continue;
         if(!config->merge || type==2) {
-            fprintf(config->output_fp[type], "%s\t%i\t%i\t%i\t%" PRIu32 "\t%" PRIu32 "\n", \
-                hdr->target_name[tid], pos, pos+1, (int) (100.0 * ((double) nmethyl)/(nmethyl+nunmethyl)), nmethyl, nunmethyl);
+            writeCall(config->output_fp[type], config, hdr->target_name[tid], pos, 1, nmethyl, nunmethyl);
         } else {
             //Merge into per-CpG/CHG metrics
             if(type==0) {
                 if(base=='G' || base=='g') pos--;
-                processLast(config->output_fp[0], lastCpG, hdr, tid, pos, 2, nmethyl, nunmethyl);
+                processLast(config->output_fp[0], config, lastCpG, hdr, tid, pos, 2, nmethyl, nunmethyl);
             } else {
                 if(base=='G' || base=='g') pos-=2;
-                processLast(config->output_fp[1], lastCHG, hdr, tid, pos, 3, nmethyl, nunmethyl);
+                processLast(config->output_fp[1], config, lastCHG, hdr, tid, pos, 3, nmethyl, nunmethyl);
             }
         }
     }
@@ -168,16 +200,10 @@ void extractCalls(Config *config) {
     //Don't forget the last CpG/CHG
     if(config->merge) {
         if(config->keepCpG && lastCpG->tid != -1) {
-            fprintf(config->output_fp[0], "%s\t%i\t%i\t%i\t%" PRIu32 "\t%" PRIu32 "\n", \
-                hdr->target_name[lastCpG->tid], lastCpG->pos, lastCpG->pos+2,
-                (int) (100.0 * ((double) lastCpG->nmethyl)/(lastCpG->nmethyl+lastCpG->nunmethyl)),
-                lastCpG->nmethyl, lastCpG->nunmethyl);
+            processLast(config->output_fp[0], config, lastCpG, hdr, tid, pos, 2, nmethyl, nunmethyl);
         }
         if(config->keepCHG && lastCHG->tid != -1) {
-            fprintf(config->output_fp[1], "%s\t%i\t%i\t%i\t%" PRIu32 "\t%" PRIu32 "\n", \
-                hdr->target_name[lastCHG->tid], lastCHG->pos, lastCHG->pos+3,
-                (int) (100.0 * ((double) lastCHG->nmethyl)/(lastCHG->nmethyl+lastCHG->nunmethyl)),
-                lastCHG->nmethyl, lastCHG->nunmethyl);
+            processLast(config->output_fp[1], config, lastCHG, hdr, tid, pos, 3, nmethyl, nunmethyl);
         }
     }
 
@@ -247,6 +273,12 @@ void extract_usage() {
 " --noCpG          Do not output CpG context methylation metrics\n"
 " --CHG            Output CHG context methylation metrics\n"
 " --CHH            Output CHH context methylation metrics\n"
+" --fraction       Extract fractional methylation (only) at each position. This\n"
+"                  produces a file with a .meth.bedGraph extension.\n"
+" --counts         Extract base counts (only) at each position. This produces a\n"
+"                  file with a .counts.bedGraph extension.\n"
+" --logit          Extract logit(M/(M+U)) (only) at each position. This produces\n"
+"                  a file with a .logit.bedGraph extension.\n"
 " --OT INT,INT,INT,INT Inclusion bounds for methylation calls from reads/pairs\n"
 "                  origination from the original top strand. Suggested values can\n"
 "                  be obtained from the MBias program. Each integer represents a\n"
@@ -262,7 +294,8 @@ void extract_usage() {
 " --CTOT INT,INT,INT,INT\n"
 " --CTOB INT,INT,INT,INT As with --OT, but for the original bottom, complementary\n"
 "                  to the original top, and complementary to the original bottom\n"
-"                  strands, respectively.\n");
+"                  strands, respectively.\n"
+"\nNote that --fraction, --counts, and --logit are mutually exclusive!\n");
 }
 
 int extract_main(int argc, char *argv[]) {
@@ -282,10 +315,16 @@ int extract_main(int argc, char *argv[]) {
     config.reg = NULL;
     config.bedName = NULL;
     config.bed = NULL;
+    config.fraction = 0;
+    config.counts = 0;
+    config.logit = 0;
     for(i=0; i<16; i++) config.bounds[i] = 0;
 
     static struct option lopts[] = {
         {"opref",        1, NULL, 'o'},
+        {"fraction",     0, NULL, 'f'},
+        {"counts",       0, NULL, 'c'},
+        {"logit",        0, NULL, 'm'},
         {"noCpG",        0, NULL,   1},
         {"CHG",          0, NULL,   2},
         {"CHH",          0, NULL,   3},
@@ -299,7 +338,7 @@ int extract_main(int argc, char *argv[]) {
         {"mergeContext", 0, NULL,  11},
         {"help",         0, NULL, 'h'}
     };
-    while((c = getopt_long(argc, argv, "q:p:r:l:o:D:", lopts,NULL)) >= 0) {
+    while((c = getopt_long(argc, argv, "q:p:r:l:o:D:f:c:m:", lopts,NULL)) >=0){
         switch(c) {
         case 'h' :
             extract_usage();
@@ -355,6 +394,15 @@ int extract_main(int argc, char *argv[]) {
         case 'p' :
             config.minPhred = atoi(optarg);
             break;
+        case 'm' :
+            config.logit = 1;
+            break;
+        case 'f' :
+            config.fraction = 1;
+            break;
+        case 'c' :
+            config.counts = 1;
+            break;
         default :
             fprintf(stderr, "Invalid option '%c'\n", c);
             extract_usage();
@@ -380,6 +428,17 @@ int extract_main(int argc, char *argv[]) {
     if(config.minMapq < 0) {
         fprintf(stderr, "-q %i is invalid. Resetting to 0, which is the lowest possible value.\n", config.minMapq);
         config.minMapq = 0;
+    }
+    if(config.fraction+config.counts+config.logit > 1) {
+        fprintf(stderr, "More than one of --fraction, --counts, and --logit were specified. These are mutually exclusive.\n");
+        extract_usage();
+        return 1;
+    }
+
+    //Has more than one output format been requested?
+    if(config.fraction + config.counts + config.logit > 1) {
+        fprintf(stderr, "You may specify AT MOST one of -c/--counts, -f/--fraction, or -m/--logit.\n");
+        return -6;
     }
 
     //Is there still a metric to output?
@@ -412,15 +471,34 @@ int extract_main(int argc, char *argv[]) {
 
     //Output files
     config.output_fp = malloc(sizeof(FILE *) * 3);
+    assert(config.output_fp);
     if(opref == NULL) {
         opref = strdup(argv[optind+1]);
+        assert(opref);
         p = strrchr(opref, '.');
         if(p != NULL) *p = '\0';
         fprintf(stderr, "writing to prefix:'%s'\n", opref);
     }
-    oname = malloc(sizeof(char) * (strlen(opref)+14));
+    if(config.fraction) { 
+      oname = malloc(sizeof(char) * (strlen(opref)+19));
+    } else if(config.counts) {
+      oname = malloc(sizeof(char) * (strlen(opref)+21));
+    } else if(config.logit) {
+      oname = malloc(sizeof(char) * (strlen(opref)+20));
+    } else { 
+      oname = malloc(sizeof(char) * (strlen(opref)+14));
+    }
+    assert(oname);
     if(config.keepCpG) {
-        sprintf(oname, "%s_CpG.bedGraph", opref);
+        if(config.fraction) { 
+          sprintf(oname, "%s_CpG.meth.bedGraph", opref);
+        } else if(config.counts) {
+          sprintf(oname, "%s_CpG.counts.bedGraph", opref);
+        } else if(config.logit) {
+          sprintf(oname, "%s_CpG.logit.bedGraph", opref);
+        } else { 
+          sprintf(oname, "%s_CpG.bedGraph", opref);
+        }
         config.output_fp[0] = fopen(oname, "w");
         if(config.output_fp[0] == NULL) {
             fprintf(stderr, "Couldn't open the output CpG metrics file for writing! Insufficient permissions?\n");
@@ -429,7 +507,15 @@ int extract_main(int argc, char *argv[]) {
         fprintf(config.output_fp[0], "track type=\"bedGraph\" description=\"%s CpG %smethylation levels\"\n", opref, config.merge?"merged ":"");
     }
     if(config.keepCHG) {
-        sprintf(oname, "%s_CHG.bedGraph", opref);
+        if(config.fraction) { 
+          sprintf(oname, "%s_CHG.meth.bedGraph", opref);
+        } else if(config.counts) {
+          sprintf(oname, "%s_CHG.counts.bedGraph", opref);
+        } else if(config.logit) {
+          sprintf(oname, "%s_CHG.logit.bedGraph", opref);
+        } else { 
+          sprintf(oname, "%s_CHG.bedGraph", opref);
+        }
         config.output_fp[1] = fopen(oname, "w");
         if(config.output_fp[1] == NULL) {
             fprintf(stderr, "Couldn't open the output CHG metrics file for writing! Insufficient permissions?\n");
@@ -438,7 +524,15 @@ int extract_main(int argc, char *argv[]) {
         fprintf(config.output_fp[1], "track type=\"bedGraph\" description=\"%s CHG %smethylation levels\"\n", opref, config.merge?"merged ":"");
     }
     if(config.keepCHH) {
-        sprintf(oname, "%s_CHH.bedGraph", opref);
+        if(config.fraction) { 
+          sprintf(oname, "%s_CHH.meth.bedGraph", opref);
+        } else if(config.counts) {
+          sprintf(oname, "%s_CHH.counts.bedGraph", opref);
+        } else if(config.logit) {
+          sprintf(oname, "%s_CHH.logit.bedGraph", opref);
+        } else { 
+          sprintf(oname, "%s_CHH.bedGraph", opref);
+        }
         config.output_fp[2] = fopen(oname, "w");
         if(config.output_fp[2] == NULL) {
             fprintf(stderr, "Couldn't open the output CHH metrics file for writing! Insufficient permissions?\n");

@@ -57,6 +57,7 @@ typedef struct {
     int minMapq, minPhred, keepDupes, maxDepth;
     int keepDiscordant, keepSingleton;
     int merge;
+    int fraction, counts, logit;
     FILE **output_fp;
     char *reg;
     htsFile *fp;

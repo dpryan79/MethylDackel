@@ -1,4 +1,4 @@
-path= /usr/local/bin #This can be changed
+prefix= /usr/local/bin #This can be changed
 CC = gcc
 AR = ar
 RANLIB = ranlib
