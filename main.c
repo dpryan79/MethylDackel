@@ -5,6 +5,9 @@
 
 int mbias_main(int argc, char *argv[]);
 int extract_main(int argc, char *argv[]);
+int extract_fraction(int argc, char *argv[]);
+int extract_counts(int argc, char *argv[]);
+int extract_logit(int argc, char *argv[]);
 
 void usage_main() {
     fprintf(stderr, "PileOMeth: A tool for processing bisulfite sequencing alignments.\n"
