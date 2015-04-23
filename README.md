@@ -86,6 +86,8 @@ The `--counts` option produces the first three columns of the standard output fo
 
 The `--logit` option produces the first three columns of the standard output followed by the logit transformed methylation fraction. The logit transformation is log(Methylation fraction/(1-Methylation fraction)). Note that log uses base e. Logit transformed methylation values range between +/- infinity, rather than [0,1]. The resulting file ends in `.logit.bedGraph` rather than simply `.bedGraph`.
 
+Note that these options may be combined with `--mergeContext`. However, `PileOMeth mergeContext` can not be used after the fact to combine these.
+
 Methylation bias plotting and correction
 ========================================
 
@@ -105,5 +107,5 @@ To do list
  - [X] Allow users to easily merge per-C metrics into per-CpG/per-CHG metrics.
  - [X] Test above and restructure into multiple functions.
  - [X] Add a stand-alone mergeContext function that will merge single-C bedGraph files into per-CpG/CHG bedGraph files.
- - [ ] Merging needs to work with --fraction, --counts, and --logit
+ - [X] Merging needs to work with --fraction, --counts, and --logit
  - [ ] Is the output format the most convenient (it's what Bison uses, so converters have already been written)? It makes more sense to output a predefined VCF format, which would allow processing multiple samples at once. This would require a spec., which should have pretty broad input.

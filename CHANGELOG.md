@@ -1,9 +1,13 @@
+Version 0.1.3 :
+
+    * Added the --mergeContext option to `PileOMeth extract`.
+    * Added the `PileOMeth mergeContext` command. This can only be used for the default output.
+    * Added this file.
+
 Version 0.1.2 :
 
     * Fixed a mistake in the Makefile, where "prefix" was used rather than "path".
-    * Added the --mergeContext option to `PileOMeth extract`.
-    * Added the `PileOMeth mergeContext` command.
-    * Added this file.
+    * Added the --logit, --counts, and --fraction option, thanks to Tim Triche
 
 Version 0.1.1 :
 
