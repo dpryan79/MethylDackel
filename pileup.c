@@ -229,12 +229,12 @@ int cust_plp_push(bam_plp_t iter, const bam1_t *b)
         iter->tail->end = b->core.pos + bam_cigar2rlen(b->core.n_cigar, bam_get_cigar(b));
         iter->tail->s = g_cstate_null; iter->tail->s.end = iter->tail->end - 1; // initialize cstate_t
         if (b->core.tid < iter->max_tid) {
-            fprintf(stderr, "[bam_pileup_core] the input is not sorted (chromosomes out of order)\n");
+            fprintf(stderr, "[cust_plp_push] the input is not sorted (chromosomes out of order)\n");
             iter->error = 1;
             return -1;
         }
         if ((b->core.tid == iter->max_tid) && (iter->tail->beg < iter->max_pos)) {
-            fprintf(stderr, "[bam_pileup_core] the input is not sorted (reads out of order)\n");
+            fprintf(stderr, "[cust_plp_push] the input is not sorted (reads out of order)\n");
             iter->error = 1;
             return -1;
         }

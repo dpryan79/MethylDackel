@@ -178,7 +178,8 @@ int mergeContext_main(int argc, char *argv[]) {
     char c;
 
     static struct option lopts[] = {
-        {"help", 0, NULL, 'h'}
+        {"help", 0, NULL, 'h'},
+        {0,      0, NULL,   0}
     };
     while((c = getopt_long(argc, argv, "ho:", lopts, NULL)) >= 0) {
         switch(c) {

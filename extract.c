@@ -336,7 +336,8 @@ int extract_main(int argc, char *argv[]) {
         {"CTOT",         1, NULL,   9},
         {"CTOB",         1, NULL,  10},
         {"mergeContext", 0, NULL,  11},
-        {"help",         0, NULL, 'h'}
+        {"help",         0, NULL, 'h'},
+        {0,              0, NULL,   0}
     };
     while((c = getopt_long(argc, argv, "q:p:r:l:o:D:f:c:m:", lopts,NULL)) >=0){
         switch(c) {
@@ -387,6 +388,7 @@ int extract_main(int argc, char *argv[]) {
             break;
         case 11 :
             config.merge = 1;
+fprintf(stderr, "Got --mergeContext\n");
             break;
         case 'q' :
             config.minMapq = atoi(optarg);
@@ -403,6 +405,7 @@ int extract_main(int argc, char *argv[]) {
         case 'c' :
             config.counts = 1;
             break;
+//        case '?' :
         default :
             fprintf(stderr, "Invalid option '%c'\n", c);
             extract_usage();
