@@ -3,6 +3,7 @@ Version 0.1.3 :
     * Added the --mergeContext option to `PileOMeth extract`.
     * Added the `PileOMeth mergeContext` command. This can only be used for the default output.
     * Added this file.
+    * The header line of each output file is now modified according to the presence of --logit, --fraction, and --counts.
 
 Version 0.1.2 :
 

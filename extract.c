@@ -242,6 +242,15 @@ void parseBounds(char *s2, int *vals, int mult) {
     free(s);
 }
 
+void printHeader(FILE *of, char *context, char *opref, Config config) {
+    fprintf(of, "track type=\"bedGraph\" description=\"%s %s", opref, context);
+    if(config.merge) fprintf(of, " merged");
+    if(config.fraction) fprintf(of, " methylation fractions\"\n");
+    else if(config.counts) fprintf(of, " methylation counts\"\n");
+    else if(config.logit) fprintf(of, " logit transformed methylation fractions\"\n");
+    else fprintf(of, " methylation levels\"\n");
+}
+
 void extract_usage() {
     fprintf(stderr, "\nUsage: PileOMeth extract [OPTIONS] <ref.fa> <sorted_alignments.bam>\n");
     fprintf(stderr,
@@ -388,7 +397,6 @@ int extract_main(int argc, char *argv[]) {
             break;
         case 11 :
             config.merge = 1;
-fprintf(stderr, "Got --mergeContext\n");
             break;
         case 'q' :
             config.minMapq = atoi(optarg);
@@ -405,7 +413,7 @@ fprintf(stderr, "Got --mergeContext\n");
         case 'c' :
             config.counts = 1;
             break;
-//        case '?' :
+        case '?' :
         default :
             fprintf(stderr, "Invalid option '%c'\n", c);
             extract_usage();
@@ -507,7 +515,7 @@ fprintf(stderr, "Got --mergeContext\n");
             fprintf(stderr, "Couldn't open the output CpG metrics file for writing! Insufficient permissions?\n");
             return -3;
         }
-        fprintf(config.output_fp[0], "track type=\"bedGraph\" description=\"%s CpG %smethylation levels\"\n", opref, config.merge?"merged ":"");
+        printHeader(config.output_fp[0], "CpG", opref, config);
     }
     if(config.keepCHG) {
         if(config.fraction) { 
@@ -524,7 +532,7 @@ fprintf(stderr, "Got --mergeContext\n");
             fprintf(stderr, "Couldn't open the output CHG metrics file for writing! Insufficient permissions?\n");
             return -3;
         }
-        fprintf(config.output_fp[1], "track type=\"bedGraph\" description=\"%s CHG %smethylation levels\"\n", opref, config.merge?"merged ":"");
+        printHeader(config.output_fp[1], "CHG", opref, config);
     }
     if(config.keepCHH) {
         if(config.fraction) { 
@@ -541,7 +549,7 @@ fprintf(stderr, "Got --mergeContext\n");
             fprintf(stderr, "Couldn't open the output CHH metrics file for writing! Insufficient permissions?\n");
             return -3;
         }
-        fprintf(config.output_fp[2], "track type=\"bedGraph\" description=\"%s CHH methylation levels\"\n", opref);
+        printHeader(config.output_fp[2], "CHH", opref, config);
     }
 
     //Run the pileup
