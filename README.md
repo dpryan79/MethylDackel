@@ -76,7 +76,7 @@ is changed to this:
 This also works for CHG-level metrics. If bedGraph files containing per-Cytosine metrics already exist, they can be converted to instead contain per-CpG/CHG metrics with `PileOMeth mergeContext`.
 
 Logit, fraction, and counts only output
----------------------------------------
+=======================================
 
 The standard output described above can be modified if you supply the `--fraction`, `--counts`, or `--logit` options to `PileOMeth extract`.
 
