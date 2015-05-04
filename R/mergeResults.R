@@ -31,7 +31,10 @@ getMethAndCounts <- function(bamFiles, minSamples=NULL, exptName="tabulated"){
   meths <- do.call(cbind, lapply(methRanges, function(mr) mr$score))
   rownames(meths) <- paste0(seqnames(coords), ":", start(coords))
 
-  stopifnot(identical(colnames(meths), colnames(counts)))
+  ## reorder to match input file order...
+  counts <- counts[ , names(countFiles) ]
+  meths <- meths[ , names(countFiles) ]
+
   write.table(meths, paste(exptName, "methylation", "txt", sep="."))
   write.table(counts, paste(exptName, "counts", "txt", sep="."))
   invisible(list(counts=counts, methylation=meths))
