@@ -26,7 +26,7 @@ getMethAndCounts <- function(bamFiles, minSamples=NULL, exptName="tabulated"){
                     lapply(countRanges, 
                            function(cr) subsetByOverlaps(cr, coords)$score))
   rownames(counts) <- paste0(seqnames(coords), ":", start(coords))
-  methFiles <- sub(".bam$", "_CpG.meth.bw", BAMfiles)
+  methFiles <- sub("_CpG.counts.bw", "_CpG.meth.bw", countFiles)
   methRanges <- GRangesList(mclapply(methFiles, import, selection=coords))
   meths <- do.call(cbind, lapply(methRanges, function(mr) mr$score))
   rownames(meths) <- paste0(seqnames(coords), ":", start(coords))
@@ -35,6 +35,7 @@ getMethAndCounts <- function(bamFiles, minSamples=NULL, exptName="tabulated"){
   counts <- counts[ , names(countFiles) ]
   meths <- meths[ , names(countFiles) ]
 
+  stopifnot(identical(colnames(meths), colnames(counts)))
   write.table(meths, paste(exptName, "methylation", "txt", sep="."))
   write.table(counts, paste(exptName, "counts", "txt", sep="."))
   invisible(list(counts=counts, methylation=meths))
