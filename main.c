@@ -5,9 +5,7 @@
 
 int mbias_main(int argc, char *argv[]);
 int extract_main(int argc, char *argv[]);
-//int extract_fraction(int argc, char *argv[]);
-//int extract_counts(int argc, char *argv[]);
-//int extract_logit(int argc, char *argv[]);
+int mergeContext_main(int argc, char *argv[]);
 
 void usage_main() {
     fprintf(stderr, "PileOMeth: A tool for processing bisulfite sequencing alignments.\n"
@@ -19,6 +17,8 @@ void usage_main() {
 "             producing diagnostic SVG images.\n"
 "    extract  Extract methylation metrics from an alignment file in BAM/CRAM\n"
 "             format.\n"
+"    mergeContext   Combine single Cytosine metrics from 'PileOMeth extract' into\n"
+"             per-CpG/CHG metrics.\n"
 );
 }
 
@@ -33,6 +33,8 @@ int main(int argc, char *argv[]) {
         return extract_main(argc-1, argv+1);
     } else if(strcmp(argv[1], "mbias") == 0) {
         return mbias_main(argc-1, argv+1);
+    } else if(strcmp(argv[1], "mergeContext") == 0) {
+        return mergeContext_main(argc-1, argv+1);
     } else {
         fprintf(stderr, "Unknown command!\n");
         usage_main();
