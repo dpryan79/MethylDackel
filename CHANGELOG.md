@@ -1,3 +1,7 @@
+Version 0.1.4 :
+
+    * Fixed a bug in getStrand() that handled SE alignments incorrectly.
+
 Version 0.1.3 :
 
     * Added the --mergeContext option to `PileOMeth extract`.
