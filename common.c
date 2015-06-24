@@ -48,7 +48,7 @@ int getStrand(bam1_t *b) {
             return 0; //One of the above should be set!
         } else {
             if(b->core.flag & 0x10) return 2; //Reverse comp. == OB
-            return 0;
+            return 1; //OT
         }
     } else {
         if(*(XG+1) == 'C') { //OT or CTOT, due to C->T converted genome

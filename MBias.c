@@ -226,11 +226,12 @@ int mbias_main(int argc, char *argv[]) {
         {"CHG",          0, NULL,   2},
         {"CHH",          0, NULL,   3},
         {"keepDupes",    0, NULL,   4},
-        {"keepSingleton",  0, NULL,   5},
-        {"keepDiscordant", 0, NULL,   6},
+        {"keepSingleton",  0, NULL, 5},
+        {"keepDiscordant", 0, NULL, 6},
         {"txt",          0, NULL,   7},
         {"noSVG",        0, NULL,   8},
-        {"help",         0, NULL, 'h'}
+        {"help",         0, NULL, 'h'},
+        {0,              0, NULL,   0}
     };
     while((c = getopt_long(argc, argv, "q:p:r:l:D:", lopts,NULL)) >= 0) {
         switch(c) {
