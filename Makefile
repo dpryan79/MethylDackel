@@ -15,7 +15,7 @@ VERSION = 0.1.5
 
 #If we're building from a git repo, then append the most recent tag
 ifneq "$(wildcard .git)" ""
-VERSION := $(VERSION)-$(shell git describe --always --dirty)
+VERSION := $(shell git describe --tags --always --dirty)
 endif
 
 version.h:
