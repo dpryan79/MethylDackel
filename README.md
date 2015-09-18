@@ -3,7 +3,7 @@ PileOMeth (a temporary name derived due to it using a PILEup to extract METHylat
 Prerequisites
 =============
 
-PileOMeth requires HTSlib version 1.1 or newer (version 1.0 is currently unsupported). As HTSlib is a submodule of this repository, this prerequisite should be automatically dealt with.
+PileOMeth now includes HTSlib version 1.2.1, though any version starting with 1.1 should work. This was originally a submodule, but that made things difficult for Galaxy integration.
 
 Compilation
 ===========
@@ -12,12 +12,9 @@ Compilation and installation can be performed via:
 
     git clone https://github.com/dpryan79/PileOMeth.git
     cd PileOMeth
-    git submodule init
-    git submodule update
     make
     make install prefix=/some/installation/path
 
-As HTSlib is now a submodule of this repository, you no longer need to manually download and compile it.
 
 Methylation Context
 ===================

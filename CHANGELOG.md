@@ -1,3 +1,7 @@
+Version 0.1.5 :
+
+    * htslib is no longer a submodule, but instead version 1.2.1 is directly included. This enables easier integration into Galaxy.
+
 Version 0.1.4 :
 
     * Fixed a bug in getStrand() that handled SE alignments incorrectly.
