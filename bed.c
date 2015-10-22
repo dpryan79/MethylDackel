@@ -224,6 +224,9 @@ bedRegions *parseBED(char *fn, bam_hdr_t *hdr) {
     free(str.s);
     gzclose(fp);
 
+    //In case the order isn't as expected...
+    sortBED(regions);
+
     fprintf(stderr, "Parsed %" PRId32 " regions in %s\n", regions->n, fn);
     return regions;
 
