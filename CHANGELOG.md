@@ -1,3 +1,7 @@
+Version 0.1.6 :
+
+   * Fixed a bug in the --mergeContext option that sometimes resulted in incorrect mergin and duplicate lines.
+
 Version 0.1.5 :
 
     * htslib is no longer a submodule, but instead version 1.2.1 is directly included. This enables easier integration into Galaxy.

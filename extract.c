@@ -64,7 +64,7 @@ void processLast(FILE *of, Config *config, struct lastCall *last, bam_hdr_t *hdr
         last->tid = -1;
     } else {
         if(last->tid != -1) {
-            writeCall(of, config, hdr->target_name[tid], pos, width, last->nmethyl+nmethyl, last->nunmethyl+nunmethyl);
+            writeCall(of, config, hdr->target_name[last->tid], last->pos, width, last->nmethyl, last->nunmethyl);
         }
         last->tid = tid;
         last->pos = pos;
