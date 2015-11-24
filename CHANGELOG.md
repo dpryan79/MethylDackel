@@ -1,3 +1,9 @@
+Version 0.1.7:
+
+   * BED files are now sorted properly before extraction, so nothing is skipped now.
+   * The entire BED file isn't iterated over when there's no overlap. This significantly speed things up.
+   * The first alignment overlapping a given BED interval is no longer ignored.
+
 Version 0.1.6 :
 
    * Fixed a bug in the --mergeContext option that sometimes resulted in incorrect mergin and duplicate lines.

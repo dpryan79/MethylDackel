@@ -27,11 +27,11 @@ int spanOverlapsBED(int32_t tid, int32_t start, int32_t end, bedRegions *regs, i
     //First, test the last position we probed.
     if(compareRegions(reg[*idx].tid, reg[*idx].start, reg[*idx].end-1, tid, start, end) == 0) return 1;
     else {
-        for(i=0; i<regs->n; i++) {
+        for(i=*idx; i<regs->n; i++) {
             rv = compareRegions(reg[i].tid, reg[i].start, reg[i].end-1, tid, start, end);
             if(rv >= 0) {
                 *idx = i;
-                rv = (rv > 1) ? 1 : rv;
+                rv = (rv >= 1) ? 0 : 1;
                 break;
             }
         }
