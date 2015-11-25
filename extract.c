@@ -218,10 +218,14 @@ void extractCalls(Config *config) {
 void parseBounds(char *s2, int *vals, int mult) {
     char *p, *s = strdup(s2), *end;
     int i, v;
+    long tempV;
 
     p = strtok(s, ",");
-    v = strtol(p, &end, 10);
-    if((errno == ERANGE && (v == LONG_MAX || v == LONG_MIN)) || (errno != 0 && v == 0) || end == p) v = -1;
+    tempV = strtol(p, &end, 10);
+    if((errno == ERANGE && (tempV == LONG_MAX || tempV == LONG_MIN)) || (errno != 0 && tempV == 0) || end == p) v = -1;
+    else if(tempV > INT_MAX || tempV < LONG_MIN) v = -1;
+    else v = tempV;
+
     if(v>=0) vals[4*mult] = v;
     else {
         fprintf(stderr, "Invalid bounds string, %s\n", s2);
@@ -230,8 +234,11 @@ void parseBounds(char *s2, int *vals, int mult) {
     }
     for(i=1; i<4; i++) {
         p = strtok(NULL, ",");
-        v = strtol(p, &end, 10);
-        if((errno == ERANGE && (v == LONG_MAX || v == LONG_MIN)) || (errno != 0 && v == 0) || end == p) v = -1;
+        tempV = strtol(p, &end, 10);
+        if((errno == ERANGE && (tempV == LONG_MAX || tempV == LONG_MIN)) || (errno != 0 && tempV == 0) || end == p) v = -1;
+        else if(tempV > INT_MAX || tempV < LONG_MIN) v = -1;
+        else v = tempV;
+
         if(v>=0) vals[4*mult+i] = v;
         else {
             fprintf(stderr, "Invalid bounds string, %s\n", s2);

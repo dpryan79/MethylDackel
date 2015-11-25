@@ -170,24 +170,21 @@ bedRegions *parseBED(char *fn, bam_hdr_t *hdr) {
 
         //Parse the start and end positions
         p1 = p2+1;
-        regions->region[regions->n].start = strtol(p1, &p2, 10);
-        if(p2 == p1) { //There was no number!
+        if(sscanf(p1, "%"PRId32, &regions->region[regions->n].start) != 1 || regions->region[regions->n].start == -1) {
             fprintf(stderr, "Line %" PRId32 " of %s is malformed.\n", lnum, fn);
             goto err;
         }
-        if(regions->region[regions->n].start == LONG_MIN || regions->region[regions->n].start == LONG_MAX) {
-            fprintf(stderr, "The position on line %" PRId32 " of %s is outside the bounds that we can store.\n", lnum, fn);
-            goto err;
-        }
-        p1 = p2;
-        regions->region[regions->n].end = strtol(p1, &p2, 10);
-        if(p2 == p1) { //There was no number!
+        p2++;
+
+        while(*p2 && !isspace(*p2)) p2++;
+        if(*p2 != '\0') *p2 = '\0';
+        p1 = p2+1;
+        if(sscanf(p1, "%"PRId32, &regions->region[regions->n].end) != 1 || regions->region[regions->n].end == -1) {
             fprintf(stderr, "Line %" PRId32 " of %s is malformed.\n", lnum, fn);
             goto err;
         }
-        regions->region[regions->n].end = strtol(p1, &p2, 10);
-        if(regions->region[regions->n].start == LONG_MIN || regions->region[regions->n].start == LONG_MAX) {
-            fprintf(stderr, "The position on line %" PRId32 " of %s is outside the bounds that we can store.\n", lnum, fn);
+        if(regions->region[regions->n].start >= regions->region[regions->n].end) {
+            fprintf(stderr, "The position on line %" PRId32 " of %s is incorrect (%"PRId32" >= %"PRId32".\n", lnum, fn, regions->region[regions->n].start, regions->region[regions->n].end);
             goto err;
         }
         if(regions->region[regions->n].start < 0) regions->region[regions->n].start = 0;

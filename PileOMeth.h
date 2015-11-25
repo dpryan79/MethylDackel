@@ -140,9 +140,9 @@ void makeTXT(strandMeth **meths);
  @param pos	The index within the sequence
  @param seqlen	The length of the sequence
 */
-inline int isCpG(char *seq, int pos, int seqlen);
-inline int isCHG(char *seq, int pos, int seqlen);
-inline int isCHH(char *seq, int pos, int seqlen);
+int isCpG(char *seq, int pos, int seqlen);
+int isCHG(char *seq, int pos, int seqlen);
+int isCHH(char *seq, int pos, int seqlen);
 
 /*! @function
  @abstract Determine what strand an alignment originated from
