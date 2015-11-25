@@ -1,3 +1,7 @@
+Version 0.1.8:
+
+   * Fix compilation issues with clang
+
 Version 0.1.7:
 
    * BED files are now sorted properly before extraction, so nothing is skipped now.
