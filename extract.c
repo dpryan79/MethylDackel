@@ -23,7 +23,7 @@ struct lastCall{
 };
 
 void writeCall(FILE *of, Config *config, char *chrom, int32_t pos, int32_t width, uint32_t nmethyl, uint32_t nunmethyl, char base) { 
-    char strand = (base=='C') ? 'F' : 'R';
+    char strand = (base=='C' || base=='c') ? 'F' : 'R';
     if (!config->fraction && !config->logit && !config->counts && !config->methylKit) {
         fprintf(of, \
             "%s\t%i\t%i\t%i\t%" PRIu32 "\t%" PRIu32 "\n", \
