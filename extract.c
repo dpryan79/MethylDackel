@@ -22,8 +22,9 @@ struct lastCall{
     uint32_t nmethyl, nunmethyl;
 };
 
-void writeCall(FILE *of, Config *config, char *chrom, int32_t pos, int32_t width, uint32_t nmethyl, uint32_t nunmethyl) { 
-    if (!config->fraction && !config->logit && !config->counts) {
+void writeCall(FILE *of, Config *config, char *chrom, int32_t pos, int32_t width, uint32_t nmethyl, uint32_t nunmethyl, char base) { 
+    char strand = (base=='C') ? 'F' : 'R';
+    if (!config->fraction && !config->logit && !config->counts && !config->methylKit) {
         fprintf(of, \
             "%s\t%i\t%i\t%i\t%" PRIu32 "\t%" PRIu32 "\n", \
             chrom, \
@@ -53,18 +54,29 @@ void writeCall(FILE *of, Config *config, char *chrom, int32_t pos, int32_t width
             pos, \
             pos+width, \
             logit(((double) nmethyl)/(nmethyl+nunmethyl)));
+    } else if(config->methylKit) {
+        fprintf(of, \
+            "%s.%i\t%s\t%i\t%c\t%i\t%f\t%f\n", \
+            chrom, \
+            pos+1, \
+            chrom, \
+            pos+1, \
+            strand, \
+            nmethyl+nunmethyl, \
+            ((double) nmethyl)/(nmethyl+nunmethyl), \
+            ((double) nunmethyl)/(nmethyl+nunmethyl));
     }
 }
 
-void processLast(FILE *of, Config *config, struct lastCall *last, bam_hdr_t *hdr, int32_t tid, int32_t pos, int width, uint32_t nmethyl, uint32_t nunmethyl) {
+void processLast(FILE *of, Config *config, struct lastCall *last, bam_hdr_t *hdr, int32_t tid, int32_t pos, int width, uint32_t nmethyl, uint32_t nunmethyl, char base) {
     if(last->tid == tid && last->pos == pos) {
         nmethyl += last->nmethyl;
         nunmethyl += last->nunmethyl;
-        writeCall(of, config, hdr->target_name[tid], pos, width, nmethyl, nunmethyl);
+        writeCall(of, config, hdr->target_name[tid], pos, width, nmethyl, nunmethyl, base);
         last->tid = -1;
     } else {
         if(last->tid != -1) {
-            writeCall(of, config, hdr->target_name[last->tid], last->pos, width, last->nmethyl, last->nunmethyl);
+            writeCall(of, config, hdr->target_name[last->tid], last->pos, width, last->nmethyl, last->nunmethyl, base);
         }
         last->tid = tid;
         last->pos = pos;
@@ -83,7 +95,7 @@ void extractCalls(Config *config) {
     int idxBED = 0, strand;
     uint32_t nmethyl = 0, nunmethyl = 0;
     const bam_pileup1_t **plp = NULL;
-    char *seq = NULL, base;
+    char *seq = NULL, base = 'A';
     mplp_data *data = NULL;
     struct lastCall *lastCpG = NULL;
     struct lastCall *lastCHG = NULL;
@@ -184,15 +196,15 @@ void extractCalls(Config *config) {
 
         if(nmethyl+nunmethyl==0) continue;
         if(!config->merge || type==2) {
-            writeCall(config->output_fp[type], config, hdr->target_name[tid], pos, 1, nmethyl, nunmethyl);
+            writeCall(config->output_fp[type], config, hdr->target_name[tid], pos, 1, nmethyl, nunmethyl, base);
         } else {
             //Merge into per-CpG/CHG metrics
             if(type==0) {
                 if(base=='G' || base=='g') pos--;
-                processLast(config->output_fp[0], config, lastCpG, hdr, tid, pos, 2, nmethyl, nunmethyl);
+                processLast(config->output_fp[0], config, lastCpG, hdr, tid, pos, 2, nmethyl, nunmethyl, base);
             } else {
                 if(base=='G' || base=='g') pos-=2;
-                processLast(config->output_fp[1], config, lastCHG, hdr, tid, pos, 3, nmethyl, nunmethyl);
+                processLast(config->output_fp[1], config, lastCHG, hdr, tid, pos, 3, nmethyl, nunmethyl, base);
             }
         }
     }
@@ -200,10 +212,10 @@ void extractCalls(Config *config) {
     //Don't forget the last CpG/CHG
     if(config->merge) {
         if(config->keepCpG && lastCpG->tid != -1) {
-            processLast(config->output_fp[0], config, lastCpG, hdr, tid, pos, 2, nmethyl, nunmethyl);
+            processLast(config->output_fp[0], config, lastCpG, hdr, tid, pos, 2, nmethyl, nunmethyl, base);
         }
         if(config->keepCHG && lastCHG->tid != -1) {
-            processLast(config->output_fp[1], config, lastCHG, hdr, tid, pos, 3, nmethyl, nunmethyl);
+            processLast(config->output_fp[1], config, lastCHG, hdr, tid, pos, 3, nmethyl, nunmethyl, base);
         }
     }
 
@@ -295,6 +307,8 @@ void extract_usage() {
 "                  file with a .counts.bedGraph extension.\n"
 " --logit          Extract logit(M/(M+U)) (only) at each position. This produces\n"
 "                  a file with a .logit.bedGraph extension.\n"
+" --methylKit      Output in the format required by methylKit. Note that this is\n"
+"                  incompatible with --mergeContext, --fraction and --counts.\n"
 " --OT INT,INT,INT,INT Inclusion bounds for methylation calls from reads/pairs\n"
 "                  origination from the original top strand. Suggested values can\n"
 "                  be obtained from the MBias program. Each integer represents a\n"
@@ -323,6 +337,7 @@ int extract_main(int argc, char *argv[]) {
     config.keepCpG = 1; config.keepCHG = 0; config.keepCHH = 0;
     config.minMapq = 10; config.minPhred = 5; config.keepDupes = 0;
     config.keepSingleton = 0, config.keepDiscordant = 0;
+    config.methylKit = 0;
     config.merge = 0;
     config.maxDepth = 2000;
     config.fai = NULL;
@@ -352,6 +367,7 @@ int extract_main(int argc, char *argv[]) {
         {"CTOT",         1, NULL,   9},
         {"CTOB",         1, NULL,  10},
         {"mergeContext", 0, NULL,  11},
+        {"methylKit",    0, NULL,  12},
         {"help",         0, NULL, 'h'},
         {0,              0, NULL,   0}
     };
@@ -405,6 +421,9 @@ int extract_main(int argc, char *argv[]) {
         case 11 :
             config.merge = 1;
             break;
+        case 12 :
+            config.methylKit = 1;
+            break;
         case 'q' :
             config.minMapq = atoi(optarg);
             break;
@@ -447,8 +466,13 @@ int extract_main(int argc, char *argv[]) {
         fprintf(stderr, "-q %i is invalid. Resetting to 0, which is the lowest possible value.\n", config.minMapq);
         config.minMapq = 0;
     }
-    if(config.fraction+config.counts+config.logit > 1) {
-        fprintf(stderr, "More than one of --fraction, --counts, and --logit were specified. These are mutually exclusive.\n");
+    if(config.fraction+config.counts+config.logit+config.methylKit > 1) {
+        fprintf(stderr, "More than one of --fraction, --counts, --methylKit and --logit were specified. These are mutually exclusive.\n");
+        extract_usage();
+        return 1;
+    }
+    if(config.methylKit + config.merge == 2) {
+        fprintf(stderr, "--mergeContext and --methylKit are mutually exclusive.\n");
         extract_usage();
         return 1;
     }
@@ -498,65 +522,85 @@ int extract_main(int argc, char *argv[]) {
         fprintf(stderr, "writing to prefix:'%s'\n", opref);
     }
     if(config.fraction) { 
-      oname = malloc(sizeof(char) * (strlen(opref)+19));
+        oname = malloc(sizeof(char) * (strlen(opref)+19));
     } else if(config.counts) {
-      oname = malloc(sizeof(char) * (strlen(opref)+21));
+        oname = malloc(sizeof(char) * (strlen(opref)+21));
     } else if(config.logit) {
-      oname = malloc(sizeof(char) * (strlen(opref)+20));
+        oname = malloc(sizeof(char) * (strlen(opref)+20));
+    } else if(config.methylKit) {
+        oname = malloc(sizeof(char) * (strlen(opref)+15));
     } else { 
-      oname = malloc(sizeof(char) * (strlen(opref)+14));
+        oname = malloc(sizeof(char) * (strlen(opref)+14));
     }
     assert(oname);
     if(config.keepCpG) {
         if(config.fraction) { 
-          sprintf(oname, "%s_CpG.meth.bedGraph", opref);
+            sprintf(oname, "%s_CpG.meth.bedGraph", opref);
         } else if(config.counts) {
-          sprintf(oname, "%s_CpG.counts.bedGraph", opref);
+            sprintf(oname, "%s_CpG.counts.bedGraph", opref);
         } else if(config.logit) {
-          sprintf(oname, "%s_CpG.logit.bedGraph", opref);
+            sprintf(oname, "%s_CpG.logit.bedGraph", opref);
+        } else if(config.methylKit) {
+            sprintf(oname, "%s_CpG.methylKit", opref);
         } else { 
-          sprintf(oname, "%s_CpG.bedGraph", opref);
+            sprintf(oname, "%s_CpG.bedGraph", opref);
         }
         config.output_fp[0] = fopen(oname, "w");
         if(config.output_fp[0] == NULL) {
             fprintf(stderr, "Couldn't open the output CpG metrics file for writing! Insufficient permissions?\n");
             return -3;
         }
-        printHeader(config.output_fp[0], "CpG", opref, config);
+        if(config.methylKit) {
+            fprintf(config.output_fp[0], "chrBase\tchr\tbase\tstrand\tcoverage\tfreqC\tfreqT\n");
+        } else {
+            printHeader(config.output_fp[0], "CpG", opref, config);
+        }
     }
     if(config.keepCHG) {
         if(config.fraction) { 
-          sprintf(oname, "%s_CHG.meth.bedGraph", opref);
+            sprintf(oname, "%s_CHG.meth.bedGraph", opref);
         } else if(config.counts) {
-          sprintf(oname, "%s_CHG.counts.bedGraph", opref);
+            sprintf(oname, "%s_CHG.counts.bedGraph", opref);
         } else if(config.logit) {
-          sprintf(oname, "%s_CHG.logit.bedGraph", opref);
+            sprintf(oname, "%s_CHG.logit.bedGraph", opref);
+        } else if(config.methylKit) {
+            sprintf(oname, "%s_CHG.methylKit", opref);
         } else { 
-          sprintf(oname, "%s_CHG.bedGraph", opref);
+            sprintf(oname, "%s_CHG.bedGraph", opref);
         }
         config.output_fp[1] = fopen(oname, "w");
         if(config.output_fp[1] == NULL) {
             fprintf(stderr, "Couldn't open the output CHG metrics file for writing! Insufficient permissions?\n");
             return -3;
         }
-        printHeader(config.output_fp[1], "CHG", opref, config);
+        if(config.methylKit) {
+            fprintf(config.output_fp[1], "chrBase\tchr\tbase\tstrand\tcoverage\tfreqC\tfreqT\n");
+        } else {
+            printHeader(config.output_fp[1], "CHG", opref, config);
+        }
     }
     if(config.keepCHH) {
         if(config.fraction) { 
-          sprintf(oname, "%s_CHH.meth.bedGraph", opref);
+            sprintf(oname, "%s_CHH.meth.bedGraph", opref);
         } else if(config.counts) {
-          sprintf(oname, "%s_CHH.counts.bedGraph", opref);
+            sprintf(oname, "%s_CHH.counts.bedGraph", opref);
         } else if(config.logit) {
-          sprintf(oname, "%s_CHH.logit.bedGraph", opref);
+            sprintf(oname, "%s_CHH.logit.bedGraph", opref);
+        } else if(config.methylKit) {
+            sprintf(oname, "%s_CHH.methylKit", opref);
         } else { 
-          sprintf(oname, "%s_CHH.bedGraph", opref);
+            sprintf(oname, "%s_CHH.bedGraph", opref);
         }
         config.output_fp[2] = fopen(oname, "w");
         if(config.output_fp[2] == NULL) {
             fprintf(stderr, "Couldn't open the output CHH metrics file for writing! Insufficient permissions?\n");
             return -3;
         }
-        printHeader(config.output_fp[2], "CHH", opref, config);
+        if(config.methylKit) {
+            fprintf(config.output_fp[2], "chrBase\tchr\tbase\tstrand\tcoverage\tfreqC\tfreqT\n");
+        } else {
+            printHeader(config.output_fp[2], "CHH", opref, config);
+        }
     }
 
     //Run the pileup
