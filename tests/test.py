@@ -1,7 +1,8 @@
 from subprocess import check_call
 import os
 import os.path as op
-
+wd = op.dirname(op.realpath(__file__))
+os.chdir(wd)
 
 def rm(f):
     try:
@@ -9,8 +10,6 @@ def rm(f):
     except OSError:
         pass
 
-rm('po')
-check_call('cd .. && make', shell=True)
 assert op.exists('../PileOMeth')
 
 rm('ct_aln_CpG.bedGraph')

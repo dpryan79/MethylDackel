@@ -11,7 +11,7 @@ OPTS ?= -Wall -g -O3
 all: lib PileOMeth
 
 OBJS = common.o bed.o svg.o pileup.o extract.o MBias.o mergeContext.o
-VERSION = 0.1.8
+VERSION = 0.1.9
 
 #If we're building from a git repo, then append the most recent tag
 ifneq "$(wildcard .git)" ""
@@ -35,6 +35,9 @@ lib: libPileOMeth.a
 
 PileOMeth: htslib version.h libPileOMeth.a
 	$(CC) $(OPTS) -Ihtslib -o PileOMeth main.c libPileOMeth.a htslib/libhts.a -lm -lz -lpthread
+
+test: PileOMeth
+	python tests/test.py
 
 clean:
 	rm -f *.o PileOMeth libPileOMeth.a
