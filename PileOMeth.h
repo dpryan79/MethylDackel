@@ -45,6 +45,8 @@ typedef struct {
  @field	maxDepth	Maximum depth for the pileup
  @field keepDiscordant	0: Do not include discordantly aligned reads when calculating metrics
  @field	keepSingleton	0: Do not include singletons when calculating metrics
+ @field merge   1: Merge Cs in either a CpG or CHG context into single entries
+ @field methylKit       Output in a format compatible with methylKit
  @field output_fp	Output file pointers (to CpG, CHG, and CHH, respectively)
  @field	reg	A region specified by -r
  @field fp	Input file pointer (must be a BAM or CRAM file)
@@ -56,7 +58,7 @@ typedef struct {
     int keepCpG, keepCHG, keepCHH;
     int minMapq, minPhred, keepDupes, maxDepth;
     int keepDiscordant, keepSingleton;
-    int merge;
+    int merge, methylKit;
     int fraction, counts, logit;
     FILE **output_fp;
     char *reg;

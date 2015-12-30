@@ -87,6 +87,11 @@ The `--logit` option produces the first three columns of the standard output fol
 
 Note that these options may be combined with `--mergeContext`. However, `PileOMeth mergeContext` can not be used after the fact to combine these.
 
+methylKit-compatible output
+===========================
+
+methylKit has its own format, which can be produced with the `--methylKit` option. Merging Cs into CpGs or CHGs is forbidden in this format. Likewise, this option is mutually exclusive with `--logit` et al.
+
 Methylation bias plotting and correction
 ========================================
 

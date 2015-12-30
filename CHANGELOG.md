@@ -1,3 +1,8 @@
+Version 0.1.9:
+
+   * Added the --methylKit option
+   * Added automated testing with `make test`
+
 Version 0.1.8:
 
    * Fix compilation issues with clang
