@@ -6,6 +6,7 @@
 int mbias_main(int argc, char *argv[]);
 int extract_main(int argc, char *argv[]);
 int mergeContext_main(int argc, char *argv[]);
+void print_version(void);
 
 void usage_main() {
     fprintf(stderr, "PileOMeth: A tool for processing bisulfite sequencing alignments.\n"
@@ -28,6 +29,9 @@ int main(int argc, char *argv[]) {
         return 0;
     } else if(strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0) {
         usage_main();
+        return 0;
+    } else if(strcmp(argv[1], "-v") == 0 || strcmp(argv[1], "--version") == 0) {
+        print_version();
         return 0;
     } else if(strcmp(argv[1], "extract") == 0) {
         return extract_main(argc-1, argv+1);

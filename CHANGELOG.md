@@ -1,3 +1,8 @@
+Version 0.1.10:
+
+   * Added the --version/-v option.
+   * Fixed the -h/--help option, which actually wasn't recognized before!
+
 Version 0.1.9:
 
    * Added the --methylKit option
