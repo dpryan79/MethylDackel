@@ -43,6 +43,7 @@ typedef struct {
  @field	minPhred	Minimum Phred score to include a base (-p)
  @field	keepDupes	1: Include marked duplicates when calculating metrics
  @field	maxDepth	Maximum depth for the pileup
+ @field	minDepth	Minimum depth for outputing methylation metrics
  @field keepDiscordant	0: Do not include discordantly aligned reads when calculating metrics
  @field	keepSingleton	0: Do not include singletons when calculating metrics
  @field merge   1: Merge Cs in either a CpG or CHG context into single entries
@@ -56,7 +57,7 @@ typedef struct {
 */
 typedef struct {
     int keepCpG, keepCHG, keepCHH;
-    int minMapq, minPhred, keepDupes, maxDepth;
+    int minMapq, minPhred, keepDupes, maxDepth, minDepth;
     int keepDiscordant, keepSingleton;
     int merge, methylKit;
     int fraction, counts, logit;
