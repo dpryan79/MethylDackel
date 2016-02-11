@@ -46,3 +46,10 @@ assert op.exists('cg_aln_CHH.methylKit')
 lines = sum(1 for _ in open('cg_aln_CHH.methylKit'))
 assert lines == 1
 rm('cg_aln_CHH.methylKit')
+
+# Check that --minDepth is working, which means there should be no called sites
+check_call('../PileOMeth extract --minDepth 2 cg100.fa cg_aln.bam -q 2', shell=True)
+assert op.exists('cg_aln_CpG.bedGraph')
+lines = sum(1 for _ in open('cg_aln_CpG.bedGraph'))
+assert lines == 1
+rm('cg_aln_CpG.bedGraph')
