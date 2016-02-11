@@ -6,6 +6,8 @@
 #include "htslib/faidx.h"
 #include "htslib/kseq.h"
 
+void print_version(void);
+
 int fgets2(FILE*f, unsigned char *s, int l) {
     return (fgets((char*) s, l, f))?strlen((char*)s):0;
 }
@@ -169,6 +171,7 @@ void mergeContext_usage() {
 "            - allows reading from a pipe.\n"
 "\nOptions:\n"
 "  -o STR    Output file name [stdout]\n"
+"  --version Printer version and quit\n"
 );
 }
 
@@ -178,13 +181,17 @@ int mergeContext_main(int argc, char *argv[]) {
     char c;
 
     static struct option lopts[] = {
-        {"help", 0, NULL, 'h'},
-        {0,      0, NULL,   0}
+        {"help",    0, NULL, 'h'},
+        {"version", 0, NULL, 'v'},
+        {0,         0, NULL,   0}
     };
-    while((c = getopt_long(argc, argv, "ho:", lopts, NULL)) >= 0) {
+    while((c = getopt_long(argc, argv, "hvo:", lopts, NULL)) >= 0) {
         switch(c) {
         case 'h' :
             mergeContext_usage();
+            return 0;
+        case 'v' :
+            print_version();
             return 0;
         case 'o' :
             if((ofile = fopen(optarg, "w")) == NULL) {

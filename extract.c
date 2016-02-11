@@ -12,6 +12,8 @@
 #include <math.h>
 #include "PileOMeth.h"
 
+void print_version(void);
+
 inline double logit(double p) { 
     return(log(p) - log(1 - p)); 
 }
@@ -325,6 +327,7 @@ void extract_usage() {
 " --CTOB INT,INT,INT,INT As with --OT, but for the original bottom, complementary\n"
 "                  to the original top, and complementary to the original bottom\n"
 "                  strands, respectively.\n"
+" --version        Print version and then quit.\n"
 "\nNote that --fraction, --counts, and --logit are mutually exclusive!\n");
 }
 
@@ -369,12 +372,16 @@ int extract_main(int argc, char *argv[]) {
         {"mergeContext", 0, NULL,  11},
         {"methylKit",    0, NULL,  12},
         {"help",         0, NULL, 'h'},
+        {"version",      0, NULL, 'v'},
         {0,              0, NULL,   0}
     };
-    while((c = getopt_long(argc, argv, "q:p:r:l:o:D:f:c:m:", lopts,NULL)) >=0){
+    while((c = getopt_long(argc, argv, "hvq:p:r:l:o:D:f:c:m:", lopts,NULL)) >=0){
         switch(c) {
         case 'h' :
             extract_usage();
+            return 0;
+        case 'v' :
+            print_version();
             return 0;
         case 'o' :
             opref = strdup(optarg);

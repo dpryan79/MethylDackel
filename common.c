@@ -1,5 +1,10 @@
 #include "PileOMeth.h"
+#include "version.h"
 #include <assert.h>
+
+void print_version() {
+    printf("%s (using HTSlib version %s)\n", VERSION, hts_version());
+}
 
 inline int isCpG(char *seq, int pos, int seqlen) {
     if(pos+1 == seqlen) return 0;

@@ -9,6 +9,8 @@
 #include <assert.h>
 #include "PileOMeth.h"
 
+void print_version(void);
+
 strandMeth *growStrandMeth(strandMeth *s, int32_t l) {
     int32_t m;
     int i;
@@ -201,7 +203,8 @@ void mbias_usage() {
 "                  that an output prefix is no longer required with this option.\n"
 " --noCpG          Do not output CpG methylation metrics\n"
 " --CHG            Output CHG methylation metrics\n"
-" --CHH            Output CHH methylation metrics\n");
+" --CHH            Output CHH methylation metrics\n"
+" --version        Print version and the quit\n");
 }
 
 int mbias_main(int argc, char *argv[]) {
@@ -232,12 +235,16 @@ int mbias_main(int argc, char *argv[]) {
         {"txt",          0, NULL,   7},
         {"noSVG",        0, NULL,   8},
         {"help",         0, NULL, 'h'},
+        {"version",      0, NULL, 'v'},
         {0,              0, NULL,   0}
     };
-    while((c = getopt_long(argc, argv, "q:p:r:l:D:", lopts,NULL)) >= 0) {
+    while((c = getopt_long(argc, argv, "hvq:p:r:l:D:", lopts,NULL)) >= 0) {
         switch(c) {
         case 'h' :
             mbias_usage();
+            return 0;
+        case 'v' :
+            print_version();
             return 0;
         case 'D' :
             config.maxDepth = atoi(optarg);
