@@ -1,4 +1,5 @@
-![Master build status](https://travis-ci.org/dpryan79/PileOMeth.svg?branch=master)
+[![Master build status](https://travis-ci.org/dpryan79/PileOMeth.svg?branch=master)](https://travis-ci.org/dpryan79/PileOMeth)
+[![Galaxy installation](https://img.shields.io/badge/install%20with-galaxy-brightgreen.svg?style=flat-square)](https://toolshed.g2.bx.psu.edu/)
 
 PileOMeth (a temporary name derived due to it using a PILEup to extract METHylation metrics) will process a coordinate-sorted and indexed BAM or CRAM file containing some form of BS-seq alignments and extract per-base methylation metrics from them. PileOMeth requires an indexed fasta file containing the reference genome as well.
 
