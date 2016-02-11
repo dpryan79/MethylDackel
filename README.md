@@ -74,6 +74,11 @@ is changed to this:
 
 This also works for CHG-level metrics. If bedGraph files containing per-Cytosine metrics already exist, they can be converted to instead contain per-CpG/CHG metrics with `PileOMeth mergeContext`.
 
+Excluding low-coverage regions
+==============================
+
+If your downstream analysis requires an absolute minimum coverage (here, defined as the number of methylation calls kept after filtering for MAPQ, phred score, etc.), you can use the `--minDepth` option to achieve this. By default, `PileOMeth extract` will output all methylation metrics as long as the coverage is at least 1. If you use `--minDepth 10`, then only sites covered at least 10x will be output. This works in conjunction with the `--mergeContext` option, above. So if you request per-CpG context output (i.e., with `--mergeContext`) and `--minDepth 10` then only CpGs with a minimum coverage of 10 will be output.
+
 Logit, fraction, and counts only output
 =======================================
 
