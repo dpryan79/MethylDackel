@@ -2,6 +2,7 @@ Version 0.1.10:
 
    * Added the --version/-v option.
    * Fixed the -h/--help option, which actually wasn't recognized before!
+   * Added the --minDepth option.
 
 Version 0.1.9:
 
