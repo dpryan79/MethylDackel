@@ -24,6 +24,7 @@ struct lastCall{
 
 void writeCall(FILE *of, Config *config, char *chrom, int32_t pos, int32_t width, uint32_t nmethyl, uint32_t nunmethyl, char base) { 
     char strand = (base=='C' || base=='c') ? 'F' : 'R';
+    if(nmethyl+nunmethyl < config->minDepth) return;
     if (!config->fraction && !config->logit && !config->counts && !config->methylKit) {
         fprintf(of, \
             "%s\t%i\t%i\t%i\t%" PRIu32 "\t%" PRIu32 "\n", \
@@ -279,6 +280,9 @@ void extract_usage() {
 " -p INT           Minimum Phred threshold to include a base (default 5). This\n"
 "                  must be >0.\n"
 " -D INT           Maximum per-base depth (default 2000)\n"
+" -d INT           Minimum per-base depth for reporting output. If you use\n"
+"                  --mergeContext, this then applies to the merged CpG/CHG.\n"
+"                  (default 1)\n"
 " -r STR           Region string in which to extract methylation\n"
 " -l FILE          A BED file listing regions for inclusion. Note that unlike\n"
 "                  samtools mpileup, this option will utilize the strand column\n"
@@ -337,6 +341,7 @@ int extract_main(int argc, char *argv[]) {
     config.keepCpG = 1; config.keepCHG = 0; config.keepCHH = 0;
     config.minMapq = 10; config.minPhred = 5; config.keepDupes = 0;
     config.keepSingleton = 0, config.keepDiscordant = 0;
+    config.minDepth = 1;
     config.methylKit = 0;
     config.merge = 0;
     config.maxDepth = 2000;
@@ -356,6 +361,7 @@ int extract_main(int argc, char *argv[]) {
         {"fraction",     0, NULL, 'f'},
         {"counts",       0, NULL, 'c'},
         {"logit",        0, NULL, 'm'},
+        {"minDepth",     1, NULL, 'd'},
         {"noCpG",        0, NULL,   1},
         {"CHG",          0, NULL,   2},
         {"CHH",          0, NULL,   3},
@@ -381,6 +387,13 @@ int extract_main(int argc, char *argv[]) {
             break;
         case 'D' :
             config.maxDepth = atoi(optarg);
+            break;
+        case 'd' :
+            config.minDepth = atoi(optarg);
+            if(config.minDepth < 1) {
+                fprintf(stderr, "Error, the minimum depth must be at least 1!\n");
+                return 1;
+            }
             break;
 	case 'r':
 	    config.reg = strdup(optarg);
