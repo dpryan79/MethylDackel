@@ -44,6 +44,8 @@ inline int isCHH(char *seq, int pos, int seqlen) {
 
 int getStrand(bam1_t *b) {
     char *XG = (char *) bam_aux_get(b, "XG");
+    //Only bismark uses the XG tag like this. Some other aligners use it for other purposes...
+    if(XG != NULL && *(XG+1) != 'C' && *(XG+1) != 'G') XG = NULL;
     if(XG == NULL) { //Can't handle non-directional libraries!
         if(b->core.flag & BAM_FPAIRED) {
             if((b->core.flag & 0x50) == 0x50) return 2; //Read1, reverse comp. == OB
