@@ -381,7 +381,7 @@ int extract_main(int argc, char *argv[]) {
         {"version",      0, NULL, 'v'},
         {0,              0, NULL,   0}
     };
-    while((c = getopt_long(argc, argv, "hvq:p:r:l:o:D:f:c:m:", lopts,NULL)) >=0){
+    while((c = getopt_long(argc, argv, "hvq:p:r:l:o:D:f:c:m:d:", lopts,NULL)) >=0){
         switch(c) {
         case 'h' :
             extract_usage();

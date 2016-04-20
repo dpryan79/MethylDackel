@@ -1,3 +1,7 @@
+Version 0.1.11:
+
+   * The --minDepth/-d option is actually recognized now. Sorry about that!
+
 Version 0.1.10:
 
    * Added the --version/-v option.
