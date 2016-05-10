@@ -1,3 +1,7 @@
+Version 0.1.12:
+
+   * Fixed handling of hard-clipped bases, which caused a segfault before.
+
 Version 0.1.11:
 
    * The --minDepth/-d option is actually recognized now. Sorry about that!

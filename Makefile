@@ -11,7 +11,7 @@ OPTS ?= -Wall -g -O3
 all: lib PileOMeth
 
 OBJS = common.o bed.o svg.o pileup.o extract.o MBias.o mergeContext.o
-VERSION = 0.1.11
+VERSION = 0.1.12
 
 #If we're building from a git repo, then append the most recent tag
 ifneq "$(wildcard .git)" ""

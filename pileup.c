@@ -78,11 +78,12 @@ int32_t *calculate_positions(bam1_t *read) {
             if(op == 0 || op == 7 || op == 8) { //M, =, X
                 *(positions+offset) = previous_position++;
                 offset++;
-            } else if(op == 1 || op == 4 || op == 5) { //I, S, H
+            } else if(op == 1 || op == 4) { //I, S, H
                 *(positions+offset) = -1;
                 offset++;
             } else if(op == 2 || op == 3) { //D, N
                 previous_position++;
+            } else if(op == 5) { //H, which isn't in the sequence
             } else { //P
                 fprintf(stderr, "[calculate_positions] We encountered a CIGAR operation that we're not ready to deal with in %s\n", bam_get_qname(read));
             }
@@ -105,15 +106,15 @@ static void cust_tweak_overlap_quality(bam1_t *a, bam1_t *b) {
     if(((sa-sb)&1) == 1) goto quit;
 
     //Go to the first mapped position
-    while(posa[ia]<0 && ia<na) ia++;
-    while(posa[ib]<0 && ib<nb) ib++;
+    while(ia<na && posa[ia]<0) ia++;
+    while(ib<nb && posa[ib]<0) ib++;
     if(ia==na || ib==nb) goto quit;
 
     //Go to the first overlapping position
     if(posa[ia]<posb[ib]) {
-        while(posa[ia]<posb[ib] && ia<na) ia++;
+        while(ia<na && posa[ia]<posb[ib]) ia++;
     } else {
-        while(posb[ib]<posa[ia] && ib<nb) ib++;
+        while(ib<nb && posb[ib]<posa[ia]) ib++;
     }
     if(ia==na || ib==nb) goto quit;
 
