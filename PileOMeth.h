@@ -46,6 +46,7 @@ typedef struct {
  @field	minDepth	Minimum depth for outputing methylation metrics
  @field keepDiscordant	0: Do not include discordantly aligned reads when calculating metrics
  @field	keepSingleton	0: Do not include singletons when calculating metrics
+ @field ignoreFlags     Mask that's logically &ed with and ignored if > 0. Defaults to 0xF00.
  @field merge   1: Merge Cs in either a CpG or CHG context into single entries
  @field methylKit       Output in a format compatible with methylKit
  @field output_fp	Output file pointers (to CpG, CHG, and CHH, respectively)
@@ -58,7 +59,7 @@ typedef struct {
 typedef struct {
     int keepCpG, keepCHG, keepCHH;
     int minMapq, minPhred, keepDupes, maxDepth, minDepth;
-    int keepDiscordant, keepSingleton;
+    int keepDiscordant, keepSingleton, ignoreFlags;
     int merge, methylKit;
     int fraction, counts, logit;
     FILE **output_fp;

@@ -304,6 +304,12 @@ void extract_usage() {
 "                  unset in the FLAG field are ignored. Note that the definition\n"
 "                  of concordant and discordant is based on your aligner\n"
 "                  settings.\n"
+" -F, --ignoreFlags    By deault, any alignment marked as secondary (bit 0x100),\n"
+"                  failing QC (bit 0x200), a PCR/optical duplicate (0x400) or\n"
+"                  supplemental (0x800) is ignored. This equates to a value of\n"
+"                  0xF00 or 3840 in decimal. If you would like to change that,\n"
+"                  you can specify a new value here.\n"
+"                  ignored. Specifying this causes them to be included.\n"
 " --noCpG          Do not output CpG context methylation metrics\n"
 " --CHG            Output CHG context methylation metrics\n"
 " --CHH            Output CHH context methylation metrics\n"
@@ -357,6 +363,7 @@ int extract_main(int argc, char *argv[]) {
     config.fraction = 0;
     config.counts = 0;
     config.logit = 0;
+    config.ignoreFlags = 0xF00;
     for(i=0; i<16; i++) config.bounds[i] = 0;
 
     static struct option lopts[] = {
@@ -377,11 +384,12 @@ int extract_main(int argc, char *argv[]) {
         {"CTOB",         1, NULL,  10},
         {"mergeContext", 0, NULL,  11},
         {"methylKit",    0, NULL,  12},
+        {"ignoreFlags",  1, NULL, 'F'},
         {"help",         0, NULL, 'h'},
         {"version",      0, NULL, 'v'},
         {0,              0, NULL,   0}
     };
-    while((c = getopt_long(argc, argv, "hvq:p:r:l:o:D:f:c:m:d:", lopts,NULL)) >=0){
+    while((c = getopt_long(argc, argv, "hvq:p:r:l:o:D:f:c:m:d:F:", lopts,NULL)) >=0){
         switch(c) {
         case 'h' :
             extract_usage();
@@ -443,6 +451,9 @@ int extract_main(int argc, char *argv[]) {
             break;
         case 12 :
             config.methylKit = 1;
+            break;
+        case 'F' :
+            config.ignoreFlags = atoi(optarg);
             break;
         case 'q' :
             config.minMapq = atoi(optarg);

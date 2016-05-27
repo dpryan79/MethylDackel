@@ -1,3 +1,7 @@
+Version 0.1.13:
+
+   * Added the `--ignoreFlags`/`-F` option, which is equivalent to the -F option in samtools. The default is 0xF00, which ignores duplicates, QC fail, secondary, and supplemental alignments.
+
 Version 0.1.12:
 
    * Fixed handling of hard-clipped bases, which caused a segfault before.

@@ -53,3 +53,10 @@ assert op.exists('cg_aln_CpG.bedGraph')
 lines = sum(1 for _ in open('cg_aln_CpG.bedGraph'))
 assert lines == 1
 rm('cg_aln_CpG.bedGraph')
+
+# Check that --ignoreFlags is working, which means that there are now called sites
+check_call('../PileOMeth extract --ignoreFlags 0xD00 cg100.fa cg_aln.bam -q 2', shell=True)
+assert op.exists('cg_aln_CpG.bedGraph')
+lines = sum(1 for _ in open('cg_aln_CpG.bedGraph'))
+assert lines == 49
+rm('cg_aln_CpG.bedGraph')
