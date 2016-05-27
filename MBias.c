@@ -196,6 +196,12 @@ void mbias_usage() {
 "                  unset in the FLAG field are ignored. Note that the definition\n"
 "                  of concordant and discordant is based on your aligner\n"
 "                  settings.\n"
+" -F, --ignoreFlags    By deault, any alignment marked as secondary (bit 0x100),\n"
+"                  failing QC (bit 0x200), a PCR/optical duplicate (0x400) or\n"
+"                  supplemental (0x800) is ignored. This equates to a value of\n"
+"                  0xF00 or 3840 in decimal. If you would like to change that,\n"
+"                  you can specify a new value here.\n"
+"                  ignored. Specifying this causes them to be included.\n"
 " --txt            Output tab separated metrics to the screen. These can be\n"
 "                  imported into R or another program for manual plotting and\n"
 "                  analysis.\n"
@@ -223,6 +229,7 @@ int mbias_main(int argc, char *argv[]) {
     config.reg = NULL;
     config.bedName = NULL;
     config.bed = NULL;
+    config.ignoreFlags = 0xF00;
     for(i=0; i<16; i++) config.bounds[i] = 0;
 
     static struct option lopts[] = {
@@ -234,11 +241,12 @@ int mbias_main(int argc, char *argv[]) {
         {"keepDiscordant", 0, NULL, 6},
         {"txt",          0, NULL,   7},
         {"noSVG",        0, NULL,   8},
+        {"ignoreFlags",  1, NULL, 'F'},
         {"help",         0, NULL, 'h'},
         {"version",      0, NULL, 'v'},
         {0,              0, NULL,   0}
     };
-    while((c = getopt_long(argc, argv, "hvq:p:r:l:D:", lopts,NULL)) >= 0) {
+    while((c = getopt_long(argc, argv, "hvq:p:r:l:D:F:", lopts,NULL)) >= 0) {
         switch(c) {
         case 'h' :
             mbias_usage();
@@ -279,6 +287,9 @@ int mbias_main(int argc, char *argv[]) {
         case 8 :
             SVG = 0;
             txt = 1;
+            break;
+        case 'F' :
+            config.ignoreFlags = atoi(optarg);
             break;
         case 'q' :
             config.minMapq = atoi(optarg);
