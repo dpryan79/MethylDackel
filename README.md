@@ -37,6 +37,22 @@ By default, PileOMeth will only calculate metrics for Cytosines in a CpG context
 
 PileOMeth can filter reads and bases according to MAPQ and Phred score, respectively. The default minimums are MAPQ >= 10 and Phred >= 5, though these can be changed with the -q and -p options. PileOMeth can also account for methylation bias (described below) with the `--OT`, `--OB`, `--CTOT`, and `--CTOB` options.
 
+A note on overlapping reads
+===========================
+
+A commonly asked and important question is how paired-end reads that overlap are treated. If two mates from a paired-end experiment happen to both overlap the same CpG then one could get skewed results if the methylation status is taken from both reads, rather than only one of them (i.e., double counting paired-end reads is a bad idea). PileOMeth was written with this in mind, so by default paired-end reads that overlap will never be double counted.
+
+It's useful to note how this is implemented internally, since it relates to the `-p` option. For the sake of an example, suppose you have two mates that overlap a given position. In this example, we'll specify that mate #1 has a base call with a phred score of 20 at that position and that mate #2 has a base all with a phred score of 15.
+
+ 1. If both base calls agree, then the one with the lower score (here, mate #2 with a score of 15) is set to 0. Further, the other read's base score (here, mate #1 with a score of 20) is increased by 20%. Since the `-p` option defaults to 10, it will skip mate #2 and only count read #1.
+ 2. If the base calls instead disagree, then the process is more complicated. There are a total of four possibilities for how this could work:
+   1. Mate #1 has a higher phred score and the base call is not an `N`. Then its phred score is decremented by that of the other mate (in the example above, `20-15=5`, so `5` would be the new phred score). The phred score for the mate is then set to 0.
+   2. Mate #2 has a higher phred score and the base call is not an `N`. In that case the same procedure as that above is followed, with the mate #2 phred score decremented and the mate #1 phred score set to 0.
+   3. The mate with the higher phred score has a base call of `N`. In this case, the phred scores for both mates are set to 0.
+   4. The mates have identical phred scores. In this case, the phred scores are both set to 0.
+
+It's important to think about the above possibilities in conjunction with the `-p` option. If two mates agree but individually have low quality base calls, they may combine to produce a base call of acceptable quality. Similarly, if the two mates have high quality base calls but these disagree, the result could be a combined base call of low quality (due to the disagreement). This is actually the same prodcedure that `samtools mpileup` uses internally, so if you're familiar with variant calling with `samtools` then the methodology and reasons are identical.
+
 Single Cytosine methylation metrics extraction
 ==============================================
 
