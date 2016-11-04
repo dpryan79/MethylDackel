@@ -150,7 +150,7 @@ bam1_t *trimAbsoluteAlignment(bam1_t *b, int bounds[16]) {
     rb = (rb<b->core.l_qseq) ? rb : b->core.l_qseq;
 
     if(lb) {
-        for(i=0; i<lb; i++) 
+        for(i=0; i<lb; i++) {
             qual[i] = 0;
             if(i&1) seq[i>>1] |= 0xf;
             else seq[i>>1] |= 0xf0;
