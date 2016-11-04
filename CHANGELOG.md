@@ -1,3 +1,7 @@
+Version 0.1.14:
+
+   * Added the `--requireFlags`/`-r` option, which is equivalent to the -f option in samtools. The default is 0, which requires nothing.
+
 Version 0.1.13:
 
    * Added the `--ignoreFlags`/`-F` option, which is equivalent to the -F option in samtools. The default is 0xF00, which ignores duplicates, QC fail, secondary, and supplemental alignments.

@@ -132,7 +132,4 @@ Ignored alignments
 
 By default, any alignment marked as being secondary (bit 256), having failed QC (bit 512), being a PCR/optical duplicate (bit 1024), or being supplemental (bit 2048) is ignored. This is a reasonable default and should only be changed by expert users. For those needing to change this behaviour, please see the `-F` or `--ignoreFlags` options to both `PileOMeth mbias` and `PileOMeth extract`.
 
-To do list
-==========
-
- - [ ] Is the output format the most convenient (it's what Bison uses, so converters have already been written)? It makes more sense to output a predefined VCF format, which would allow processing multiple samples at once. This would require a spec., which should have pretty broad input.
+Relatedly, if you would like to require that all included alignments have certain flags set, then the `-R` or `--requireFlags` options to both `PileOMeth mbias` and `PileOMeth extract` can be given.

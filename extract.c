@@ -310,6 +310,10 @@ void extract_usage() {
 "                  0xF00 or 3840 in decimal. If you would like to change that,\n"
 "                  you can specify a new value here.\n"
 "                  ignored. Specifying this causes them to be included.\n"
+" -R, --requireFlags   Require each alignment to have all bits in this value\n"
+"                  present, or else the alignment is ignored. This is equivalent\n"
+"                  to the -f option in samtools. The default is 0, which\n"
+"                  includes all alignments.\n"
 " --noCpG          Do not output CpG context methylation metrics\n"
 " --CHG            Output CHG context methylation metrics\n"
 " --CHH            Output CHH context methylation metrics\n"
@@ -364,6 +368,7 @@ int extract_main(int argc, char *argv[]) {
     config.counts = 0;
     config.logit = 0;
     config.ignoreFlags = 0xF00;
+    config.requireFlags = 0;
     for(i=0; i<16; i++) config.bounds[i] = 0;
 
     static struct option lopts[] = {
@@ -385,11 +390,12 @@ int extract_main(int argc, char *argv[]) {
         {"mergeContext", 0, NULL,  11},
         {"methylKit",    0, NULL,  12},
         {"ignoreFlags",  1, NULL, 'F'},
+        {"requireFlags", 1, NULL, 'R'},
         {"help",         0, NULL, 'h'},
         {"version",      0, NULL, 'v'},
         {0,              0, NULL,   0}
     };
-    while((c = getopt_long(argc, argv, "hvq:p:r:l:o:D:f:c:m:d:F:", lopts,NULL)) >=0){
+    while((c = getopt_long(argc, argv, "hvq:p:r:l:o:D:f:c:m:d:F:R:", lopts,NULL)) >=0){
         switch(c) {
         case 'h' :
             extract_usage();
@@ -454,6 +460,9 @@ int extract_main(int argc, char *argv[]) {
             break;
         case 'F' :
             config.ignoreFlags = atoi(optarg);
+            break;
+        case 'R':
+            config.requireFlags = atoi(optarg);
             break;
         case 'q' :
             config.minMapq = atoi(optarg);

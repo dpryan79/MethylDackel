@@ -146,6 +146,7 @@ int filter_func(void *data, bam1_t *b) {
         if(b->core.tid == -1 || b->core.flag & BAM_FUNMAP) continue; //Unmapped
         if(b->core.qual < ldata->config->minMapq) continue; //-q
         if(b->core.flag & ldata->config->ignoreFlags) continue; //By default: secondary alignments, QC failed, PCR duplicates, and supplemental alignments
+        if(ldata->config->requireFlags && b->core.flag & ldata->config->requireFlags != ldata->config->requireFlags) continue;
         if(!ldata->config->keepDupes && b->core.flag & BAM_FDUP) continue;
         p = bam_aux_get(b, "NH");
         if(p != NULL) {
