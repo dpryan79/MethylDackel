@@ -231,6 +231,7 @@ int mbias_main(int argc, char *argv[]) {
     config.bed = NULL;
     config.ignoreFlags = 0xF00;
     for(i=0; i<16; i++) config.bounds[i] = 0;
+    for(i=0; i<16; i++) config.absoluteBounds[i] = 0;
 
     static struct option lopts[] = {
         {"noCpG",        0, NULL,   1},
