@@ -1,3 +1,7 @@
+Version 0.1.14:
+
+   * Fixed the plotting where the sometimes the plotted lines escape the bounds of the graph. The cause for this was that read #2 was being ignored when the graph bounds were being computed.
+
 Version 0.1.13:
 
    * Added the `--ignoreFlags`/`-F` option, which is equivalent to the -F option in samtools. The default is 0xF00, which ignores duplicates, QC fail, secondary, and supplemental alignments.
