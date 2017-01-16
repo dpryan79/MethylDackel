@@ -8,10 +8,10 @@ OPTS ?= -Wall -g -O3
 
 .SUFFIXES:.c .o
 
-all: lib PileOMeth
+all: lib MethylDackel
 
 OBJS = common.o bed.o svg.o pileup.o extract.o MBias.o mergeContext.o
-VERSION = 0.1.14
+VERSION = 0.2.0
 
 #If we're building from a git repo, then append the most recent tag
 ifneq "$(wildcard .git)" ""
@@ -27,23 +27,23 @@ version.h:
 htslib: 
 	$(MAKE) -C htslib
 
-libPileOMeth.a: version.h $(OBJS)
+libMethylDackel.a: version.h $(OBJS)
 	-@rm -f $@
 	$(AR) -rcs $@ $(OBJS)
 
-lib: libPileOMeth.a
+lib: libMethylDackel.a
 
-PileOMeth: htslib version.h libPileOMeth.a
-	$(CC) $(OPTS) -Ihtslib -o PileOMeth main.c libPileOMeth.a htslib/libhts.a -lm -lz -lpthread
+MethylDackel: htslib version.h libMethylDackel.a
+	$(CC) $(OPTS) -Ihtslib -o MethylDackel main.c libMethylDackel.a htslib/libhts.a -lm -lz -lpthread
 
-test: PileOMeth
+test: MethylDackel 
 	python tests/test.py
 
 clean:
-	rm -f *.o PileOMeth libPileOMeth.a
+	rm -f *.o MethylDackel libMethylDackel.a
 
 clean-all: clean
 	make --directory=htslib clean
 
-install: PileOMeth
-	install PileOMeth $(prefix)
+install: MethylDackel
+	install MethylDackel $(prefix)

@@ -1,4 +1,4 @@
-#include "PileOMeth.h"
+#include "MethylDackel.h"
 #include <ctype.h>
 #include <limits.h>
 #include "htslib/kseq.h"

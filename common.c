@@ -1,4 +1,4 @@
-#include "PileOMeth.h"
+#include "MethylDackel.h"
 #include "version.h"
 #include <assert.h>
 
@@ -132,6 +132,42 @@ bam1_t *trimAlignment(bam1_t *b, int bounds[16]) {
     return b;
 }
 
+bam1_t *trimAbsoluteAlignment(bam1_t *b, int bounds[16]) {
+    int strand = getStrand(b)-1;
+    int i, lb, rb;
+    uint8_t *qual = bam_get_qual(b);
+    uint8_t *seq = bam_get_seq(b);
+
+    if(b->core.flag & BAM_FREAD2) {
+        lb = bounds[4*strand+2];
+        rb = bounds[4*strand+3];
+    } else {
+        lb = bounds[4*strand];
+        rb = bounds[4*strand+1];
+    }
+
+    lb = (lb<b->core.l_qseq) ? lb : b->core.l_qseq;
+    rb = (rb<b->core.l_qseq) ? rb : b->core.l_qseq;
+
+    if(lb) {
+        for(i=0; i<lb; i++) {
+            qual[i] = 0;
+            if(i&1) seq[i>>1] |= 0xf;
+            else seq[i>>1] |= 0xf0;
+        }
+    }
+
+    if(rb) {
+        for(i=0; i<rb; i++) {
+            qual[b->core.l_qseq - i] = 0;
+            if((b->core.l_qseq - i)&1) seq[(b->core.l_qseq - i)>>1] |= 0xf;
+            else seq[(b->core.l_qseq - i)>>1] |= 0xf0;
+        }
+    }
+
+    return b;
+}
+
 //This will need to be restructured to handle multiple input files
 int filter_func(void *data, bam1_t *b) {
     int rv, NH, overlap;
@@ -168,9 +204,9 @@ int filter_func(void *data, bam1_t *b) {
         /***********************************************************************
         *
         * Deal with bounds inclusion (--OT, --OB, etc.)
-        * If we don't do this now, then the dealing with this after the overlap
+        * If we don't do this now, then dealing with this after the overlap
         * detection will result in losing a lot of calls that we actually should
-        * keep (i.e., if a call is in an overlapping region near an end of read
+        * keep (i.e., if a call is in an overlapping region near the end of read
         * #1 and that region is excluded in that read then we lose the call).
         * The overlap detection will only decrement read #2's phred score by 20%
         * (instead of to 0) if there's a base mismatch and read #2 has the
@@ -178,6 +214,7 @@ int filter_func(void *data, bam1_t *b) {
         *
         ***********************************************************************/
         if(ldata->config->bounds) b = trimAlignment(b, ldata->config->bounds);
+        if(ldata->config->absoluteBounds) b = trimAbsoluteAlignment(b, ldata->config->absoluteBounds);
         break;
     }
     return rv;

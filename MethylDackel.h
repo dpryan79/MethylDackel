@@ -71,6 +71,7 @@ typedef struct {
     bedRegions *bed;
     faidx_t *fai;
     int bounds[16];
+    int absoluteBounds[16];
 } Config;
 
 /*! @typedef

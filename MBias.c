@@ -7,7 +7,7 @@
 #include <string.h>
 #include <inttypes.h>
 #include <assert.h>
-#include "PileOMeth.h"
+#include "MethylDackel.h"
 
 void print_version(void);
 
@@ -173,7 +173,7 @@ void extractMBias(Config *config, char *opref, int SVG, int txt) {
 }
 
 void mbias_usage() {
-    fprintf(stderr, "\nUsage: PileOMeth mbias [OPTIONS] <ref.fa> <sorted_alignments.bam> <output.prefix>\n");
+    fprintf(stderr, "\nUsage: MethylDackel mbias [OPTIONS] <ref.fa> <sorted_alignments.bam> <output.prefix>\n");
     fprintf(stderr,
 "\n"
 "Options:\n"
@@ -236,6 +236,7 @@ int mbias_main(int argc, char *argv[]) {
     config.ignoreFlags = 0xF00;
     config.requireFlags = 0;
     for(i=0; i<16; i++) config.bounds[i] = 0;
+    for(i=0; i<16; i++) config.absoluteBounds[i] = 0;
 
     static struct option lopts[] = {
         {"noCpG",        0, NULL,   1},

@@ -10,7 +10,7 @@
 #include <errno.h>
 #include <limits.h>
 #include <math.h>
-#include "PileOMeth.h"
+#include "MethylDackel.h"
 
 void print_version(void);
 
@@ -274,7 +274,7 @@ void printHeader(FILE *of, char *context, char *opref, Config config) {
 }
 
 void extract_usage() {
-    fprintf(stderr, "\nUsage: PileOMeth extract [OPTIONS] <ref.fa> <sorted_alignments.bam>\n");
+    fprintf(stderr, "\nUsage: MethylDackel extract [OPTIONS] <ref.fa> <sorted_alignments.bam>\n");
     fprintf(stderr,
 "\n"
 "Options:\n"
@@ -341,6 +341,16 @@ void extract_usage() {
 " --CTOB INT,INT,INT,INT As with --OT, but for the original bottom, complementary\n"
 "                  to the original top, and complementary to the original bottom\n"
 "                  strands, respectively.\n"
+" --nOT INT,INT,INT,INT Like --OT, but always exclude INT bases from a given end\n"
+"                  from inclusion,regardless of the length of an alignment. This\n"
+"                  is useful in cases where reads may have already been trimmed\n"
+"                  to different lengths, but still none-the-less contain a\n"
+"                  certain length bias at one or more ends.\n"
+" --nOB INT,INT,INT,INT\n"
+" --nCTOT INT,INT,INT,INT\n"
+" --nCTOB INT,INT,INT,INT As with --nOT, but for the original bottom, complementary\n"
+"                  to the original top, and complementary to the original bottom\n"
+"                  strands, respectively.\n"
 " --version        Print version and then quit.\n"
 "\nNote that --fraction, --counts, and --logit are mutually exclusive!\n");
 }
@@ -370,6 +380,7 @@ int extract_main(int argc, char *argv[]) {
     config.ignoreFlags = 0xF00;
     config.requireFlags = 0;
     for(i=0; i<16; i++) config.bounds[i] = 0;
+    for(i=0; i<16; i++) config.absoluteBounds[i] = 0;
 
     static struct option lopts[] = {
         {"opref",        1, NULL, 'o'},
@@ -389,6 +400,10 @@ int extract_main(int argc, char *argv[]) {
         {"CTOB",         1, NULL,  10},
         {"mergeContext", 0, NULL,  11},
         {"methylKit",    0, NULL,  12},
+        {"nOT",          1, NULL,  13},
+        {"nOB",          1, NULL,  14},
+        {"nCTOT",        1, NULL,  15},
+        {"nCTOB",        1, NULL,  16},
         {"ignoreFlags",  1, NULL, 'F'},
         {"requireFlags", 1, NULL, 'R'},
         {"help",         0, NULL, 'h'},
@@ -457,6 +472,18 @@ int extract_main(int argc, char *argv[]) {
             break;
         case 12 :
             config.methylKit = 1;
+            break;
+        case 13 :
+            parseBounds(optarg, config.absoluteBounds, 0);
+            break;
+        case 14 :
+            parseBounds(optarg, config.absoluteBounds, 1);
+            break;
+        case 15 :
+            parseBounds(optarg, config.absoluteBounds, 2);
+            break;
+        case 16 :
+            parseBounds(optarg, config.absoluteBounds, 3);
             break;
         case 'F' :
             config.ignoreFlags = atoi(optarg);

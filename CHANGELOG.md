@@ -1,5 +1,7 @@
-Version 0.1.14:
+Version 0.2.0:
 
+   * Changed the package name from PileOMeth to MethylDackel. It is unfortunate that the temporary "PileOMeth" name stuck around for so long.
+   * Fixed the plotting where the sometimes the plotted lines escape the bounds of the graph. The cause for this was that read #2 was being ignored when the graph bounds were being computed.
    * Added the `--requireFlags`/`-r` option, which is equivalent to the -f option in samtools. The default is 0, which requires nothing.
 
 Version 0.1.13:

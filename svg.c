@@ -1,4 +1,4 @@
-#include "PileOMeth.h"
+#include "MethylDackel.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -61,8 +61,8 @@ double getMinY(strandMeth *m) {
             val = CI(m->unmeth1[i], m->meth1[i], 0);
             minimum = (val < minimum) ? val : minimum;
         }
-        if(m->meth1[i]+m->unmeth1[i]) {
-            val = CI(m->unmeth1[i], m->meth1[i], 0);
+        if(m->meth2[i]+m->unmeth2[i]) {
+            val = CI(m->unmeth2[i], m->meth2[i], 0);
             minimum = (val < minimum) ? val : minimum;
         }
     }
