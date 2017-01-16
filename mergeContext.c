@@ -157,7 +157,7 @@ void mergeContext(FILE *ifile, faidx_t *fai, FILE *ofile) {
     free(lastCHG);
 }
 void mergeContext_usage() {
-    fprintf(stderr, "\nUsage: PileOMeth mergeContext [OPTIONS] <ref.fa> <input>\n");
+    fprintf(stderr, "\nUsage: MethylDackel mergeContext [OPTIONS] <ref.fa> <input>\n");
     fprintf(stderr,
 "\n"
 "This program will merge single Cytosine methylation metrics into per-CpG/CHG\n"
@@ -167,7 +167,7 @@ void mergeContext_usage() {
 "\n"
 "  ref.fa    Reference genome in fasta format. This must be indexed with\n"
 "            samtools faidx\n"
-"  input     An input file such as that produced by PileOMeth extract. Specifying\n"
+"  input     An input file such as that produced by MethylDackel extract. Specifying\n"
 "            - allows reading from a pipe.\n"
 "\nOptions:\n"
 "  -o STR    Output file name [stdout]\n"
