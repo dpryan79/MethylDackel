@@ -7,7 +7,7 @@
 #include <string.h>
 #include <inttypes.h>
 #include <assert.h>
-#include "PileOMeth.h"
+#include "MethylDackel.h"
 
 void print_version(void);
 
@@ -173,7 +173,7 @@ void extractMBias(Config *config, char *opref, int SVG, int txt) {
 }
 
 void mbias_usage() {
-    fprintf(stderr, "\nUsage: PileOMeth mbias [OPTIONS] <ref.fa> <sorted_alignments.bam> <output.prefix>\n");
+    fprintf(stderr, "\nUsage: MethylDackel mbias [OPTIONS] <ref.fa> <sorted_alignments.bam> <output.prefix>\n");
     fprintf(stderr,
 "\n"
 "Options:\n"
