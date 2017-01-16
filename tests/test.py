@@ -61,17 +61,16 @@ lines = sum(1 for _ in open('cg_aln_CpG.bedGraph'))
 assert lines == 49
 rm('cg_aln_CpG.bedGraph')
 
-<<<<<<< HEAD
 # Check that --requireFlags is working
-check_call('../PileOMeth extract --requireFlags 0xD00 cg100.fa cg_aln.bam -q 2', shell=True)
+check_call('../MethylDackel extract --requireFlags 0xD00 cg100.fa cg_aln.bam -q 2', shell=True)
 assert op.exists('cg_aln_CpG.bedGraph')
 lines = sum(1 for _ in open('cg_aln_CpG.bedGraph'))
 assert lines == 49
-=======
+rm('cg_aln_CpG.bedGraph')
+
 # Check absolute trimming bounds
 check_call('../MethylDackel extract --nOT 50,50,40,40 cg100.fa cg_aln.bam -q 2', shell=True)
 assert op.exists('cg_aln_CpG.bedGraph')
 lines = sum(1 for _ in open('cg_aln_CpG.bedGraph'))
 assert lines == 12
->>>>>>> master
 rm('cg_aln_CpG.bedGraph')
