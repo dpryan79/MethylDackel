@@ -2,6 +2,6 @@ tests/*.fa.*
 tests/*.bedGraph
 *.o
 *.swp
-libPileOMeth.a
-PileOMeth
+libMethylDackel.a
+MethylDackel
 version.h
