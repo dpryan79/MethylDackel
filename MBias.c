@@ -202,6 +202,10 @@ void mbias_usage() {
 "                  0xF00 or 3840 in decimal. If you would like to change that,\n"
 "                  you can specify a new value here.\n"
 "                  ignored. Specifying this causes them to be included.\n"
+" -R, --requireFlags   Require each alignment to have all bits in this value\n"
+"                  present, or else the alignment is ignored. This is equivalent\n"
+"                  to the -f option in samtools. The default is 0, which\n"
+"                  includes all alignments.\n"
 " --txt            Output tab separated metrics to the screen. These can be\n"
 "                  imported into R or another program for manual plotting and\n"
 "                  analysis.\n"
@@ -230,6 +234,7 @@ int mbias_main(int argc, char *argv[]) {
     config.bedName = NULL;
     config.bed = NULL;
     config.ignoreFlags = 0xF00;
+    config.requireFlags = 0;
     for(i=0; i<16; i++) config.bounds[i] = 0;
     for(i=0; i<16; i++) config.absoluteBounds[i] = 0;
 
@@ -243,6 +248,7 @@ int mbias_main(int argc, char *argv[]) {
         {"txt",          0, NULL,   7},
         {"noSVG",        0, NULL,   8},
         {"ignoreFlags",  1, NULL, 'F'},
+        {"requireFlags", 1, NULL, 'R'},
         {"help",         0, NULL, 'h'},
         {"version",      0, NULL, 'v'},
         {0,              0, NULL,   0}
@@ -291,6 +297,9 @@ int mbias_main(int argc, char *argv[]) {
             break;
         case 'F' :
             config.ignoreFlags = atoi(optarg);
+            break;
+        case 'R' :
+            config.requireFlags = atoi(optarg);
             break;
         case 'q' :
             config.minMapq = atoi(optarg);

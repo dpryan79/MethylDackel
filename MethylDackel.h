@@ -47,6 +47,7 @@ typedef struct {
  @field keepDiscordant	0: Do not include discordantly aligned reads when calculating metrics
  @field	keepSingleton	0: Do not include singletons when calculating metrics
  @field ignoreFlags     Mask that's logically &ed with and ignored if > 0. Defaults to 0xF00.
+ @field requireFlags    Mask that's logically &ed with and ignored if < mask. Defaults to 0, which means ignore.
  @field merge   1: Merge Cs in either a CpG or CHG context into single entries
  @field methylKit       Output in a format compatible with methylKit
  @field output_fp	Output file pointers (to CpG, CHG, and CHH, respectively)
@@ -59,7 +60,7 @@ typedef struct {
 typedef struct {
     int keepCpG, keepCHG, keepCHH;
     int minMapq, minPhred, keepDupes, maxDepth, minDepth;
-    int keepDiscordant, keepSingleton, ignoreFlags;
+    int keepDiscordant, keepSingleton, ignoreFlags, requireFlags;
     int merge, methylKit;
     int fraction, counts, logit;
     FILE **output_fp;
