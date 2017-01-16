@@ -127,6 +127,11 @@ That command will create a methylation bias (mbias for short) plot for each of t
 
 If you have paired-end data, both reads in the pair will be shown separately, as is the case above. The program will suggest regions for inclusion ("--OT 2,0,0,98" above) and mark them on the plot, if applicable. The format of this output is described in `MethylDackel extract -h`. These suggestions should not be accepted blindly; users are strongly encouraged to have a look for themselves and tweak the actual bounds as appropriate. The lines indicate the average methylation percentage at a given position and the shaded regions the 99.9% confidence interval around it. This is useful in gauging how many methylation calls a given position has relative to its neighbors. Note the spike in methylation at the end of read #2 and the corresponding dip at the beginning of read #1. This is common and these regions can be ignored with the suggested trimming bounds. Note also that the numbers refer to the first and last base that should be included during methylation extraction, not the last and first base to ignore!.
 
+Alignment trimming
+==================
+
+In some protocols it is useful to trim X bases from one or both ends of the alignments regardless of their length. To do this, one can use the `--nOT`, `--nOB`, `--nCTOT`, and `-nCTOB` options, which have a format similar to that mentioned for `--OT` et al. above (the only difference being that one specifies a number of bases, rather than the position within each alignment). Thus, to ignore the 5 bases on either end of alignments on the original top (OT) strand, one would specify `--nOT 5,5,5,5`. Thus, it is irrelevant how long each alignment is, the outermost 5 bases will always be ignored. Note that specifying bounds longer than a given alignment (e.g., `--nOT 100,200,300,400` for a pair of 50 base long alignments) will not cause an error.
+
 Ignored alignments
 ==================
 
