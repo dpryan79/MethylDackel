@@ -10,7 +10,7 @@
 #include <errno.h>
 #include <limits.h>
 #include <math.h>
-#include "PileOMeth.h"
+#include "MethylDackel.h"
 
 void print_version(void);
 
@@ -274,7 +274,7 @@ void printHeader(FILE *of, char *context, char *opref, Config config) {
 }
 
 void extract_usage() {
-    fprintf(stderr, "\nUsage: PileOMeth extract [OPTIONS] <ref.fa> <sorted_alignments.bam>\n");
+    fprintf(stderr, "\nUsage: MethylDackel extract [OPTIONS] <ref.fa> <sorted_alignments.bam>\n");
     fprintf(stderr,
 "\n"
 "Options:\n"

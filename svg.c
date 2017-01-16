@@ -1,4 +1,4 @@
-#include "PileOMeth.h"
+#include "MethylDackel.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
