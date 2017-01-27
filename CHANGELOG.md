@@ -1,3 +1,7 @@
+Version 0.2.1:
+
+   * The `--methylKit` option output methylation values between 0-1 rather than 0-100. This has been corrected.
+
 Version 0.2.0:
 
    * Changed the package name from PileOMeth to MethylDackel. It is unfortunate that the temporary "PileOMeth" name stuck around for so long.

@@ -59,15 +59,15 @@ void writeCall(FILE *of, Config *config, char *chrom, int32_t pos, int32_t width
             logit(((double) nmethyl)/(nmethyl+nunmethyl)));
     } else if(config->methylKit) {
         fprintf(of, \
-            "%s.%i\t%s\t%i\t%c\t%i\t%f\t%f\n", \
+            "%s.%i\t%s\t%i\t%c\t%i\t%6.2f\t%6.2f\n", \
             chrom, \
             pos+1, \
             chrom, \
             pos+1, \
             strand, \
             nmethyl+nunmethyl, \
-            ((double) nmethyl)/(nmethyl+nunmethyl), \
-            ((double) nunmethyl)/(nmethyl+nunmethyl));
+            100.0 * ((double) nmethyl)/(nmethyl+nunmethyl), \
+            100.0 * ((double) nunmethyl)/(nmethyl+nunmethyl));
     }
 }
 
