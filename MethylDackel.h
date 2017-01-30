@@ -173,3 +173,6 @@ int filter_func(void *data, bam1_t *b);
 
 //Used internally by the pileup-based functions
 int updateMetrics(Config *config, const bam_pileup1_t *plp);
+
+//Used internally to parse things like --OT 0,1,2,3
+void parseBounds(char *s2, int *vals, int mult);

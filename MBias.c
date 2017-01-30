@@ -214,6 +214,16 @@ void mbias_usage() {
 " --noCpG          Do not output CpG methylation metrics\n"
 " --CHG            Output CHG methylation metrics\n"
 " --CHH            Output CHH methylation metrics\n"
+" --nOT INT,INT,INT,INT Like --OT, but always exclude INT bases from a given end\n"
+"                  from inclusion,regardless of the length of an alignment. This\n"
+"                  is useful in cases where reads may have already been trimmed\n"
+"                  to different lengths, but still none-the-less contain a\n"
+"                  certain length bias at one or more ends.\n"
+" --nOB INT,INT,INT,INT\n"
+" --nCTOT INT,INT,INT,INT\n"
+" --nCTOB INT,INT,INT,INT As with --nOT, but for the original bottom, complementary\n"
+"                  to the original top, and complementary to the original bottom\n"
+"                  strands, respectively.\n"
 " --version        Print version and the quit\n");
 }
 
@@ -226,6 +236,7 @@ int mbias_main(int argc, char *argv[]) {
     config.keepCpG = 1; config.keepCHG = 0; config.keepCHH = 0;
     config.minMapq = 10; config.minPhred = 5; config.keepDupes = 0;
     config.keepSingleton = 0, config.keepDiscordant = 0;
+    
     config.maxDepth = 2000;
     config.fai = NULL;
     config.fp = NULL;
@@ -247,6 +258,10 @@ int mbias_main(int argc, char *argv[]) {
         {"keepDiscordant", 0, NULL, 6},
         {"txt",          0, NULL,   7},
         {"noSVG",        0, NULL,   8},
+        {"nOT",          1, NULL,   9},
+        {"nOB",          1, NULL,  10},
+        {"nCTOT",        1, NULL,  11},
+        {"nCTOB",        1, NULL,  12},
         {"ignoreFlags",  1, NULL, 'F'},
         {"requireFlags", 1, NULL, 'R'},
         {"help",         0, NULL, 'h'},
@@ -294,6 +309,18 @@ int mbias_main(int argc, char *argv[]) {
         case 8 :
             SVG = 0;
             txt = 1;
+            break;
+        case 9 :
+            parseBounds(optarg, config.absoluteBounds, 0);
+            break;
+        case 10 :
+            parseBounds(optarg, config.absoluteBounds, 1);
+            break;
+        case 11 :
+            parseBounds(optarg, config.absoluteBounds, 2);
+            break;
+        case 12 :
+            parseBounds(optarg, config.absoluteBounds, 3);
             break;
         case 'F' :
             config.ignoreFlags = atoi(optarg);
