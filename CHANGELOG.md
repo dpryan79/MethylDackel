@@ -1,3 +1,7 @@
+Vesion 0.3.0:
+
+   * Added `--nOT`, `--nOB`, `--nCTOT` and `--nCTOB`, which are related to `--OT` and similar. The difference is that the specified number of bases will be ignored, regardless of read length. So `--nOT 5,5,5,5` will result in the 5 bases on either end of both reads being ignored.
+
 Version 0.2.1:
 
    * The `--methylKit` option output methylation values between 0-1 rather than 0-100. This has been corrected.
