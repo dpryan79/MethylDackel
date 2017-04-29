@@ -2,6 +2,7 @@ tests/*.fa.*
 tests/*.bedGraph
 *.o
 *.swp
+htslib/*
 libMethylDackel.a
 MethylDackel
 version.h

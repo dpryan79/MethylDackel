@@ -292,7 +292,7 @@ void extract_usage() {
 " --methylKit      Output in the format required by methylKit. Note that this is\n"
 "                  incompatible with --mergeContext, --fraction and --counts.\n"
 " --OT INT,INT,INT,INT Inclusion bounds for methylation calls from reads/pairs\n"
-"                  origination from the original top strand. Suggested values can\n"
+"                  originating from the original top strand. Suggested values can\n"
 "                  be obtained from the MBias program. Each integer represents a\n"
 "                  1-based position on a read. For example --OT A,B,C,D\n"
 "                  translates to, \"Include calls at positions from A through B\n"
