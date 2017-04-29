@@ -88,6 +88,18 @@ void processLast(FILE *of, Config *config, struct lastCall *last, bam_hdr_t *hdr
     }
 }
 
+// The opposite strand of a C should be a G. Ns are ignored
+int isVariant(Config *config, const bam_pileup1_t *plp, uint32_t *coverage) {
+    uint8_t base = bam_seqi(bam_get_seq(plp->b), plp->qpos);
+
+    //Is the phred score even high enough?
+    if(bam_get_qual(plp->b)[plp->qpos] < config->minPhred) return 0;
+
+    *coverage += 1;
+    if(base != 4 && base != 15) return 1;
+    else return 0;
+}
+
 void extractCalls(Config *config) {
     bam_hdr_t *hdr = sam_hdr_read(config->fp);
     bam_mplp_t iter;
@@ -96,7 +108,8 @@ void extractCalls(Config *config) {
     int n_plp; //This will need to be modified for multiple input files
     int ctid = -1; //The tid of the contig whose sequence is stored in "seq"
     int idxBED = 0, strand;
-    uint32_t nmethyl = 0, nunmethyl = 0;
+    uint32_t nmethyl = 0, nunmethyl = 0, nOff = 0, nVariant = 0;
+    uint64_t nVariantPositions = 0;
     const bam_pileup1_t **plp = NULL;
     char *seq = NULL, base = 'A';
     mplp_data *data = NULL;
@@ -180,7 +193,7 @@ void extractCalls(Config *config) {
             continue;
         }
 
-        nmethyl = nunmethyl = 0;
+        nmethyl = nunmethyl = nVariant = nOff = 0;
         base = *(seq+pos);
         for(i=0; i<n_plp; i++) {
             if(plp[0][i].is_del) continue;
@@ -188,13 +201,27 @@ void extractCalls(Config *config) {
             if(config->bed) if(!readStrandOverlapsBED(plp[0][i].b, config->bed->region[idxBED])) continue;
             strand = getStrand((plp[0]+i)->b);
             if(strand & 1) {
-                if(base != 'C' && base != 'c') continue;
+                if(base != 'C' && base != 'c') {
+                    nVariant += isVariant(config, plp[0]+i, &nOff);
+                    continue;
+                }
             } else {
-                if(base != 'G' && base != 'g') continue;
+                if(base != 'G' && base != 'g') {
+                    nVariant += isVariant(config, plp[0]+i, &nOff);
+                    continue;
+                }
             }
             rv = updateMetrics(config, plp[0]+i);
             if(rv > 0) nmethyl++;
             else if(rv<0) nunmethyl++;
+        }
+
+        // Skip likely variant positions
+        if(config->minOppositeDepth > 0 && \
+           nOff >= config->minOppositeDepth && \
+           ((double) nVariant) / ((double) nOff) >= config->maxVariantFrac) {
+            nVariantPositions++;
+            continue;
         }
 
         if(nmethyl+nunmethyl==0) continue;
@@ -228,6 +255,7 @@ void extractCalls(Config *config) {
     free(data);
     free(plp);
     if(seq != NULL) free(seq);
+    if(nVariantPositions > 0) fprintf(stdout, "%"PRIu64" positions were excluded due to likely being variants.\n", nVariantPositions);
 }
 
 void printHeader(FILE *of, char *context, char *opref, Config config) {
@@ -289,6 +317,18 @@ void extract_usage() {
 "                  file with a .counts.bedGraph extension.\n"
 " --logit          Extract logit(M/(M+U)) (only) at each position. This produces\n"
 "                  a file with a .logit.bedGraph extension.\n"
+" --minOppositeDepth   If you would like to exclude sites that likely contain\n"
+"                  SNPs, then specifying a value greater than 0 here will\n"
+"                  indicate the minimum depth required on the strand opposite of\n"
+"                  a C to look for A/T/C bases. The fraction of these necessary\n"
+"                  to exclude a position from methylation extraction is specified\n"
+"                  by the --maxVariantFrac parameter. The default is 0, which\n"
+"                  means that no positions will be excluded. Note that the -p and\n"
+"                  -q apply here as well.\n"
+" --maxVariantFrac The maximum fraction of A/T/C base calls on the strand\n"
+"                  opposite of a C to allow before a position is declared a\n"
+"                  variant (thereby being excluded from output). The default is\n"
+"                  0.0. See also --minOppositeDepth.\n"
 " --methylKit      Output in the format required by methylKit. Note that this is\n"
 "                  incompatible with --mergeContext, --fraction and --counts.\n"
 " --OT INT,INT,INT,INT Inclusion bounds for methylation calls from reads/pairs\n"
@@ -333,6 +373,8 @@ int extract_main(int argc, char *argv[]) {
     config.minDepth = 1;
     config.methylKit = 0;
     config.merge = 0;
+    config.minOppositeDepth = 0;
+    config.maxVariantFrac = 0.0;
     config.maxDepth = 2000;
     config.fai = NULL;
     config.fp = NULL;
@@ -370,6 +412,8 @@ int extract_main(int argc, char *argv[]) {
         {"nOB",          1, NULL,  14},
         {"nCTOT",        1, NULL,  15},
         {"nCTOB",        1, NULL,  16},
+        {"minOppositeDepth", 1, NULL, 17},
+        {"maxVariantFrac", 1, NULL, 18},
         {"ignoreFlags",  1, NULL, 'F'},
         {"requireFlags", 1, NULL, 'R'},
         {"help",         0, NULL, 'h'},
@@ -450,6 +494,12 @@ int extract_main(int argc, char *argv[]) {
             break;
         case 16 :
             parseBounds(optarg, config.absoluteBounds, 3);
+            break;
+        case 17:
+            config.minOppositeDepth = atoi(optarg);
+            break;
+        case 18:
+            config.maxVariantFrac = atof(optarg);
             break;
         case 'F' :
             config.ignoreFlags = atoi(optarg);

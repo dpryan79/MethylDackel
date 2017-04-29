@@ -74,3 +74,10 @@ assert op.exists('cg_aln_CpG.bedGraph')
 lines = sum(1 for _ in open('cg_aln_CpG.bedGraph'))
 assert lines == 12
 rm('cg_aln_CpG.bedGraph')
+
+# Check variant filtering (there are 49 lines otherwise)
+check_call('../MethylDackel extract -p 1 -q 0 --minOppositeDepth 3 --maxVariantFrac 0.25 cg100.fa cg_with_variants.bam', shell=True)
+assert op.exists('cg_with_variants_CpG.bedGraph')
+lines = sum(1 for _ in open('cg_with_variants_CpG.bedGraph'))
+assert lines == 48
+rm('cg_with_variants_CpG.bedGraph')
