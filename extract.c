@@ -89,21 +89,27 @@ void processLast(FILE *of, Config *config, struct lastCall *last, bam_hdr_t *hdr
 }
 
 // The opposite strand of a C should be a G. Ns are ignored
-int isVariant(Config *config, const bam_pileup1_t *plp, uint32_t *coverage) {
+int isVariant(Config *config, const bam_pileup1_t *plp, uint32_t *coverage, int strand) {
     uint8_t base = bam_seqi(bam_get_seq(plp->b), plp->qpos);
 
     //Is the phred score even high enough?
     if(bam_get_qual(plp->b)[plp->qpos] < config->minPhred) return 0;
 
     *coverage += 1;
-    if(base != 4 && base != 15) return 1;
-    else return 0;
+    if(strand & 1) { //OT or CTOT
+        if(base != 4 && base != 15) return 1;
+        else return 0;
+    } else { // OB or CTOB
+        if(base != 2 && base != 15) return 1;
+        else return 0;
+    }
 }
 
 void extractCalls(Config *config) {
     bam_hdr_t *hdr = sam_hdr_read(config->fp);
     bam_mplp_t iter;
     int ret, tid, pos, i, seqlen, type, rv, o = 0;
+    int ltid = -1, lpos = -1;
     int beg0 = 0, end0 = 1u<<29;
     int n_plp; //This will need to be modified for multiple input files
     int ctid = -1; //The tid of the contig whose sequence is stored in "seq"
@@ -202,12 +208,12 @@ void extractCalls(Config *config) {
             strand = getStrand((plp[0]+i)->b);
             if(strand & 1) {
                 if(base != 'C' && base != 'c') {
-                    nVariant += isVariant(config, plp[0]+i, &nOff);
+                    nVariant += isVariant(config, plp[0]+i, &nOff, strand);
                     continue;
                 }
             } else {
                 if(base != 'G' && base != 'g') {
-                    nVariant += isVariant(config, plp[0]+i, &nOff);
+                    nVariant += isVariant(config, plp[0]+i, &nOff, strand);
                     continue;
                 }
             }
@@ -221,7 +227,30 @@ void extractCalls(Config *config) {
            nOff >= config->minOppositeDepth && \
            ((double) nVariant) / ((double) nOff) >= config->maxVariantFrac) {
             nVariantPositions++;
+            //If we're merging context, then skip an entire merged site
+            if(config->merge) {
+                if(type == 0 && lastCpG->tid == tid && lastCpG->pos == pos - 1 && (base == 'G' || base == 'g')) {
+                    lastCpG->nmethyl = 0;
+                    lastCpG->nunmethyl = 0;
+                } else if(type == 1 && lastCHG->tid == tid && lastCHG->pos == pos - 2 && (base == 'G' || base == 'g')) {
+                    lastCHG->nmethyl = 0;
+                    lastCHG->nunmethyl = 0;
+                }
+            }
+            ltid = tid;
+            lpos = pos;
             continue;
+        }
+
+        //If we're merging and just skipped the merged position due to a variant, then skip the merged site all together
+        if(config->merge) {
+            if(type == 0 && ltid == tid && lpos == pos - 1 && (base == 'G' || base == 'g')) {
+                lastCpG->nmethyl = nmethyl = 0;
+                lastCpG->nunmethyl = nunmethyl = 0;
+            } else if(type == 1 && ltid == tid && lpos == pos - 2 && (base == 'G' || base == 'g')) {
+                lastCHG->nmethyl = nmethyl = 0;
+                lastCHG->nunmethyl = nunmethyl = 0;
+            }
         }
 
         if(nmethyl+nunmethyl==0) continue;
@@ -324,7 +353,9 @@ void extract_usage() {
 "                  to exclude a position from methylation extraction is specified\n"
 "                  by the --maxVariantFrac parameter. The default is 0, which\n"
 "                  means that no positions will be excluded. Note that the -p and\n"
-"                  -q apply here as well.\n"
+"                  -q apply here as well. Note further that if you use\n"
+"                  --mergeContext that a merged site will be excluded if either\n"
+"                  of its individual Cs would be excluded.\n"
 " --maxVariantFrac The maximum fraction of A/T/C base calls on the strand\n"
 "                  opposite of a C to allow before a position is declared a\n"
 "                  variant (thereby being excluded from output). The default is\n"

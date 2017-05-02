@@ -119,6 +119,8 @@ Excluding likely variant sites
 
 If your samples are not genetically homogenous, it can sometimes be advantageous to exclude likely variant sites from methylation extraction. As an example, since unmethylated Cs are read as Ts, extracting methylation from a position with a C->T mutation will cause incorrect results. In such a case, the opposite strand will have an A rather than a G (in the non-variant case, there would be a G regardless of methylation status). MethylDackel tracks the number of non-Gs on the strand opposite of Cs in the reference sequence. If the fraction of these exceeds the `--maxVariantFrac` option, then that position will be excluded from output. To exclude cases where the `--maxVariantFrac` value is exceeded only due to low coverage, the opposite strand must have a depth of coverage of at least `--minOppositeDepth`. Note that the default value for `--minOppositeDepth` is 0, indicating that the variant site exclusion process is skipped.
 
+Note that if one additionally specifies `--mergeContext`, that a given CpG or CHG will be excluded from output if either of its individual Cs would be excluded given the specified `--minOppositeDepth` and --maxVariantFrac`.
+
 Methylation bias plotting and correction
 ========================================
 
