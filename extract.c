@@ -236,9 +236,9 @@ void extractCalls(Config *config) {
                     lastCHG->nmethyl = 0;
                     lastCHG->nunmethyl = 0;
                 }
+                ltid = tid;
+                lpos = pos;
             }
-            ltid = tid;
-            lpos = pos;
             continue;
         }
 

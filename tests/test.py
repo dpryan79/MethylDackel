@@ -12,72 +12,81 @@ def rm(f):
 
 assert op.exists('../MethylDackel')
 
-rm('ct_aln_CpG.bedGraph')
-check_call('../MethylDackel extract ct100.fa ct_aln.bam -q 2', shell=True)
-assert op.exists('ct_aln_CpG.bedGraph')
-lines = sum(1 for _ in open('ct_aln_CpG.bedGraph'))
+rm('test1_CpG.bedGraph')
+check_call('../MethylDackel extract ct100.fa ct_aln.bam -q 2 -o test1', shell=True)
+assert op.exists('test1_CpG.bedGraph')
+lines = sum(1 for _ in open('test1_CpG.bedGraph'))
 assert lines == 1
-rm('ct_aln_CpG.bedGraph')
+rm('test1_CpG.bedGraph')
 
-rm('cg_aln_CpG.bedGraph')
-check_call('../MethylDackel extract cg100.fa cg_aln.bam -q 2', shell=True)
-assert op.exists('cg_aln_CpG.bedGraph')
-lines = sum(1 for _ in open('cg_aln_CpG.bedGraph'))
+rm('test2_CpG.bedGraph')
+check_call('../MethylDackel extract cg100.fa cg_aln.bam -q 2 -o test2', shell=True)
+assert op.exists('test2_CpG.bedGraph')
+lines = sum(1 for _ in open('test2_CpG.bedGraph'))
 assert lines > 1
-rm('cg_aln_CpG.bedGraph')
+rm('test2_CpG.bedGraph')
 
 # should be none with q > 10
-check_call('../MethylDackel extract cg100.fa cg_aln.bam -q 10', shell=True)
-assert op.exists('cg_aln_CpG.bedGraph')
-lines = sum(1 for _ in open('cg_aln_CpG.bedGraph'))
+rm('test3_CpG.bedGraph')
+check_call('../MethylDackel extract cg100.fa cg_aln.bam -q 10 -o test3', shell=True)
+assert op.exists('test3_CpG.bedGraph')
+lines = sum(1 for _ in open('test3_CpG.bedGraph'))
 assert lines == 1
-rm('cg_aln_CpG.bedGraph')
+rm('test3_CpG.bedGraph')
 
 # Test the new methylKit option
-check_call('../MethylDackel extract --methylKit --CHH --CHG cg100.fa cg_aln.bam -q 2', shell=True)
-assert op.exists('cg_aln_CpG.methylKit')
-lines = sum(1 for _ in open('cg_aln_CpG.methylKit'))
+rm('test4_CpG.methylKit')
+rm('test4_CHG.methylKit')
+rm('test4_CHH.methylKit')
+check_call('../MethylDackel extract --methylKit --CHH --CHG cg100.fa cg_aln.bam -q 2 -o test4', shell=True)
+assert op.exists('test4_CpG.methylKit')
+lines = sum(1 for _ in open('test4_CpG.methylKit'))
 assert lines > 1
-rm('cg_aln_CpG.methylKit')
-lines = sum(1 for _ in open('cg_aln_CHG.methylKit'))
+rm('test4_CpG.methylKit')
+lines = sum(1 for _ in open('test4_CHG.methylKit'))
 assert lines == 1
-rm('cg_aln_CHG.methylKit')
-assert op.exists('cg_aln_CHH.methylKit')
-lines = sum(1 for _ in open('cg_aln_CHH.methylKit'))
+rm('test4_CHG.methylKit')
+assert op.exists('test4_CHH.methylKit')
+lines = sum(1 for _ in open('test4_CHH.methylKit'))
 assert lines == 1
-rm('cg_aln_CHH.methylKit')
+rm('test4_CHH.methylKit')
 
 # Check that --minDepth is working, which means there should be no called sites
-check_call('../MethylDackel extract --minDepth 2 cg100.fa cg_aln.bam -q 2', shell=True)
-assert op.exists('cg_aln_CpG.bedGraph')
-lines = sum(1 for _ in open('cg_aln_CpG.bedGraph'))
+rm('test5_CpG.bedGraph')
+check_call('../MethylDackel extract --minDepth 2 cg100.fa cg_aln.bam -q 2 -o test5', shell=True)
+assert op.exists('test5_CpG.bedGraph')
+lines = sum(1 for _ in open('test5_CpG.bedGraph'))
 assert lines == 1
-rm('cg_aln_CpG.bedGraph')
+rm('test5_CpG.bedGraph')
 
 # Check that --ignoreFlags is working, which means that there are now called sites
-check_call('../MethylDackel extract --ignoreFlags 0xD00 cg100.fa cg_aln.bam -q 2', shell=True)
-assert op.exists('cg_aln_CpG.bedGraph')
-lines = sum(1 for _ in open('cg_aln_CpG.bedGraph'))
+rm('test6_CpG.bedGraph')
+check_call('../MethylDackel extract --ignoreFlags 0xD00 cg100.fa cg_aln.bam -q 2 -o test6', shell=True)
+assert op.exists('test6_CpG.bedGraph')
+lines = sum(1 for _ in open('test6_CpG.bedGraph'))
 assert lines == 49
-rm('cg_aln_CpG.bedGraph')
+rm('test6_CpG.bedGraph')
 
 # Check that --requireFlags is working
-check_call('../MethylDackel extract --requireFlags 0xD00 cg100.fa cg_aln.bam -q 2', shell=True)
-assert op.exists('cg_aln_CpG.bedGraph')
-lines = sum(1 for _ in open('cg_aln_CpG.bedGraph'))
+rm('test7_CpG.bedGraph')
+check_call('../MethylDackel extract --requireFlags 0xD00 cg100.fa cg_aln.bam -q 2 -o test7', shell=True)
+assert op.exists('test7_CpG.bedGraph')
+lines = sum(1 for _ in open('test7_CpG.bedGraph'))
 assert lines == 49
-rm('cg_aln_CpG.bedGraph')
+rm('test7_CpG.bedGraph')
 
 # Check absolute trimming bounds
-check_call('../MethylDackel extract --nOT 50,50,40,40 cg100.fa cg_aln.bam -q 2', shell=True)
-assert op.exists('cg_aln_CpG.bedGraph')
-lines = sum(1 for _ in open('cg_aln_CpG.bedGraph'))
+rm('test8_CpG.bedGraph')
+check_call('../MethylDackel extract --nOT 50,50,40,40 cg100.fa cg_aln.bam -q 2 -o test8', shell=True)
+assert op.exists('test8_CpG.bedGraph')
+lines = sum(1 for _ in open('test8_CpG.bedGraph'))
 assert lines == 12
-rm('cg_aln_CpG.bedGraph')
+rm('test8_CpG.bedGraph')
 
 # Check variant filtering (there are 49 lines otherwise)
-check_call('../MethylDackel extract -p 1 -q 0 --minOppositeDepth 3 --maxVariantFrac 0.25 cg100.fa cg_with_variants.bam', shell=True)
-assert op.exists('cg_with_variants_CpG.bedGraph')
-lines = sum(1 for _ in open('cg_with_variants_CpG.bedGraph'))
+rm('test9_CpG.bedGraph')
+check_call('../MethylDackel extract -p 1 -q 0 -o test9 --minOppositeDepth 3 --maxVariantFrac 0.25 cg100.fa cg_with_variants.bam', shell=True)
+assert op.exists('test9_CpG.bedGraph')
+lines = sum(1 for _ in open('test9_CpG.bedGraph'))
 assert lines == 48
-rm('cg_with_variants_CpG.bedGraph')
+rm('test9_CpG.bedGraph')
