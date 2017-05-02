@@ -50,6 +50,8 @@ typedef struct {
  @field requireFlags    Mask that's logically &ed with and ignored if < mask. Defaults to 0, which means ignore.
  @field merge   1: Merge Cs in either a CpG or CHG context into single entries
  @field methylKit       Output in a format compatible with methylKit
+ @field minOppositeDepth	Minimum depth covering the opposite strand needed to look for variants
+ @field maxVariantFrac	If the fraction of non-Gs on the opposite strand is greater than this then a position is excluded.
  @field output_fp	Output file pointers (to CpG, CHG, and CHH, respectively)
  @field	reg	A region specified by -r
  @field fp	Input file pointer (must be a BAM or CRAM file)
@@ -61,7 +63,8 @@ typedef struct {
     int keepCpG, keepCHG, keepCHH;
     int minMapq, minPhred, keepDupes, maxDepth, minDepth;
     int keepDiscordant, keepSingleton, ignoreFlags, requireFlags;
-    int merge, methylKit;
+    int merge, methylKit, minOppositeDepth;
+    double maxVariantFrac;
     int fraction, counts, logit;
     FILE **output_fp;
     char *reg;
