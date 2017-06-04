@@ -4,6 +4,16 @@
 #include "htslib/sam.h"
 #include "htslib/faidx.h"
 
+//These are needed to handle multiple threads
+pthread_mutex_t positionMutex;
+pthread_mutex_t outputMutex;
+uint32_t globalTid;
+uint32_t globalPos;
+uint32_t globalEnd;
+uint32_t bin;
+uint32_t outputBin;
+uint64_t globalnVariantPositions;
+
 /*! @typedef
  @abstract Structure to hold one region defined in a BED file
  @field	tid	The chromosome ID, defined by bam_hdr_t
@@ -58,6 +68,7 @@ typedef struct {
  @field	bai	The index for fp
  @field bed	Pointer to regions specified in a BED file (-l option)
  @field fai	Fasta file index pointer
+ @field nThreads	Number of threads in use.
 */
 typedef struct {
     int keepCpG, keepCHG, keepCHH;
@@ -68,13 +79,15 @@ typedef struct {
     int fraction, counts, logit;
     FILE **output_fp;
     char *reg;
+    char *BAMName;
     htsFile *fp;
     hts_idx_t *bai;
     char *bedName;
     bedRegions *bed;
-    faidx_t *fai;
+    char *FastaName;
     int bounds[16];
     int absoluteBounds[16];
+    int nThreads;
 } Config;
 
 /*! @typedef
@@ -85,6 +98,7 @@ typedef struct {
 */
 typedef struct {
     Config *config;
+    htsFile *fp;
     bam_hdr_t *hdr;
     hts_itr_t *iter;
 } mplp_data;
@@ -179,3 +193,6 @@ int updateMetrics(Config *config, const bam_pileup1_t *plp);
 
 //Used internally to parse things like --OT 0,1,2,3
 void parseBounds(char *s2, int *vals, int mult);
+
+//Used internally to not split CpGs/CHGs between threads
+void adjustBounds(Config *config, bam_hdr_t *hdr, faidx_t *fai, uint32_t *localTid, uint32_t *localPos, uint32_t *localEnd);

@@ -7,6 +7,7 @@
 #include <string.h>
 #include <inttypes.h>
 #include <assert.h>
+#include <pthread.h>
 #include "MethylDackel.h"
 
 void print_version(void);
@@ -37,139 +38,201 @@ strandMeth *growStrandMeth(strandMeth *s, int32_t l) {
     return s;
 }
 
-void extractMBias(Config *config, char *opref, int SVG, int txt) {
-    bam_hdr_t *hdr = sam_hdr_read(config->fp);
+strandMeth *mergeStrandMeth(strandMeth *target, strandMeth *source) {
+    int32_t i;
+    if(target->m < source->l) target = growStrandMeth(target, source->m);
+    if(target->l < source->l) target->l = source->l;
+
+    for(i=0; i<target->l; i++) {
+        target->unmeth1[i] += source->unmeth1[i];
+        target->meth1[i] += source->meth1[i];
+        target->unmeth2[i] += source->unmeth2[i];
+        target->meth2[i] += source->meth2[i];
+    }
+    return target;
+}
+
+void *extractMBias(void *foo) {
+    Config *config = (Config*) foo;
+    bam_hdr_t *hdr;
     bam_mplp_t iter;
-    int ret, tid, pos, i, seqlen, rv, o = 0;
-    int beg0 = 0, end0 = 1u<<29;
+    int ret, tid, pos, i, seqlen, rv;
     int strand;
     int n_plp; //This will need to be modified for multiple input files
-    int ctid = -1; //The tid of the contig whose sequence is stored in "seq"
-    int idxBED = 0;
     const bam_pileup1_t **plp = NULL;
     char *seq = NULL, base;
     mplp_data *data = NULL;
-    strandMeth *meths[4];
+    strandMeth **meths = malloc(4*sizeof(strandMeth*));
+    assert(meths);
+    uint32_t localPos, localEnd, localTid;
+    faidx_t *fai;
+    hts_idx_t *bai;
+    htsFile *fp;
 
     for(i=0; i<4; i++) {
         meths[i] = calloc(1, sizeof(strandMeth));
         assert(meths[i]);
     }
 
+    //Open the files
+    if((fai = fai_load(config->FastaName)) == NULL) {
+        fprintf(stderr, "Couldn't open the index for %s!\n", config->FastaName);
+        return NULL;
+    }
+    if((fp = hts_open(config->BAMName, "rb")) == NULL) {
+        fprintf(stderr, "Couldn't open %s for reading!\n", config->BAMName);
+        return NULL;
+    }
+    if((bai = sam_index_load(fp, config->BAMName)) == NULL) {
+        fprintf(stderr, "Couldn't load the index for %s\n", config->BAMName);
+        return NULL;
+    }
+    hdr = sam_hdr_read(fp);
+
     data = calloc(1,sizeof(mplp_data));
     if(data == NULL) {
         fprintf(stderr, "Couldn't allocate space for the data structure in extractCalls()!\n");
-        return;
+        return NULL;
     }
     data->config = config;
     data->hdr = hdr;
-    if (config->reg) {
-        if((data->iter = sam_itr_querys(config->bai, hdr, config->reg)) == 0){
-            fprintf(stderr, "failed to parse regions %s", config->reg);
-            return;
-        }
-    }
-    if(config->bedName) {
-        config->bed = parseBED(config->bedName, hdr);
-        if(config->bed == NULL) return;
-    }
-
+    data->fp = fp;
 
     plp = calloc(1, sizeof(bam_pileup1_t *)); //This will have to be modified for multiple input files
     if(plp == NULL) {
         fprintf(stderr, "Couldn't allocate space for the plp structure in extractCalls()!\n");
-        return;
+        return NULL;
     }
 
-    //Start the pileup
-    iter = bam_mplp_init(1, filter_func, (void **) &data);
-    bam_mplp_set_maxcnt(iter, config->maxDepth);
-    while((ret = bam_mplp_auto(iter, &tid, &pos, &n_plp, plp)) > 0) {
-        //Do we need to process this position?
-        if (config->reg){
-            beg0 = data->iter->beg, end0 = data->iter->end;
-            if ((pos < beg0 || pos >= end0)) continue; // out of the region requested
-        }
-        if(tid != ctid) {
-            if(seq != NULL) free(seq);
-            seq = faidx_fetch_seq(config->fai, hdr->target_name[tid], 0, faidx_seq_len(config->fai, hdr->target_name[tid]), &seqlen);
-            if(seqlen < 0) {
-                fprintf(stderr, "faidx_fetch_seq returned %i while trying to fetch the sequence for tid %i (%s)!\n",\
-                    seqlen, tid, hdr->target_name[tid]);
-                fprintf(stderr, "Note that the output will be truncated!\n");
-                return;
+/*******************************
+*
+* LOOP HERE!!!!
+*
+* TODO:
+*
+*  * Test BED files
+*  * Support changing the chunk size?
+*  * Does multithreading really work?
+*  * Are the results still correct?
+*  * Memory leaks?
+*
+*******************************/
+    while(1) {
+        //Lock and unlock the mutex so we can get/update the tid/position
+        pthread_mutex_lock(&positionMutex);
+        if(config->bed) {
+            if(bin >= config->bed->n) {
+                pthread_mutex_unlock(&positionMutex);
+                break;
             }
-            ctid = tid;
-        }
-
-        if(config->bed) { //Handle -l
-            while((o = posOverlapsBED(tid, pos, config->bed, idxBED)) == -1) idxBED++;
-            if(o == 0) continue; //Wrong strand
-        }
-
-        if(isCpG(seq, pos, seqlen)) {
-            if(!config->keepCpG) continue;
-        } else if(isCHG(seq, pos, seqlen)) {
-            if(!config->keepCHG) continue;
-        } else if(isCHH(seq, pos, seqlen)) {
-            if(!config->keepCHH) continue;
+            localTid = config->bed->region[bin].tid;
+            localPos = config->bed->region[bin].start;
+            localEnd = config->bed->region[bin].end;
+            bin++;
         } else {
-            continue;
-        }
-
-        base = *(seq+pos);
-        for(i=0; i<n_plp; i++) {
-            if(config->bed) if(!readStrandOverlapsBED(plp[0][i].b, config->bed->region[idxBED])) continue;
-            strand = getStrand((plp[0]+i)->b);
-            if(strand & 1) {
-                if(base != 'C' && base != 'c') continue;
-            } else {
-                if(base != 'G' && base != 'g') continue;
+            localTid = globalTid;
+            localPos = globalPos;
+            localEnd = localPos + 1000000;
+            if(localTid >= hdr->n_targets) {
+                pthread_mutex_unlock(&positionMutex);
+                break;
             }
-            rv = updateMetrics(config, plp[0]+i);
-            if(rv != 0) {
-                if((plp[0]+i)->qpos >= meths[strand-1]->m)
-                    meths[strand-1] = growStrandMeth(meths[strand-1], (plp[0]+i)->qpos);
-                if(rv < 0) {
-                    if((plp[0]+i)->b->core.flag & BAM_FREAD2) {
-                        assert((meths[strand-1]->unmeth2[(plp[0]+i)->qpos]) < 0xFFFFFFFF);
-                        meths[strand-1]->unmeth2[(plp[0]+i)->qpos]++;
-                    } else {
-                        assert((meths[strand-1]->unmeth1[(plp[0]+i)->qpos]) < 0xFFFFFFFF);
-                        meths[strand-1]->unmeth1[(plp[0]+i)->qpos]++;
-                    }
-                } else {
-                    if((plp[0]+i)->b->core.flag & BAM_FREAD2) {
-                        assert((meths[strand-1]->meth2[(plp[0]+i)->qpos]) < 0xFFFFFFFF);
-                        meths[strand-1]->meth2[(plp[0]+i)->qpos]++;
-                    } else {
-                        assert((meths[strand-1]->meth1[(plp[0]+i)->qpos]) < 0xFFFFFFFF);
-                        meths[strand-1]->meth1[(plp[0]+i)->qpos]++;
-                    }
+            if(globalEnd && localEnd > globalEnd) localEnd = globalEnd;
+            adjustBounds(config, hdr, fai, &localTid, &localPos, &localEnd);
+            globalPos = localEnd;
+            if(globalEnd > 0 && globalPos >= globalEnd) {
+                //If we've specified a region, then break once we're outside of it
+                globalTid = (uint32_t) -1;
+            }
+            if(localTid < hdr->n_targets && globalTid != (uint32_t) -1) {
+                if(globalPos >= hdr->target_len[localTid]) {
+                    localEnd = hdr->target_len[localTid];
+                    globalTid++;
+                    globalPos = 0;
                 }
-                if((plp[0]+i)->qpos+1 > meths[strand-1]->l) meths[strand-1]->l = (plp[0]+i)->qpos+1;
             }
         }
-    }
+        pthread_mutex_unlock(&positionMutex);
 
-    //Report some output
-    if(SVG) makeSVGs(opref, meths, config->keepCpG + 2*config->keepCHG + 4*config->keepCHH);
-    if(txt) makeTXT(meths);
+        //Break out of the loop if finished
+        if(localTid >= hdr->n_targets) break; //Finish looping
+        if(globalEnd && localPos >= globalEnd) break;
+        data->iter = sam_itr_queryi(bai, localTid, localPos, localEnd);
+
+        seq = faidx_fetch_seq(fai, hdr->target_name[localTid], localPos, localEnd, &seqlen);
+        if(seqlen < 0) {
+            fprintf(stderr, "faidx_fetch_seq returned %i while trying to fetch the sequence for tid %s:%"PRIu32"-%"PRIu32"!\n",\
+                seqlen, hdr->target_name[localTid], localPos, localEnd);
+            fprintf(stderr, "Note that the output will be truncated!\n");
+            return NULL;
+        }
+
+        //Start the pileup
+        iter = bam_mplp_init(1, filter_func, (void **) &data);
+        bam_mplp_init_overlaps(iter);
+        bam_mplp_set_maxcnt(iter, config->maxDepth);
+        while((ret = bam_mplp_auto(iter, &tid, &pos, &n_plp, plp)) > 0) {
+            if(pos < localPos || pos >= localEnd) continue; // out of the region requested
+
+            if(isCpG(seq, pos-localPos, seqlen)) {
+                if(!config->keepCpG) continue;
+            } else if(isCHG(seq, pos-localPos, seqlen)) {
+                if(!config->keepCHG) continue;
+            } else if(isCHH(seq, pos-localPos, seqlen)) {
+                if(!config->keepCHH) continue;
+            } else {
+                continue;
+            }
+
+            base = *(seq+pos-localPos);
+            for(i=0; i<n_plp; i++) {
+                if(plp[0][i].is_del) continue;
+                if(plp[0][i].is_refskip) continue;
+                strand = getStrand((plp[0]+i)->b);
+                if(strand & 1) {
+                    if(base != 'C' && base != 'c') continue;
+                } else {
+                    if(base != 'G' && base != 'g') continue;
+                }
+                rv = updateMetrics(config, plp[0]+i);
+                if(rv != 0) {
+                    if((plp[0]+i)->qpos >= meths[strand-1]->m)
+                        meths[strand-1] = growStrandMeth(meths[strand-1], (plp[0]+i)->qpos);
+                    if(rv < 0) {
+                        if((plp[0]+i)->b->core.flag & BAM_FREAD2) {
+                            assert((meths[strand-1]->unmeth2[(plp[0]+i)->qpos]) < 0xFFFFFFFF);
+                            meths[strand-1]->unmeth2[(plp[0]+i)->qpos]++;
+                        } else {
+                            assert((meths[strand-1]->unmeth1[(plp[0]+i)->qpos]) < 0xFFFFFFFF);
+                            meths[strand-1]->unmeth1[(plp[0]+i)->qpos]++;
+                        }
+                    } else {
+                        if((plp[0]+i)->b->core.flag & BAM_FREAD2) {
+                            assert((meths[strand-1]->meth2[(plp[0]+i)->qpos]) < 0xFFFFFFFF);
+                            meths[strand-1]->meth2[(plp[0]+i)->qpos]++;
+                        } else {
+                            assert((meths[strand-1]->meth1[(plp[0]+i)->qpos]) < 0xFFFFFFFF);
+                            meths[strand-1]->meth1[(plp[0]+i)->qpos]++;
+                        }
+                    }
+                    if((plp[0]+i)->qpos+1 > meths[strand-1]->l) meths[strand-1]->l = (plp[0]+i)->qpos+1;
+                }
+            }
+        }
+        hts_itr_destroy(data->iter);
+        free(seq);
+        bam_mplp_destroy(iter);
+    }
 
     //Clean up
     bam_hdr_destroy(hdr);
-    if(data->iter) hts_itr_destroy(data->iter);
-    bam_mplp_destroy(iter);
+    fai_destroy(fai);
+    hts_close(fp);
+    hts_idx_destroy(bai);
     free(data);
     free(plp);
-    if(seq != NULL) free(seq);
-    for(i=0; i<4; i++) {
-        if(meths[i]->meth1) free(meths[i]->meth1);
-        if(meths[i]->unmeth1) free(meths[i]->unmeth1);
-        if(meths[i]->meth2) free(meths[i]->meth2);
-        if(meths[i]->unmeth2) free(meths[i]->unmeth2);
-        free(meths[i]);
-    }
+
+    return meths;
 }
 
 void mbias_usage() {
@@ -188,6 +251,7 @@ void mbias_usage() {
 "                  column, then only metrics from the top strand will be\n"
 "                  output. Note that the -r option can be used to limit the\n"
 "                  regions of -l.\n"
+" -@ nThreads      The number of threads to use, the default 1\n"
 " --keepDupes      By default, any alignment marked as a duplicate is ignored.\n"
 "                  This option causes them to be incorporated.\n"
 " --keepSingleton  By default, if only one read in a pair aligns (a singleton)\n"
@@ -235,7 +299,8 @@ void mbias_usage() {
 
 int mbias_main(int argc, char *argv[]) {
     char *opref = NULL;
-    int c, i, SVG = 1, txt = 0;
+    int c, i, j, SVG = 1, txt = 0;
+    strandMeth *meths[4], **threadout = NULL;
     Config config;
 
     //Defaults
@@ -244,7 +309,6 @@ int mbias_main(int argc, char *argv[]) {
     config.keepSingleton = 0, config.keepDiscordant = 0;
     
     config.maxDepth = 2000;
-    config.fai = NULL;
     config.fp = NULL;
     config.bai = NULL;
     config.reg = NULL;
@@ -252,6 +316,7 @@ int mbias_main(int argc, char *argv[]) {
     config.bed = NULL;
     config.ignoreFlags = 0xF00;
     config.requireFlags = 0;
+    config.nThreads = 1;
     for(i=0; i<16; i++) config.bounds[i] = 0;
     for(i=0; i<16; i++) config.absoluteBounds[i] = 0;
 
@@ -286,7 +351,7 @@ int mbias_main(int argc, char *argv[]) {
             config.maxDepth = atoi(optarg);
             break;
         case 'r':
-            config.reg = strdup(optarg);
+            config.reg = optarg;
             break;
         case 'l' :
             config.bedName = optarg;
@@ -340,6 +405,9 @@ int mbias_main(int argc, char *argv[]) {
         case 'p' :
             config.minPhred = atoi(optarg);
             break;
+        case '@':
+            config.nThreads = atoi(optarg);
+            break;
         default :
             fprintf(stderr, "Invalid option '%c'\n", c);
             mbias_usage();
@@ -374,11 +442,8 @@ int mbias_main(int argc, char *argv[]) {
     }
 
     //Open the files
-    if((config.fai = fai_load(argv[optind])) == NULL) {
-        fprintf(stderr, "Couldn't open the index for %s!\n", argv[optind]);
-        mbias_usage();
-        return -2;
-    }
+    config.FastaName = argv[optind];
+    config.BAMName = argv[optind+1];
     if((config.fp = hts_open(argv[optind+1], "rb")) == NULL) {
         fprintf(stderr, "Couldn't open %s for reading!\n", argv[optind+1]);
         return -4;
@@ -398,14 +463,83 @@ int mbias_main(int argc, char *argv[]) {
     //Output files (this needs to be filled in)
     if(SVG) opref = argv[optind+2];
 
+    //parse the region, if needed
+    if(config.reg) {
+        const char *foo;
+        char *bar = NULL;
+        int s, e;
+        bam_hdr_t *hdr = sam_hdr_read(config.fp);
+        foo = hts_parse_reg(config.reg, &s, &e);
+        if(foo == NULL) {
+            fprintf(stderr, "Could not parse the specified region!\n");
+            return -4;
+        }
+        bar = malloc(foo - config.reg + 1);
+        if(bar == NULL) {
+            fprintf(stderr, "Could not allocate temporary space for parsing the requested region!\n");
+            return -5;
+        }
+        strncpy(bar, config.reg, foo - config.reg);
+        bar[foo - config.reg] = 0;
+        globalTid = bam_name2id(hdr, bar);
+        if(globalTid == (uint32_t) -1) {
+            fprintf(stderr, "%s did not match a known chromosome/contig name!\n", config.reg);
+            return -6;
+        }
+        if(s>0) globalPos = s;
+        if(e>0) globalEnd = e;
+        if(globalEnd > hdr->target_len[globalTid]) globalEnd = hdr->target_len[globalTid];
+        free(bar);
+        bam_hdr_destroy(hdr);
+    } else if(config.bedName) {
+        bam_hdr_t *hdr = sam_hdr_read(config.fp);
+        config.bed = parseBED(config.bedName, hdr);
+        bam_hdr_destroy(hdr);
+        if(!config.bed) {
+            fprintf(stderr, "There was an error while reading in your BED file!\n");
+            return 1;
+        }
+    }
+
+    for(i=0; i<4; i++) {
+        meths[i] = calloc(1, sizeof(strandMeth));
+        assert(meths[i]);
+    }
+
     //Run the pileup
-    extractMBias(&config, opref, SVG, txt);
+    pthread_mutex_init(&positionMutex, NULL);
+    pthread_t *threads = calloc(config.nThreads, sizeof(pthread_t));
+    for(i=0; i < config.nThreads; i++) pthread_create(threads+i, NULL, &extractMBias, &config);
+    for(i=0; i < config.nThreads; i++) {
+        pthread_join(threads[i], (void**) &threadout);
+        for(j=0; j<4; j++) {
+            meths[j] = mergeStrandMeth(meths[j], threadout[j]);
+            if(threadout[j]->meth1) free(threadout[j]->meth1);
+            if(threadout[j]->unmeth1) free(threadout[j]->unmeth1);
+            if(threadout[j]->meth2) free(threadout[j]->meth2);
+            if(threadout[j]->unmeth2) free(threadout[j]->unmeth2);
+            free(threadout[j]);
+        }
+        free(threadout);
+    }
+
+    free(threads);
+    pthread_mutex_destroy(&positionMutex);
+
+    //Report some output
+    if(SVG) makeSVGs(opref, meths, config.keepCpG + 2*config.keepCHG + 4*config.keepCHH);
+    if(txt) makeTXT(meths);
 
     //Close things up
     hts_close(config.fp);
-    fai_destroy(config.fai);
     hts_idx_destroy(config.bai);
-    if(config.reg) free(config.reg);
+    for(i=0; i<4; i++) {
+        if(meths[i]->meth1) free(meths[i]->meth1);
+        if(meths[i]->unmeth1) free(meths[i]->unmeth1);
+        if(meths[i]->meth2) free(meths[i]->meth2);
+        if(meths[i]->unmeth2) free(meths[i]->unmeth2);
+        free(meths[i]);
+    }
 
     return 0;
 }

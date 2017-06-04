@@ -2,7 +2,7 @@ prefix ?= /usr/local/bin #This can be changed
 CC ?= gcc
 AR ?= ar
 RANLIB ?= ranlib
-OPTS ?= -Wall -g -O3
+OPTS ?= -Wall -g -O3 -pthread
 
 .PHONY: all clean htslib install clean-all version.h
 
@@ -11,7 +11,7 @@ OPTS ?= -Wall -g -O3
 all: lib MethylDackel
 
 OBJS = common.o bed.o svg.o pileup.o extract.o MBias.o mergeContext.o
-VERSION = 0.2.1
+VERSION = 0.3.0
 
 #If we're building from a git repo, then append the most recent tag
 ifneq "$(wildcard .git)" ""
