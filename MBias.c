@@ -169,7 +169,7 @@ void *extractMBias(void *foo) {
 
         //Start the pileup
         iter = bam_mplp_init(1, filter_func, (void **) &data);
-        bam_mplp_init_overlaps(iter);
+//        bam_mplp_init_overlaps(iter);
         bam_mplp_set_maxcnt(iter, config->maxDepth);
         while((ret = bam_mplp_auto(iter, &tid, &pos, &n_plp, plp)) > 0) {
             if(pos < localPos || pos >= localEnd) continue; // out of the region requested
