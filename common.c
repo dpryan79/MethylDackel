@@ -45,8 +45,8 @@ void print_version() {
 }
 
 inline int isCpG(char *seq, int pos, int seqlen) {
-    if(pos+1 == seqlen) return 0;
     if(*(seq+pos) == 'C' || *(seq+pos) == 'c') {
+        if(pos+1 == seqlen) return 0;
         if(*(seq+pos+1) == 'G' || *(seq+pos+1) == 'g') return 1;
         return 0;
     } else if(*(seq+pos) == 'G' || *(seq+pos) == 'g') {
@@ -58,8 +58,8 @@ inline int isCpG(char *seq, int pos, int seqlen) {
 }
 
 inline int isCHG(char *seq, int pos, int seqlen) {
-    if(pos+2 >= seqlen) return 0;
     if(*(seq+pos) == 'C' || *(seq+pos) == 'c') {
+        if(pos+2 >= seqlen) return 0;
         if(*(seq+pos+2) == 'G' || *(seq+pos+2) == 'g') return 1;
         return 0;
     } else if(*(seq+pos) == 'G' || *(seq+pos) == 'g') {
@@ -71,12 +71,8 @@ inline int isCHG(char *seq, int pos, int seqlen) {
 }
 
 inline int isCHH(char *seq, int pos, int seqlen) {
-    if(pos+2 >= seqlen) return 0;
     if(*(seq+pos) == 'C' || *(seq+pos) == 'c') return 1;
-    else if(*(seq+pos) == 'G' || *(seq+pos) == 'g') {
-        if(pos <= 1) return 0;
-        return -1;
-    }
+    else if(*(seq+pos) == 'G' || *(seq+pos) == 'g') return -1;
     return 0;
 }
 
@@ -209,12 +205,11 @@ bam1_t *trimAbsoluteAlignment(bam1_t *b, int bounds[16]) {
 //This will need to be restructured to handle multiple input files
 int filter_func(void *data, bam1_t *b) {
     int rv, NH, overlap;
-    static int32_t idxBED = 0;
     mplp_data *ldata = (mplp_data *) data;
     uint8_t *p;
 
     while(1) {
-        rv = ldata->iter ? sam_itr_next(ldata->config->fp, ldata->iter, b) : sam_read1(ldata->config->fp, ldata->hdr, b);
+        rv = ldata->iter ? sam_itr_next(ldata->fp, ldata->iter, b) : sam_read1(ldata->fp, ldata->hdr, b);
 
         if(rv<0) return rv;
         if(b->core.tid == -1 || b->core.flag & BAM_FUNMAP) continue; //Unmapped
@@ -231,7 +226,7 @@ int filter_func(void *data, bam1_t *b) {
         if(!ldata->config->keepDiscordant && (b->core.flag & 0x3) == 0x1) continue; //Discordant
         if((b->core.flag & 0x9) == 0x1) b->core.flag |= 0x2; //Discordant pairs can cause double counts
         if(ldata->config->bed) { //Prefilter reads overlapping a BED file (N.B., strand independent).
-            overlap = spanOverlapsBED(b->core.tid, b->core.pos, bam_endpos(b), ldata->config->bed, &idxBED);
+            overlap = spanOverlapsBED(b->core.tid, b->core.pos, bam_endpos(b), ldata->config->bed, &(ldata->bedIdx));
             if(overlap == 0) continue;
             if(overlap < 0) {
                 rv = -1;
@@ -256,4 +251,34 @@ int filter_func(void *data, bam1_t *b) {
         break;
     }
     return rv;
+}
+
+//Ensure that CpGs and CHGs are never split between threads. Move end positions to the right
+void adjustBounds(Config *config, bam_hdr_t *hdr, faidx_t *fai, uint32_t *localTid, uint32_t *localPos, uint32_t *localEnd) {
+    uint32_t start, end, tmp; //For faidx_fetch_seq, these are 0-based fully closed!!!
+    int seqlen;
+    char *seq;
+
+    end = *localEnd + 1;
+    if(*localEnd > 0) {
+        start = *localEnd - 1;
+    } else {
+        start = 0;
+    }
+    seq = faidx_fetch_seq(fai, hdr->target_name[*localTid], start, end, &seqlen);
+    if(seqlen > 1) {
+        if(seqlen > 2 && (seq[0] & 0x5F) == 'C' && (seq[2] & 0x5F) == 'G') { //CHG
+            *localEnd += 2;
+        } else if((seq[1] & 0x5F) == 'G') { //Possible CpG or CHG
+            *localEnd += 1;
+        }
+    }
+    free(seq);
+
+    //though unlikely to ever not be the case, ensure start < end;
+    if(*localPos > *localEnd) {
+        tmp = *localPos;
+        *localPos = *localEnd;
+        *localEnd = tmp;
+    }
 }

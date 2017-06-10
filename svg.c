@@ -415,12 +415,10 @@ void makeSVGs(char *opref, strandMeth **meths, int which) {
             //Finish the image
             fprintf(of, "</svg>\n");
 
-            //Print the trimming options to stderr if applicable
-            if(lthresh1 + rthresh1 + lthresh2 + rthresh2) {
-                if(!alreadyPrinting) fprintf(stderr, "Suggested inclusion options:");
-                fprintf(stderr, " --%s %i,%i,%i,%i", abbrevs[i], lthresh1,rthresh1,lthresh2,rthresh2);
-                alreadyPrinting=1;
-            }
+            //Print the trimming options to stderr
+            if(!alreadyPrinting) fprintf(stderr, "Suggested inclusion options:");
+            fprintf(stderr, " --%s %i,%i,%i,%i", abbrevs[i], lthresh1,rthresh1,lthresh2,rthresh2);
+            alreadyPrinting=1;
 
             //Clean up
             fclose(of);

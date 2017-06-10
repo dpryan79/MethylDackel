@@ -19,9 +19,9 @@ inline int64_t compareRegions(int32_t tid0, int32_t start0, int32_t end0, int32_
 //0: No Overlap
 //-1: End of BED file
 //This should eventually be modified to use a hash
-int spanOverlapsBED(int32_t tid, int32_t start, int32_t end, bedRegions *regs, int *idx) {
+int spanOverlapsBED(int32_t tid, int32_t start, int32_t end, bedRegions *regs, int32_t *idx) {
     bedRegion *reg = regs->region;
-    int64_t rv = 2;
+    int64_t rv = -1;
     int i;
 
     //First, test the last position we probed.
@@ -37,14 +37,13 @@ int spanOverlapsBED(int32_t tid, int32_t start, int32_t end, bedRegions *regs, i
         }
         if(rv < 0) rv = -1;
     }
-    assert(rv!=2);
     return rv;
 }
 
 //-1 if region is before pos (need to go to the next region)
 // 0 if pos not in region
 //>0 if pos in region
-int posOverlapsBED(int32_t tid, int32_t pos, bedRegions *regions, int idx) {
+int posOverlapsBED(int32_t tid, int32_t pos, bedRegions *regions, int32_t idx) {
     if(idx >= regions->n) return 0; //Past the end of the regions
 
     if(tid != regions->region[idx].tid) return (regions->region[idx].tid < tid) ? -1 : 0;
@@ -88,7 +87,7 @@ void sortBED(bedRegions *regions) {
 //Returns a NULL pointer on error, which should cause the program to exit
 //N.B., If column 4 exists it can't contain a space (quotes won't help)
 //It might make sense to just use a regex
-bedRegions *parseBED(char *fn, bam_hdr_t *hdr) {
+bedRegions *parseBED(char *fn, bam_hdr_t *hdr, int keepStrand) {
     gzFile fp = NULL;
     int i, dret = 0; //dret isn't actually used
     char *p1, *p2;
@@ -193,9 +192,11 @@ bedRegions *parseBED(char *fn, bam_hdr_t *hdr) {
 
         //It's possible to have an additional 3 (or more) fields, in which case we need to skip 2 and parse the third
         regions->n++;
-        if(!isblank(*p2)) {
-            continue;
-        }
+        if(p2-str.s >= str.l) continue;
+        p2++;
+
+        if(keepStrand != 1) continue; //We don't need the remaining fields
+        while(*p2 && !isspace(*p2)) p2++;
 
         //4th column
         while(*p2 && isspace(*p2)) p2++; //skip white-space

@@ -48,7 +48,7 @@ assert lines == 1
 rm('test4_CHG.methylKit')
 assert op.exists('test4_CHH.methylKit')
 lines = sum(1 for _ in open('test4_CHH.methylKit'))
-assert lines == 1
+assert lines == 2
 rm('test4_CHH.methylKit')
 
 # Check that --minDepth is working, which means there should be no called sites

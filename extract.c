@@ -1,6 +1,7 @@
 #include "htslib/sam.h"
 #include "htslib/hts.h"
 #include "htslib/faidx.h"
+#include "htslib/kstring.h"
 #include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,6 +11,7 @@
 #include <errno.h>
 #include <limits.h>
 #include <math.h>
+#include <pthread.h>
 #include "MethylDackel.h"
 
 void print_version(void);
@@ -24,11 +26,13 @@ struct lastCall{
     uint32_t nmethyl, nunmethyl;
 };
 
-void writeCall(FILE *of, Config *config, char *chrom, int32_t pos, int32_t width, uint32_t nmethyl, uint32_t nunmethyl, char base) { 
+void writeCall(kstring_t *ks, Config *config, char *chrom, int32_t pos, int32_t width, uint32_t nmethyl, uint32_t nunmethyl, char base) { 
+    char str[10000]; // I don't really like hardcoding it, but given the probability that it ever won't suffice...
     char strand = (base=='C' || base=='c') ? 'F' : 'R';
     if(nmethyl+nunmethyl < config->minDepth) return;
+
     if (!config->fraction && !config->logit && !config->counts && !config->methylKit) {
-        fprintf(of, \
+        snprintf(str, 10000, \
             "%s\t%i\t%i\t%i\t%" PRIu32 "\t%" PRIu32 "\n", \
             chrom, \
             pos, \
@@ -37,28 +41,28 @@ void writeCall(FILE *of, Config *config, char *chrom, int32_t pos, int32_t width
             nmethyl, \
             nunmethyl);
     } else if(config->fraction) {
-        fprintf(of, \
+        snprintf(str, 10000, \
             "%s\t%i\t%i\t%f\n", \
             chrom, \
             pos, \
             pos+width, \
             ((double) nmethyl)/(nmethyl+nunmethyl));
     } else if(config->counts) {
-        fprintf(of, \
+        snprintf(str, 10000, \
             "%s\t%i\t%i\t%i\n", \
             chrom, \
             pos, \
             pos+width, \
             nmethyl+nunmethyl);
     } else if(config->logit) {
-        fprintf(of, \
+        snprintf(str, 10000, \
             "%s\t%i\t%i\t%f\n", \
             chrom, \
             pos, \
             pos+width, \
             logit(((double) nmethyl)/(nmethyl+nunmethyl)));
     } else if(config->methylKit) {
-        fprintf(of, \
+        snprintf(str, 10000, \
             "%s.%i\t%s\t%i\t%c\t%i\t%6.2f\t%6.2f\n", \
             chrom, \
             pos+1, \
@@ -69,17 +73,19 @@ void writeCall(FILE *of, Config *config, char *chrom, int32_t pos, int32_t width
             100.0 * ((double) nmethyl)/(nmethyl+nunmethyl), \
             100.0 * ((double) nunmethyl)/(nmethyl+nunmethyl));
     }
+
+    kputs(str, ks);
 }
 
-void processLast(FILE *of, Config *config, struct lastCall *last, bam_hdr_t *hdr, int32_t tid, int32_t pos, int width, uint32_t nmethyl, uint32_t nunmethyl, char base) {
+void processLast(kstring_t *ks, Config *config, struct lastCall *last, bam_hdr_t *hdr, int32_t tid, int32_t pos, int width, uint32_t nmethyl, uint32_t nunmethyl, char base) {
     if(last->tid == tid && last->pos == pos) {
         nmethyl += last->nmethyl;
         nunmethyl += last->nunmethyl;
-        writeCall(of, config, hdr->target_name[tid], pos, width, nmethyl, nunmethyl, base);
+        writeCall(ks, config, hdr->target_name[tid], pos, width, nmethyl, nunmethyl, base);
         last->tid = -1;
     } else {
         if(last->tid != -1) {
-            writeCall(of, config, hdr->target_name[last->tid], last->pos, width, last->nmethyl, last->nunmethyl, base);
+            writeCall(ks, config, hdr->target_name[last->tid], last->pos, width, last->nmethyl, last->nunmethyl, base);
         }
         last->tid = tid;
         last->pos = pos;
@@ -105,22 +111,53 @@ int isVariant(Config *config, const bam_pileup1_t *plp, uint32_t *coverage, int 
     }
 }
 
-void extractCalls(Config *config) {
-    bam_hdr_t *hdr = sam_hdr_read(config->fp);
+void *extractCalls(void *foo) {
+    Config *config = (Config*) foo;
+    bam_hdr_t *hdr;
     bam_mplp_t iter;
     int ret, tid, pos, i, seqlen, type, rv, o = 0;
-    int ltid = -1, lpos = -1;
-    int beg0 = 0, end0 = 1u<<29;
+    int32_t bedIdx = 0;
     int n_plp; //This will need to be modified for multiple input files
-    int ctid = -1; //The tid of the contig whose sequence is stored in "seq"
-    int idxBED = 0, strand;
+    int strand;
     uint32_t nmethyl = 0, nunmethyl = 0, nOff = 0, nVariant = 0;
+    uint32_t localBin = 0, localPos = 0, localEnd = 0, localTid = 0;
     uint64_t nVariantPositions = 0;
     const bam_pileup1_t **plp = NULL;
     char *seq = NULL, base = 'A';
     mplp_data *data = NULL;
     struct lastCall *lastCpG = NULL;
     struct lastCall *lastCHG = NULL;
+    kstring_t **os = NULL, *os_CpG = NULL, *os_CHG = NULL, *os_CHH = NULL;
+    faidx_t *fai;
+    hts_idx_t *bai;
+    htsFile *fp;
+
+    os = calloc(3, sizeof(kstring_t*));
+    os_CpG = calloc(1, sizeof(kstring_t));
+    os_CHG = calloc(1, sizeof(kstring_t));
+    os_CHH = calloc(1, sizeof(kstring_t));
+    if(!os_CpG || !os_CHG || !os_CHH || !os) {
+        fprintf(stderr, "Couldn't allocate space for the kstring_t structures in extractCalls()!\n");
+        return NULL;
+    }
+    os[0] = os_CpG;
+    os[1] = os_CHG;
+    os[2] = os_CHH;
+
+    //Open the files
+    if((fai = fai_load(config->FastaName)) == NULL) {
+        fprintf(stderr, "Couldn't open the index for %s!\n", config->FastaName);
+        return NULL;
+    }
+    if((fp = hts_open(config->BAMName, "rb")) == NULL) {
+        fprintf(stderr, "Couldn't open %s for reading!\n", config->BAMName);
+        return NULL;
+    }
+    if((bai = sam_index_load(fp, config->BAMName)) == NULL) {
+        fprintf(stderr, "Couldn't load the index for %s\n", config->BAMName);
+        return NULL;
+    }
+    hdr = sam_hdr_read(fp);
 
     if(config->merge) {
         if(config->keepCpG) {
@@ -138,153 +175,221 @@ void extractCalls(Config *config) {
     data = calloc(1,sizeof(mplp_data));
     if(data == NULL) {
         fprintf(stderr, "Couldn't allocate space for the data structure in extractCalls()!\n");
-        return;
+        return NULL;
     }
     data->config = config;
     data->hdr = hdr;
-    if (config->reg) {
-        if((data->iter = sam_itr_querys(config->bai, hdr, config->reg)) == 0){
-            fprintf(stderr, "failed to parse regions %s", config->reg);
-            return;
-        }
-    }
-    if(config->bedName) {
-        config->bed = parseBED(config->bedName, hdr);
-        if(config->bed == NULL) return;
-    }
+    data->fp = fp;
+    data->bedIdx = bedIdx;
 
     plp = calloc(1, sizeof(bam_pileup1_t *)); //This will have to be modified for multiple input files
     if(plp == NULL) {
         fprintf(stderr, "Couldn't allocate space for the plp structure in extractCalls()!\n");
-        return;
+        return NULL;
     }
 
-    //Start the pileup
-    iter = bam_mplp_init(1, filter_func, (void **) &data);
-    bam_mplp_init_overlaps(iter);
-    bam_mplp_set_maxcnt(iter, config->maxDepth);
-    while((ret = cust_mplp_auto(iter, &tid, &pos, &n_plp, plp)) > 0) {
-        //Do we need to process this position?
-	if (config->reg){
-	    beg0 = data->iter->beg, end0 = data->iter->end;
-	    if ((pos < beg0 || pos >= end0)) continue; // out of the region requested
-	}
-        if(tid != ctid) {
-            if(seq != NULL) free(seq);
-            seq = faidx_fetch_seq(config->fai, hdr->target_name[tid], 0, faidx_seq_len(config->fai, hdr->target_name[tid]), &seqlen);
-            if(seqlen < 0) {
-                fprintf(stderr, "faidx_fetch_seq returned %i while trying to fetch the sequence for tid %i (%s)!\n",\
-                    seqlen, tid, hdr->target_name[tid]);
-                fprintf(stderr, "Note that the output will be truncated!\n");
-                return;
+    while(1) {
+        //Lock and unlock the mutex so we can get/update the tid/position
+        pthread_mutex_lock(&positionMutex);
+        localBin = bin++;
+        localTid = globalTid;
+        localPos = globalPos;
+        localEnd = localPos + config->chunkSize;
+        if(localTid >= hdr->n_targets) {
+            pthread_mutex_unlock(&positionMutex);
+            break;
+        }
+        if(globalEnd && localEnd > globalEnd) localEnd = globalEnd;
+        adjustBounds(config, hdr, fai, &localTid, &localPos, &localEnd);
+        globalPos = localEnd;
+        if(globalEnd > 0 && globalPos >= globalEnd) {
+            //If we've specified a region, then break once we're outside of it
+            globalTid = (uint32_t) -1;
+        }
+        if(localTid < hdr->n_targets && globalTid != (uint32_t) -1) {
+            if(globalPos >= hdr->target_len[localTid]) {
+                localEnd = hdr->target_len[localTid];
+                globalTid++;
+                globalPos = 0;
             }
-            ctid = tid;
         }
+        pthread_mutex_unlock(&positionMutex);
 
-        if(config->bed) { //Handle -l
-            while((o = posOverlapsBED(tid, pos, config->bed, idxBED)) == -1) idxBED++;
-            if(o == 0) continue; //Wrong strand
-        }
-
-        if(isCpG(seq, pos, seqlen)) {
-            if(!config->keepCpG) continue;
-            type = 0;
-        } else if(isCHG(seq, pos, seqlen)) {
-            if(!config->keepCHG) continue;
-            type = 1;
-        } else if(isCHH(seq, pos, seqlen)) {
-            if(!config->keepCHH) continue;
-            type = 2;
-        } else {
-            continue;
-        }
-
-        nmethyl = nunmethyl = nVariant = nOff = 0;
-        base = *(seq+pos);
-        for(i=0; i<n_plp; i++) {
-            if(plp[0][i].is_del) continue;
-            if(plp[0][i].is_refskip) continue;
-            if(config->bed) if(!readStrandOverlapsBED(plp[0][i].b, config->bed->region[idxBED])) continue;
-            strand = getStrand((plp[0]+i)->b);
-            if(strand & 1) {
-                if(base != 'C' && base != 'c') {
-                    nVariant += isVariant(config, plp[0]+i, &nOff, strand);
-                    continue;
+        //If we have a BED file, then jump to the first overlapping region:
+        if(config->bed) {
+            if(spanOverlapsBED(localTid, localPos, localEnd, config->bed, &bedIdx) != 1) {
+                //Set the bin as written and loop
+                while(1) {
+                    pthread_mutex_lock(&outputMutex);
+                    if(outputBin != localBin) {
+                        pthread_mutex_unlock(&outputMutex);
+                        continue;
+                    }
+                    outputBin++;
+                    break;
                 }
+                pthread_mutex_unlock(&outputMutex);
+                continue;
+            }
+        }
+
+
+        //Break out of the loop if finished
+        if(localTid >= hdr->n_targets) break; //Finish looping
+        if(globalEnd && localPos >= globalEnd) break;
+        data->iter = sam_itr_queryi(bai, localTid, localPos, localEnd);
+
+        seq = faidx_fetch_seq(fai, hdr->target_name[localTid], localPos, localEnd+10, &seqlen);
+        if(seqlen < 0) {
+            fprintf(stderr, "faidx_fetch_seq returned %i while trying to fetch the sequence for tid %s:%"PRIu32"-%"PRIu32"!\n",\
+                seqlen, hdr->target_name[localTid], localPos, localEnd);
+            fprintf(stderr, "Note that the output will be truncated!\n");
+            return NULL;
+        }
+
+        //Start the pileup
+        iter = bam_mplp_init(1, filter_func, (void **) &data);
+        bam_mplp_init_overlaps(iter);
+        bam_mplp_set_maxcnt(iter, config->maxDepth);
+        while((ret = cust_mplp_auto(iter, &tid, &pos, &n_plp, plp)) > 0) {
+            if(pos < localPos || pos >= localEnd) continue; // out of the region requested
+
+            if(config->bed) { //Handle -l
+                while((o = posOverlapsBED(tid, pos, config->bed, bedIdx)) == -1) bedIdx++;
+                if(o == 0) continue; //Wrong strand
+            }
+
+            if(isCpG(seq, pos-localPos, seqlen)) {
+                if(!config->keepCpG) continue;
+                type = 0;
+            } else if(isCHG(seq, pos-localPos, seqlen)) {
+                if(!config->keepCHG) continue;
+                type = 1;
+            } else if(isCHH(seq, pos-localPos, seqlen)) {
+                if(!config->keepCHH) continue;
+                type = 2;
             } else {
-                if(base != 'G' && base != 'g') {
-                    nVariant += isVariant(config, plp[0]+i, &nOff, strand);
-                    continue;
+                continue;
+            }
+
+            nmethyl = nunmethyl = nVariant = nOff = 0;
+            base = *(seq+pos-localPos);
+            for(i=0; i<n_plp; i++) {
+                if(plp[0][i].is_del) continue;
+                if(plp[0][i].is_refskip) continue;
+                if(config->bed) if(!readStrandOverlapsBED(plp[0][i].b, config->bed->region[bedIdx])) continue;
+                strand = getStrand((plp[0]+i)->b);
+                if(strand & 1) {
+                    if(base != 'C' && base != 'c') {
+                        nVariant += isVariant(config, plp[0]+i, &nOff, strand);
+                        continue;
+                    }
+                } else {
+                    if(base != 'G' && base != 'g') {
+                        nVariant += isVariant(config, plp[0]+i, &nOff, strand);
+                        continue;
+                    }
+                }
+                rv = updateMetrics(config, plp[0]+i);
+                if(rv > 0) nmethyl++;
+                else if(rv<0) nunmethyl++;
+            }
+
+            // Skip likely variant positions
+            if(config->minOppositeDepth > 0 && \
+               nOff >= config->minOppositeDepth && \
+               ((double) nVariant) / ((double) nOff) >= config->maxVariantFrac) {
+                nVariantPositions++;
+                //If we're merging context, then skip an entire merged site
+                if(config->merge) {
+                    if(type == 0 && lastCpG->tid == tid && lastCpG->pos == pos - 1 && (base == 'G' || base == 'g')) {
+                        lastCpG->nmethyl = 0;
+                        lastCpG->nunmethyl = 0;
+                    } else if(type == 1 && lastCHG->tid == tid && lastCHG->pos == pos - 2 && (base == 'G' || base == 'g')) {
+                        lastCHG->nmethyl = 0;
+                        lastCHG->nunmethyl = 0;
+                    }
+                }
+                continue;
+            }
+
+            if(nmethyl+nunmethyl==0) continue;
+            if(!config->merge || type==2) {
+                writeCall(os[type], config, hdr->target_name[tid], pos, 1, nmethyl, nunmethyl, base);
+            } else {
+                //Merge into per-CpG/CHG metrics
+                if(type==0) {
+                    if(base=='G' || base=='g') pos--;
+                    processLast(os_CpG, config, lastCpG, hdr, tid, pos, 2, nmethyl, nunmethyl, base);
+                } else {
+                    if(base=='G' || base=='g') pos-=2;
+                    processLast(os_CHG, config, lastCHG, hdr, tid, pos, 3, nmethyl, nunmethyl, base);
                 }
             }
-            rv = updateMetrics(config, plp[0]+i);
-            if(rv > 0) nmethyl++;
-            else if(rv<0) nunmethyl++;
         }
+        bam_mplp_destroy(iter);
 
-        // Skip likely variant positions
-        if(config->minOppositeDepth > 0 && \
-           nOff >= config->minOppositeDepth && \
-           ((double) nVariant) / ((double) nOff) >= config->maxVariantFrac) {
-            nVariantPositions++;
-            //If we're merging context, then skip an entire merged site
-            if(config->merge) {
-                if(type == 0 && lastCpG->tid == tid && lastCpG->pos == pos - 1 && (base == 'G' || base == 'g')) {
-                    lastCpG->nmethyl = 0;
-                    lastCpG->nunmethyl = 0;
-                } else if(type == 1 && lastCHG->tid == tid && lastCHG->pos == pos - 2 && (base == 'G' || base == 'g')) {
-                    lastCHG->nmethyl = 0;
-                    lastCHG->nunmethyl = 0;
-                }
-                ltid = tid;
-                lpos = pos;
-            }
-            continue;
-        }
-
-        //If we're merging and just skipped the merged position due to a variant, then skip the merged site all together
+        //Don't forget the last CpG/CHG
+        nmethyl = 0;
+        nunmethyl = 0;
         if(config->merge) {
-            if(type == 0 && ltid == tid && lpos == pos - 1 && (base == 'G' || base == 'g')) {
-                lastCpG->nmethyl = nmethyl = 0;
-                lastCpG->nunmethyl = nunmethyl = 0;
-            } else if(type == 1 && ltid == tid && lpos == pos - 2 && (base == 'G' || base == 'g')) {
-                lastCHG->nmethyl = nmethyl = 0;
-                lastCHG->nunmethyl = nunmethyl = 0;
+            if(config->keepCpG && lastCpG->tid != -1) {
+                processLast(os_CpG, config, lastCpG, hdr, tid, pos, 2, nmethyl, nunmethyl, base);
+                lastCpG->tid = -1;
+            }
+            if(config->keepCHG && lastCHG->tid != -1) {
+                processLast(os_CHG, config, lastCHG, hdr, tid, pos, 3, nmethyl, nunmethyl, base);
+                lastCHG->tid = -1;
             }
         }
+        hts_itr_destroy(data->iter);
+        free(seq);
 
-        if(nmethyl+nunmethyl==0) continue;
-        if(!config->merge || type==2) {
-            writeCall(config->output_fp[type], config, hdr->target_name[tid], pos, 1, nmethyl, nunmethyl, base);
-        } else {
-            //Merge into per-CpG/CHG metrics
-            if(type==0) {
-                if(base=='G' || base=='g') pos--;
-                processLast(config->output_fp[0], config, lastCpG, hdr, tid, pos, 2, nmethyl, nunmethyl, base);
-            } else {
-                if(base=='G' || base=='g') pos-=2;
-                processLast(config->output_fp[1], config, lastCHG, hdr, tid, pos, 3, nmethyl, nunmethyl, base);
+        while(1) {
+            pthread_mutex_lock(&outputMutex);
+            if(outputBin != localBin) {
+                pthread_mutex_unlock(&outputMutex);
+                continue;
             }
+            if(config->keepCpG && os_CpG->l) {
+                fputs(os_CpG->s, config->output_fp[0]);
+                os_CpG->l = 0;
+            }
+            if(config->keepCHG && os_CHG->l) {
+                fputs(os_CHG->s, config->output_fp[1]);
+                os_CHG->l = 0;
+            }
+            if(config->keepCHH && os_CHH->l) {
+                fputs(os_CHH->s, config->output_fp[2]);
+                os_CHH->l = 0;
+            }
+            outputBin++;
+            pthread_mutex_unlock(&outputMutex);
+            break;
         }
     }
 
-    //Don't forget the last CpG/CHG
-    if(config->merge) {
-        if(config->keepCpG && lastCpG->tid != -1) {
-            processLast(config->output_fp[0], config, lastCpG, hdr, tid, pos, 2, nmethyl, nunmethyl, base);
-        }
-        if(config->keepCHG && lastCHG->tid != -1) {
-            processLast(config->output_fp[1], config, lastCHG, hdr, tid, pos, 3, nmethyl, nunmethyl, base);
-        }
-    }
-
+    free(os_CpG->s); free(os_CpG);
+    free(os_CHG->s); free(os_CHG);
+    free(os_CHH->s); free(os_CHH);
+    free(os);
     bam_hdr_destroy(hdr);
-    if(data->iter) hts_itr_destroy(data->iter);
-    bam_mplp_destroy(iter);
+    fai_destroy(fai);
+    hts_close(fp);
+    hts_idx_destroy(bai);
     free(data);
     free(plp);
-    if(seq != NULL) free(seq);
-    if(nVariantPositions > 0) fprintf(stdout, "%"PRIu64" positions were excluded due to likely being variants.\n", nVariantPositions);
+    if(config->merge) {
+        if(config->keepCpG) free(lastCpG);
+        if(config->keepCHG) free(lastCHG);
+    }
+
+    if(nVariantPositions > 0) {
+        pthread_mutex_lock(&outputMutex);
+        globalnVariantPositions += nVariantPositions;
+        pthread_mutex_unlock(&outputMutex);
+    }
+    return NULL;
 }
 
 void printHeader(FILE *of, char *context, char *opref, Config config) {
@@ -309,12 +414,15 @@ void extract_usage() {
 "                  --mergeContext, this then applies to the merged CpG/CHG.\n"
 "                  (default 1)\n"
 " -r STR           Region string in which to extract methylation\n"
-" -l FILE          A BED file listing regions for inclusion. Note that unlike\n"
-"                  samtools mpileup, this option will utilize the strand column\n"
-"                  (column 6) if present. Thus, if a region has a '+' in this\n"
-"                  column, then only metrics from the top strand will be\n"
-"                  output. Note that the -r option can be used to limit the\n"
-"                  regions of -l.\n"
+" -l FILE          A BED file listing regions for inclusion.\n"
+" --keepStrand     If a BED file is specified, then this option will cause the\n"
+"                  strand column (column 6) to be utilized, if present. Thus, if\n"
+"                  a region has a '+' in this column, then only metrics from the\n"
+"                  top strand will be output. Note that the -r option can be used\n"
+"                  to limit the regions of -l.\n"
+" -@ nThreads      The number of threads to use, the default 1\n"
+" --chunkSize INT  The size of the genome processed by a single thread at a time.\n"
+"                  The default is 1000000 bases. This value MUST be at least 1.\n"
 " --mergeContext   Merge per-Cytosine metrics from CpG and CHG contexts into\n"
 "                  per-CPG or per-CHG metrics.\n"
 " -o, --opref STR  Output filename prefix. CpG/CHG/CHH context metrics will be\n"
@@ -394,8 +502,11 @@ void extract_usage() {
 
 int extract_main(int argc, char *argv[]) {
     char *opref = NULL, *oname, *p;
-    int c, i;
+    int c, i, keepStrand = 0;
     Config config;
+    bam_hdr_t *hdr = NULL;
+
+    globalTid = globalPos = globalEnd = bin = globalnVariantPositions = 0;
 
     //Defaults
     config.keepCpG = 1; config.keepCHG = 0; config.keepCHH = 0;
@@ -407,7 +518,6 @@ int extract_main(int argc, char *argv[]) {
     config.minOppositeDepth = 0;
     config.maxVariantFrac = 0.0;
     config.maxDepth = 2000;
-    config.fai = NULL;
     config.fp = NULL;
     config.bai = NULL;
     config.reg = NULL;
@@ -418,6 +528,8 @@ int extract_main(int argc, char *argv[]) {
     config.logit = 0;
     config.ignoreFlags = 0xF00;
     config.requireFlags = 0;
+    config.nThreads = 1;
+    config.chunkSize = 1000000;
     for(i=0; i<16; i++) config.bounds[i] = 0;
     for(i=0; i<16; i++) config.absoluteBounds[i] = 0;
 
@@ -445,27 +557,29 @@ int extract_main(int argc, char *argv[]) {
         {"nCTOB",        1, NULL,  16},
         {"minOppositeDepth", 1, NULL, 17},
         {"maxVariantFrac", 1, NULL, 18},
+        {"chunkSize",    1, NULL,  19},
+        {"keepStrand",   0, NULL,  20},
         {"ignoreFlags",  1, NULL, 'F'},
         {"requireFlags", 1, NULL, 'R'},
         {"help",         0, NULL, 'h'},
         {"version",      0, NULL, 'v'},
         {0,              0, NULL,   0}
     };
-    while((c = getopt_long(argc, argv, "hvq:p:r:l:o:D:f:c:m:d:F:R:", lopts,NULL)) >=0){
+    while((c = getopt_long(argc, argv, "hvq:p:r:l:o:D:f:c:m:d:F:R:@:", lopts,NULL)) >=0){
         switch(c) {
-        case 'h' :
+        case 'h':
             extract_usage();
             return 0;
-        case 'v' :
+        case 'v':
             print_version();
             return 0;
-        case 'o' :
+        case 'o':
             opref = strdup(optarg);
             break;
-        case 'D' :
+        case 'D':
             config.maxDepth = atoi(optarg);
             break;
-        case 'd' :
+        case 'd':
             config.minDepth = atoi(optarg);
             if(config.minDepth < 1) {
                 fprintf(stderr, "Error, the minimum depth must be at least 1!\n");
@@ -473,57 +587,57 @@ int extract_main(int argc, char *argv[]) {
             }
             break;
 	case 'r':
-	    config.reg = strdup(optarg);
+	    config.reg = optarg;
 	    break;
-        case 'l' :
+        case 'l':
             config.bedName = optarg;
             break;
-        case 1 :
+        case 1:
             config.keepCpG = 0;
             break;
-        case 2 :
+        case 2:
             config.keepCHG = 1;
             break;
-        case 3 :
+        case 3:
             config.keepCHH = 1;
             break;
-        case 4 :
+        case 4:
             config.keepDupes = 1;
             break;
-        case 5 :
+        case 5:
             config.keepSingleton = 1;
             break;
-        case 6 :
+        case 6:
             config.keepDiscordant = 1;
             break;
-        case 7 :
+        case 7:
             parseBounds(optarg, config.bounds, 0);
             break;
-        case 8 :
+        case 8:
             parseBounds(optarg, config.bounds, 1);
             break;
-        case 9 :
+        case 9:
             parseBounds(optarg, config.bounds, 2);
             break;
-        case 10 :
+        case 10:
             parseBounds(optarg, config.bounds, 3);
             break;
-        case 11 :
+        case 11:
             config.merge = 1;
             break;
-        case 12 :
+        case 12:
             config.methylKit = 1;
             break;
-        case 13 :
+        case 13:
             parseBounds(optarg, config.absoluteBounds, 0);
             break;
-        case 14 :
+        case 14:
             parseBounds(optarg, config.absoluteBounds, 1);
             break;
-        case 15 :
+        case 15:
             parseBounds(optarg, config.absoluteBounds, 2);
             break;
-        case 16 :
+        case 16:
             parseBounds(optarg, config.absoluteBounds, 3);
             break;
         case 17:
@@ -532,28 +646,41 @@ int extract_main(int argc, char *argv[]) {
         case 18:
             config.maxVariantFrac = atof(optarg);
             break;
-        case 'F' :
+        case 19:
+            config.chunkSize = strtoul(optarg, NULL, 10);
+            if(config.chunkSize < 1) {
+                fprintf(stderr, "Error: The chunk size must be at least 1!\n");
+                return 1;
+            }
+            break;
+        case 20:
+            keepStrand = 1;
+            break;
+        case 'F':
             config.ignoreFlags = atoi(optarg);
             break;
         case 'R':
             config.requireFlags = atoi(optarg);
             break;
-        case 'q' :
+        case 'q':
             config.minMapq = atoi(optarg);
             break;
-        case 'p' :
+        case 'p':
             config.minPhred = atoi(optarg);
             break;
-        case 'm' :
+        case 'm':
             config.logit = 1;
             break;
-        case 'f' :
+        case 'f':
             config.fraction = 1;
             break;
-        case 'c' :
+        case 'c':
             config.counts = 1;
             break;
-        case '?' :
+        case '@':
+            config.nThreads = atoi(optarg);
+            break;
+        case '?':
         default :
             fprintf(stderr, "Invalid option '%c'\n", c);
             extract_usage();
@@ -604,11 +731,8 @@ int extract_main(int argc, char *argv[]) {
     }
 
     //Open the files
-    if((config.fai = fai_load(argv[optind])) == NULL) {
-        fprintf(stderr, "Couldn't open the index for %s!\n", argv[optind]);
-        extract_usage();
-        return -2;
-    }
+    config.FastaName = argv[optind];
+    config.BAMName = argv[optind+1];
     if((config.fp = hts_open(argv[optind+1], "rb")) == NULL) {
         fprintf(stderr, "Couldn't open %s for reading!\n", argv[optind+1]);
         return -4;
@@ -717,18 +841,63 @@ int extract_main(int argc, char *argv[]) {
         }
     }
 
+    //parse the region, if needed
+    if(config.reg) {
+        const char *foo;
+        char *bar = NULL;
+        int s, e;
+        hdr = sam_hdr_read(config.fp);
+        foo = hts_parse_reg(config.reg, &s, &e);
+        if(foo == NULL) {
+            fprintf(stderr, "Could not parse the specified region!\n");
+            return -4;
+        }
+        bar = malloc(foo - config.reg + 1);
+        if(bar == NULL) {
+            fprintf(stderr, "Could not allocate temporary space for parsing the requested region!\n");
+            return -5;
+        }
+        strncpy(bar, config.reg, foo - config.reg);
+        bar[foo - config.reg] = 0;
+        globalTid = bam_name2id(hdr, bar);
+        if(globalTid == (uint32_t) -1) {
+            fprintf(stderr, "%s did not match a known chromosome/contig name!\n", config.reg);
+            return -6;
+        }
+        if(s>0) globalPos = s;
+        if(e>0) globalEnd = e;
+        if(globalEnd > hdr->target_len[globalTid]) globalEnd = hdr->target_len[globalTid];
+        free(bar);
+        if(!config.bedName) bam_hdr_destroy(hdr);
+    }
+    if(config.bedName) {
+        if(!hdr) hdr = sam_hdr_read(config.fp);
+        config.bed = parseBED(config.bedName, hdr, keepStrand);
+        bam_hdr_destroy(hdr);
+        if(!config.bed) {
+            fprintf(stderr, "There was an error while reading in your BED file!\n");
+            return 1;
+        }
+    }
+
     //Run the pileup
-    extractCalls(&config);
+    pthread_mutex_init(&positionMutex, NULL);
+    pthread_t *threads = calloc(config.nThreads, sizeof(pthread_t));
+    for(i=0; i < config.nThreads; i++) pthread_create(threads+i, NULL, &extractCalls, &config);
+    for(i=0; i < config.nThreads; i++) pthread_join(threads[i], NULL);
+    free(threads);
+    pthread_mutex_destroy(&positionMutex);
+
+    //If we've filtered out variant sites
+    if(globalnVariantPositions) printf("%"PRIu64" positions were excluded due to likely being variants.\n", globalnVariantPositions);
 
     //Close things up
     hts_close(config.fp);
-    fai_destroy(config.fai);
     if(config.keepCpG) fclose(config.output_fp[0]);
     if(config.keepCHG) fclose(config.output_fp[1]);
     if(config.keepCHH) fclose(config.output_fp[2]);
     hts_idx_destroy(config.bai);
     free(opref);
-    if(config.reg) free(config.reg);
     if(config.bed) destroyBED(config.bed);
     free(oname);
     free(config.output_fp);
