@@ -1,5 +1,6 @@
 [![Master build status](https://travis-ci.org/dpryan79/MethylDackel.svg?branch=master)](https://travis-ci.org/dpryan79/MethylDackel)
 [![Galaxy installation](https://img.shields.io/badge/install_with-galaxy-brightgreen.svg?style=flat-square)](https://toolshed.g2.bx.psu.edu/)
+[![bioconda-badge](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat-square)](http://bioconda.github.io)
 
 <img align="left" src="MethylDackelLogo.png" /> MethylDackel (formerly named PileOMeth, which was a temporary name derived due to it using a PILEup to extract METHylation metrics) will process a coordinate-sorted and indexed BAM or CRAM file containing some form of BS-seq alignments and extract per-base methylation metrics from them. MethylDackel requires an indexed fasta file containing the reference genome as well.
 
