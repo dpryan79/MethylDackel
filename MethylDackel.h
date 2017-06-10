@@ -69,6 +69,7 @@ typedef struct {
  @field bed	Pointer to regions specified in a BED file (-l option)
  @field fai	Fasta file index pointer
  @field nThreads	Number of threads in use.
+ @field chunkSize	The number of bases processed by each thread at a time (can be adjusted a bit to ensure CpGs/CHGs aren't split between processors)
 */
 typedef struct {
     int keepCpG, keepCHG, keepCHH;
@@ -88,6 +89,7 @@ typedef struct {
     int bounds[16];
     int absoluteBounds[16];
     int nThreads;
+    unsigned long chunkSize;
 } Config;
 
 /*! @typedef
@@ -95,12 +97,14 @@ typedef struct {
  @field	config:	The Config* structure containing the settings
  @field hdr:	The input header
  @field iter:	The alignment iterator that should be traversed.
+ @field bedIdx: The last index into the BED file
 */
 typedef struct {
     Config *config;
     htsFile *fp;
     bam_hdr_t *hdr;
     hts_itr_t *iter;
+    int32_t bedIdx;
 } mplp_data;
 
 /*! @function
@@ -131,12 +135,12 @@ typedef struct {
 } strandMeth;
 
 //bed.c
-int posOverlapsBED(int32_t tid, int32_t pos, bedRegions *regions, int idxBED);
-int spanOverlapsBED(int32_t tid, int32_t start, int32_t end, bedRegions *regions, int *idx);
+int posOverlapsBED(int32_t tid, int32_t pos, bedRegions *regions, int32_t idxBED);
+int spanOverlapsBED(int32_t tid, int32_t start, int32_t end, bedRegions *regions, int32_t *idx);
 int readStrandOverlapsBED(bam1_t *b, bedRegion region);
 void sortBED(bedRegions *regions);
 void destroyBED(bedRegions *regions);
-bedRegions *parseBED(char *fn, bam_hdr_t *hdr);
+bedRegions *parseBED(char *fn, bam_hdr_t *hdr, int keepStrand);
 
 //pileup.c
 int cust_mplp_auto(bam_mplp_t iter, int *_tid, int *_pos, int *n_plp, const bam_pileup1_t **plp);

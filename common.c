@@ -205,13 +205,11 @@ bam1_t *trimAbsoluteAlignment(bam1_t *b, int bounds[16]) {
 //This will need to be restructured to handle multiple input files
 int filter_func(void *data, bam1_t *b) {
     int rv, NH, overlap;
-    static int32_t idxBED = 0;
     mplp_data *ldata = (mplp_data *) data;
     uint8_t *p;
 
     while(1) {
         rv = ldata->iter ? sam_itr_next(ldata->fp, ldata->iter, b) : sam_read1(ldata->fp, ldata->hdr, b);
-
 
         if(rv<0) return rv;
         if(b->core.tid == -1 || b->core.flag & BAM_FUNMAP) continue; //Unmapped
@@ -228,7 +226,7 @@ int filter_func(void *data, bam1_t *b) {
         if(!ldata->config->keepDiscordant && (b->core.flag & 0x3) == 0x1) continue; //Discordant
         if((b->core.flag & 0x9) == 0x1) b->core.flag |= 0x2; //Discordant pairs can cause double counts
         if(ldata->config->bed) { //Prefilter reads overlapping a BED file (N.B., strand independent).
-            overlap = spanOverlapsBED(b->core.tid, b->core.pos, bam_endpos(b), ldata->config->bed, &idxBED);
+            overlap = spanOverlapsBED(b->core.tid, b->core.pos, bam_endpos(b), ldata->config->bed, &(ldata->bedIdx));
             if(overlap == 0) continue;
             if(overlap < 0) {
                 rv = -1;

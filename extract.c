@@ -115,11 +115,12 @@ void *extractCalls(void *foo) {
     Config *config = (Config*) foo;
     bam_hdr_t *hdr;
     bam_mplp_t iter;
-    int ret, tid, pos, i, seqlen, type, rv;
+    int ret, tid, pos, i, seqlen, type, rv, o = 0;
+    int32_t bedIdx = 0;
     int n_plp; //This will need to be modified for multiple input files
     int strand;
     uint32_t nmethyl = 0, nunmethyl = 0, nOff = 0, nVariant = 0;
-    uint32_t localBin, localPos, localEnd, localTid;
+    uint32_t localBin = 0, localPos = 0, localEnd = 0, localTid = 0;
     uint64_t nVariantPositions = 0;
     const bam_pileup1_t **plp = NULL;
     char *seq = NULL, base = 'A';
@@ -179,6 +180,7 @@ void *extractCalls(void *foo) {
     data->config = config;
     data->hdr = hdr;
     data->fp = fp;
+    data->bedIdx = bedIdx;
 
     plp = calloc(1, sizeof(bam_pileup1_t *)); //This will have to be modified for multiple input files
     if(plp == NULL) {
@@ -186,55 +188,51 @@ void *extractCalls(void *foo) {
         return NULL;
     }
 
-/*******************************
-*
-* LOOP HERE!!!!
-*
-* TODO:
-*
-*  * Test BED files
-*  * Have we ever actually honored the BED file strand?
-*  * Support changing the chunk size?
-*
-*******************************/
     while(1) {
         //Lock and unlock the mutex so we can get/update the tid/position
         pthread_mutex_lock(&positionMutex);
-        //handle BED files
-        if(config->bed) {
-            if(bin >= config->bed->n) {
-                pthread_mutex_unlock(&positionMutex);
-                break;
-            }
-            localTid = config->bed->region[bin].tid;
-            localPos = config->bed->region[bin].start;
-            localEnd = config->bed->region[bin].end;
-            localBin = bin++;
-        } else {
-            localBin = bin++;
-            localTid = globalTid;
-            localPos = globalPos;
-            localEnd = localPos + 1000000;
-            if(localTid >= hdr->n_targets) {
-                pthread_mutex_unlock(&positionMutex);
-                break;
-            }
-            if(globalEnd && localEnd > globalEnd) localEnd = globalEnd;
-            adjustBounds(config, hdr, fai, &localTid, &localPos, &localEnd);
-            globalPos = localEnd;
-            if(globalEnd > 0 && globalPos >= globalEnd) {
-                //If we've specified a region, then break once we're outside of it
-                globalTid = (uint32_t) -1;
-            }
-            if(localTid < hdr->n_targets && globalTid != (uint32_t) -1) {
-                if(globalPos >= hdr->target_len[localTid]) {
-                    localEnd = hdr->target_len[localTid];
-                    globalTid++;
-                    globalPos = 0;
-                }
+        localBin = bin++;
+        localTid = globalTid;
+        localPos = globalPos;
+        localEnd = localPos + config->chunkSize;
+        if(localTid >= hdr->n_targets) {
+            pthread_mutex_unlock(&positionMutex);
+            break;
+        }
+        if(globalEnd && localEnd > globalEnd) localEnd = globalEnd;
+        adjustBounds(config, hdr, fai, &localTid, &localPos, &localEnd);
+        globalPos = localEnd;
+        if(globalEnd > 0 && globalPos >= globalEnd) {
+            //If we've specified a region, then break once we're outside of it
+            globalTid = (uint32_t) -1;
+        }
+        if(localTid < hdr->n_targets && globalTid != (uint32_t) -1) {
+            if(globalPos >= hdr->target_len[localTid]) {
+                localEnd = hdr->target_len[localTid];
+                globalTid++;
+                globalPos = 0;
             }
         }
         pthread_mutex_unlock(&positionMutex);
+
+        //If we have a BED file, then jump to the first overlapping region:
+        if(config->bed) {
+            if(spanOverlapsBED(localTid, localPos, localEnd, config->bed, &bedIdx) != 1) {
+                //Set the bin as written and loop
+                while(1) {
+                    pthread_mutex_lock(&outputMutex);
+                    if(outputBin != localBin) {
+                        pthread_mutex_unlock(&outputMutex);
+                        continue;
+                    }
+                    outputBin++;
+                    break;
+                }
+                pthread_mutex_unlock(&outputMutex);
+                continue;
+            }
+        }
+
 
         //Break out of the loop if finished
         if(localTid >= hdr->n_targets) break; //Finish looping
@@ -256,6 +254,11 @@ void *extractCalls(void *foo) {
         while((ret = cust_mplp_auto(iter, &tid, &pos, &n_plp, plp)) > 0) {
             if(pos < localPos || pos >= localEnd) continue; // out of the region requested
 
+            if(config->bed) { //Handle -l
+                while((o = posOverlapsBED(tid, pos, config->bed, bedIdx)) == -1) bedIdx++;
+                if(o == 0) continue; //Wrong strand
+            }
+
             if(isCpG(seq, pos-localPos, seqlen)) {
                 if(!config->keepCpG) continue;
                 type = 0;
@@ -274,6 +277,7 @@ void *extractCalls(void *foo) {
             for(i=0; i<n_plp; i++) {
                 if(plp[0][i].is_del) continue;
                 if(plp[0][i].is_refskip) continue;
+                if(config->bed) if(!readStrandOverlapsBED(plp[0][i].b, config->bed->region[bedIdx])) continue;
                 strand = getStrand((plp[0]+i)->b);
                 if(strand & 1) {
                     if(base != 'C' && base != 'c') {
@@ -410,13 +414,15 @@ void extract_usage() {
 "                  --mergeContext, this then applies to the merged CpG/CHG.\n"
 "                  (default 1)\n"
 " -r STR           Region string in which to extract methylation\n"
-" -l FILE          A BED file listing regions for inclusion. Note that unlike\n"
-"                  samtools mpileup, this option will utilize the strand column\n"
-"                  (column 6) if present. Thus, if a region has a '+' in this\n"
-"                  column, then only metrics from the top strand will be\n"
-"                  output. Note that the -r option can be used to limit the\n"
-"                  regions of -l.\n"
+" -l FILE          A BED file listing regions for inclusion.\n"
+" --keepStrand     If a BED file is specified, then this option will cause the\n"
+"                  strand column (column 6) to be utilized, if present. Thus, if\n"
+"                  a region has a '+' in this column, then only metrics from the\n"
+"                  top strand will be output. Note that the -r option can be used\n"
+"                  to limit the regions of -l.\n"
 " -@ nThreads      The number of threads to use, the default 1\n"
+" --chunkSize INT  The size of the genome processed by a single thread at a time.\n"
+"                  The default is 1000000 bases. This value MUST be at least 1.\n"
 " --mergeContext   Merge per-Cytosine metrics from CpG and CHG contexts into\n"
 "                  per-CPG or per-CHG metrics.\n"
 " -o, --opref STR  Output filename prefix. CpG/CHG/CHH context metrics will be\n"
@@ -496,8 +502,9 @@ void extract_usage() {
 
 int extract_main(int argc, char *argv[]) {
     char *opref = NULL, *oname, *p;
-    int c, i;
+    int c, i, keepStrand = 0;
     Config config;
+    bam_hdr_t *hdr = NULL;
 
     globalTid = globalPos = globalEnd = bin = globalnVariantPositions = 0;
 
@@ -522,6 +529,7 @@ int extract_main(int argc, char *argv[]) {
     config.ignoreFlags = 0xF00;
     config.requireFlags = 0;
     config.nThreads = 1;
+    config.chunkSize = 1000000;
     for(i=0; i<16; i++) config.bounds[i] = 0;
     for(i=0; i<16; i++) config.absoluteBounds[i] = 0;
 
@@ -549,6 +557,8 @@ int extract_main(int argc, char *argv[]) {
         {"nCTOB",        1, NULL,  16},
         {"minOppositeDepth", 1, NULL, 17},
         {"maxVariantFrac", 1, NULL, 18},
+        {"chunkSize",    1, NULL,  19},
+        {"keepStrand",   0, NULL,  20},
         {"ignoreFlags",  1, NULL, 'F'},
         {"requireFlags", 1, NULL, 'R'},
         {"help",         0, NULL, 'h'},
@@ -635,6 +645,16 @@ int extract_main(int argc, char *argv[]) {
             break;
         case 18:
             config.maxVariantFrac = atof(optarg);
+            break;
+        case 19:
+            config.chunkSize = strtoul(optarg, NULL, 10);
+            if(config.chunkSize < 1) {
+                fprintf(stderr, "Error: The chunk size must be at least 1!\n");
+                return 1;
+            }
+            break;
+        case 20:
+            keepStrand = 1;
             break;
         case 'F':
             config.ignoreFlags = atoi(optarg);
@@ -826,7 +846,7 @@ int extract_main(int argc, char *argv[]) {
         const char *foo;
         char *bar = NULL;
         int s, e;
-        bam_hdr_t *hdr = sam_hdr_read(config.fp);
+        hdr = sam_hdr_read(config.fp);
         foo = hts_parse_reg(config.reg, &s, &e);
         if(foo == NULL) {
             fprintf(stderr, "Could not parse the specified region!\n");
@@ -848,10 +868,11 @@ int extract_main(int argc, char *argv[]) {
         if(e>0) globalEnd = e;
         if(globalEnd > hdr->target_len[globalTid]) globalEnd = hdr->target_len[globalTid];
         free(bar);
-        bam_hdr_destroy(hdr);
-    } else if(config.bedName) {
-        bam_hdr_t *hdr = sam_hdr_read(config.fp);
-        config.bed = parseBED(config.bedName, hdr);
+        if(!config.bedName) bam_hdr_destroy(hdr);
+    }
+    if(config.bedName) {
+        if(!hdr) hdr = sam_hdr_read(config.fp);
+        config.bed = parseBED(config.bedName, hdr, keepStrand);
         bam_hdr_destroy(hdr);
         if(!config.bed) {
             fprintf(stderr, "There was an error while reading in your BED file!\n");
