@@ -62,12 +62,20 @@ typedef struct {
  @field methylKit       Output in a format compatible with methylKit
  @field minOppositeDepth	Minimum depth covering the opposite strand needed to look for variants
  @field maxVariantFrac	If the fraction of non-Gs on the opposite strand is greater than this then a position is excluded.
+ @field fraction	1: Output should be the methylation fraction only, 0: otherwise
+ @field counts	1: Output just the coverage
+ @field logit	1: Logit transform the methylation fraction
+ @field cytosine_report	1: Output a bismark-like cytosine report
  @field output_fp	Output file pointers (to CpG, CHG, and CHH, respectively)
  @field	reg	A region specified by -r
+ @field BAMName	The BAM file name
  @field fp	Input file pointer (must be a BAM or CRAM file)
  @field	bai	The index for fp
+ @field bedName	The BED file name
  @field bed	Pointer to regions specified in a BED file (-l option)
- @field fai	Fasta file index pointer
+ @field FastaName	The fasta file name
+ @field bounds	Trimming bounds
+ @field absoluteBounds	Absolute trimming bounds
  @field nThreads	Number of threads in use.
  @field chunkSize	The number of bases processed by each thread at a time (can be adjusted a bit to ensure CpGs/CHGs aren't split between processors)
 */
@@ -78,6 +86,7 @@ typedef struct {
     int merge, methylKit, minOppositeDepth;
     double maxVariantFrac;
     int fraction, counts, logit;
+    int cytosine_report;
     FILE **output_fp;
     char *reg;
     char *BAMName;

@@ -26,12 +26,19 @@ struct lastCall{
     uint32_t nmethyl, nunmethyl;
 };
 
-void writeCall(kstring_t *ks, Config *config, char *chrom, int32_t pos, int32_t width, uint32_t nmethyl, uint32_t nunmethyl, char base) { 
+const char *quux[2] = {"foo", "bar"};
+const char *TriNucleotideContexts[25] = {"CAA", "CAC", "CAG", "CAT", "CAN", \
+                                         "CCA", "CCC", "CCG", "CCT", "CCN", \
+                                         "CGA", "CGC", "CGG", "CGT", "CGN", \
+                                         "CTA", "CTC", "CTG", "CTT", "CTN", \
+                                         "CNA", "CNC", "CNG", "CNT", "CNN"};
+
+void writeCall(kstring_t *ks, Config *config, char *chrom, int32_t pos, int32_t width, uint32_t nmethyl, uint32_t nunmethyl, char base, char *context, const char *tnc) { 
     char str[10000]; // I don't really like hardcoding it, but given the probability that it ever won't suffice...
     char strand = (base=='C' || base=='c') ? 'F' : 'R';
-    if(nmethyl+nunmethyl < config->minDepth) return;
+    if(nmethyl+nunmethyl < config->minDepth && !config->cytosine_report) return;
 
-    if (!config->fraction && !config->logit && !config->counts && !config->methylKit) {
+    if (!config->fraction && !config->logit && !config->counts && !config->methylKit && !config->cytosine_report) {
         snprintf(str, 10000, \
             "%s\t%i\t%i\t%i\t%" PRIu32 "\t%" PRIu32 "\n", \
             chrom, \
@@ -72,20 +79,137 @@ void writeCall(kstring_t *ks, Config *config, char *chrom, int32_t pos, int32_t 
             nmethyl+nunmethyl, \
             100.0 * ((double) nmethyl)/(nmethyl+nunmethyl), \
             100.0 * ((double) nunmethyl)/(nmethyl+nunmethyl));
+    } else if(config->cytosine_report) {
+        strand = (base=='C' || base=='c') ? '+' : '-';
+        snprintf(str, 10000, \
+            "%s\t%i\t%c\t%"PRIu32"\t%"PRIu32"\tC%s\t%s\n", \
+            chrom, \
+            pos+1, \
+            strand, \
+            nmethyl, \
+            nunmethyl, \
+            context, \
+            tnc);
     }
 
     kputs(str, ks);
+}
+
+char revcomp(char b) {
+    switch(b) {
+        case 'A':
+        case 'a':
+            return 'T';
+        case 'C':
+        case 'c':
+            return 'G';
+        case 'G':
+        case 'g':
+            return 'C';
+        case 'T':
+        case 't':
+            return 'A';
+        default:
+            return 'N';
+    }
+}
+
+int getTriNucContext(char *seq, uint32_t offset, int seqlen, int direction) {
+    int rv = 0;
+    char base;
+
+    //Last base: column
+    if((direction > 0 && offset+2 >= seqlen) || (direction < 0 && offset <= 1)) rv = 4;
+    else {
+        base = *(seq+offset+2*direction);
+        if(direction < 0) base = revcomp(base);
+        switch(base) {
+            case 'A':
+            case 'a':
+                rv = 0;
+                break;
+            case 'C':
+            case 'c':
+                rv = 1;
+                break;
+            case 'G':
+            case 'g':
+                rv = 2;
+                break;
+            case 'T':
+            case 't':
+                rv = 3;
+                break;
+            default:
+                rv = 4;
+                break;
+        }
+    }
+
+    //Middle
+    if((direction > 0 && offset+1 >= seqlen) || (direction < 0 && offset == 0)) rv += 20;
+    else {
+        base = *(seq+offset+direction);
+        if(direction < 0) base = revcomp(base);
+        switch(base) {
+            case 'A':
+            case 'a':
+                rv += 0;
+                break;
+            case 'C':
+            case 'c':
+                rv += 5;
+                break;
+            case 'G':
+            case 'g':
+                rv += 10;
+                break;
+            case 'T':
+            case 't':
+                rv += 15;
+                break;
+            default:
+                rv += 20;
+                break;
+        }
+    }
+    return rv;
+}
+
+void writeBlank(kstring_t **ks, Config *config, char *chrom, int32_t pos, uint32_t localPos2, uint32_t *lastPos, char *seq, int seqlen) {
+    int triNucContext = 0;
+    int direction = 0;
+    char context[3] = "HG";
+    if(pos == -1) return;
+    for(;*lastPos < pos; (*lastPos)++) {
+        if((direction = isCpG(seq, *lastPos-localPos2, seqlen)) != 0) {
+            if(!config->keepCpG) continue;
+            triNucContext = getTriNucContext(seq, *lastPos - localPos2, seqlen, direction);
+            context[0] = 'G'; context[1] = 0;
+        } else if((direction = isCHG(seq, *lastPos-localPos2, seqlen)) != 0) {
+            if(!config->keepCHG) continue;
+            triNucContext = getTriNucContext(seq, *lastPos - localPos2, seqlen, direction);
+            context[0] = 'H'; context[1] = 'G';
+        } else if((direction = isCHH(seq, *lastPos-localPos2, seqlen)) != 0) {
+            if(!config->keepCHH) continue;
+            triNucContext = getTriNucContext(seq, *lastPos - localPos2, seqlen, direction);
+            context[0] = 'H'; context[1] = 'H';
+        } else {
+            continue;
+        }
+        writeCall(ks[0], config, chrom, *lastPos, 1, 0, 0, (direction>0)?'C':'G', context, TriNucleotideContexts[triNucContext]);
+    }
 }
 
 void processLast(kstring_t *ks, Config *config, struct lastCall *last, bam_hdr_t *hdr, int32_t tid, int32_t pos, int width, uint32_t nmethyl, uint32_t nunmethyl, char base) {
     if(last->tid == tid && last->pos == pos) {
         nmethyl += last->nmethyl;
         nunmethyl += last->nunmethyl;
-        writeCall(ks, config, hdr->target_name[tid], pos, width, nmethyl, nunmethyl, base);
+        writeCall(ks, config, hdr->target_name[tid], pos, width, nmethyl, nunmethyl, base, NULL, NULL);
         last->tid = -1;
     } else {
         if(last->tid != -1) {
-            writeCall(ks, config, hdr->target_name[last->tid], last->pos, width, last->nmethyl, last->nunmethyl, base);
+            writeCall(ks, config, hdr->target_name[last->tid], last->pos, width, last->nmethyl, last->nunmethyl, base, NULL, NULL);
         }
         last->tid = tid;
         last->pos = pos;
@@ -118,12 +242,14 @@ void *extractCalls(void *foo) {
     int ret, tid, pos, i, seqlen, type, rv, o = 0;
     int32_t bedIdx = 0;
     int n_plp; //This will need to be modified for multiple input files
-    int strand;
+    int strand, direction;
     uint32_t nmethyl = 0, nunmethyl = 0, nOff = 0, nVariant = 0;
-    uint32_t localBin = 0, localPos = 0, localEnd = 0, localTid = 0;
+    uint32_t localBin = 0, localPos = 0, localEnd = 0, localTid = 0, localPos2 = 0, lastPos = 0;
     uint64_t nVariantPositions = 0;
     const bam_pileup1_t **plp = NULL;
     char *seq = NULL, base = 'A';
+    char context[3] = "HG";
+    int tnc;
     mplp_data *data = NULL;
     struct lastCall *lastCpG = NULL;
     struct lastCall *lastCHG = NULL;
@@ -232,6 +358,11 @@ void *extractCalls(void *foo) {
                 continue;
             }
         }
+        localPos2 = 0;
+        if(localPos > 1) {
+            localPos2 = localPos - 2;
+        }
+        lastPos = localPos;
 
 
         //Break out of the loop if finished
@@ -239,10 +370,10 @@ void *extractCalls(void *foo) {
         if(globalEnd && localPos >= globalEnd) break;
         data->iter = sam_itr_queryi(bai, localTid, localPos, localEnd);
 
-        seq = faidx_fetch_seq(fai, hdr->target_name[localTid], localPos, localEnd+10, &seqlen);
+        seq = faidx_fetch_seq(fai, hdr->target_name[localTid], localPos2, localEnd+10, &seqlen);
         if(seqlen < 0) {
             fprintf(stderr, "faidx_fetch_seq returned %i while trying to fetch the sequence for tid %s:%"PRIu32"-%"PRIu32"!\n",\
-                seqlen, hdr->target_name[localTid], localPos, localEnd);
+                seqlen, hdr->target_name[localTid], localPos2, localEnd);
             fprintf(stderr, "Note that the output will be truncated!\n");
             return NULL;
         }
@@ -259,13 +390,13 @@ void *extractCalls(void *foo) {
                 if(o == 0) continue; //Wrong strand
             }
 
-            if(isCpG(seq, pos-localPos, seqlen)) {
+            if((direction = isCpG(seq, pos-localPos2, seqlen))) {
                 if(!config->keepCpG) continue;
                 type = 0;
-            } else if(isCHG(seq, pos-localPos, seqlen)) {
+            } else if((direction = isCHG(seq, pos-localPos2, seqlen))) {
                 if(!config->keepCHG) continue;
                 type = 1;
-            } else if(isCHH(seq, pos-localPos, seqlen)) {
+            } else if((direction = isCHH(seq, pos-localPos2, seqlen))) {
                 if(!config->keepCHH) continue;
                 type = 2;
             } else {
@@ -273,7 +404,7 @@ void *extractCalls(void *foo) {
             }
 
             nmethyl = nunmethyl = nVariant = nOff = 0;
-            base = *(seq+pos-localPos);
+            base = *(seq+pos-localPos2);
             for(i=0; i<n_plp; i++) {
                 if(plp[0][i].is_del) continue;
                 if(plp[0][i].is_refskip) continue;
@@ -313,9 +444,27 @@ void *extractCalls(void *foo) {
                 continue;
             }
 
-            if(nmethyl+nunmethyl==0) continue;
-            if(!config->merge || type==2) {
-                writeCall(os[type], config, hdr->target_name[tid], pos, 1, nmethyl, nunmethyl, base);
+            if(nmethyl+nunmethyl==0 && config->cytosine_report == 0) continue;
+            if(!config->merge || type==2) { //Also, cytosine report
+                if(config->cytosine_report) {
+                    writeBlank(os, config, hdr->target_name[tid], pos, localPos2, &lastPos, seq, seqlen);
+
+                    //Set the C-context
+                    if(type == 0) {
+                        context[0] = 'G'; context[1] = 0;
+                    } else if(type == 1) {
+                        context[0] = 'H'; context[1] = 'G';
+                    } else {
+                        context[0] = 'H'; context[1] = 'H';
+                    }
+
+                    //Set the trinucleotide context
+                    tnc = getTriNucContext(seq, pos - localPos2, seqlen, direction);
+
+                    writeCall(os[0], config, hdr->target_name[tid], pos, 1, nmethyl, nunmethyl, base, context, TriNucleotideContexts[tnc]);
+                } else {
+                    writeCall(os[type], config, hdr->target_name[tid], pos, 1, nmethyl, nunmethyl, base, NULL, NULL);
+                }
             } else {
                 //Merge into per-CpG/CHG metrics
                 if(type==0) {
@@ -326,6 +475,7 @@ void *extractCalls(void *foo) {
                     processLast(os_CHG, config, lastCHG, hdr, tid, pos, 3, nmethyl, nunmethyl, base);
                 }
             }
+            lastPos = pos+1;
         }
         bam_mplp_destroy(iter);
 
@@ -341,6 +491,8 @@ void *extractCalls(void *foo) {
                 processLast(os_CHG, config, lastCHG, hdr, tid, pos, 3, nmethyl, nunmethyl, base);
                 lastCHG->tid = -1;
             }
+        } else if(config->cytosine_report) {
+            writeBlank(os, config, hdr->target_name[tid], localEnd, localPos2, &lastPos, seq, seqlen);
         }
         hts_itr_destroy(data->iter);
         free(seq);
@@ -470,6 +622,16 @@ void extract_usage() {
 "                  0.0. See also --minOppositeDepth.\n"
 " --methylKit      Output in the format required by methylKit. Note that this is\n"
 "                  incompatible with --mergeContext, --fraction and --counts.\n"
+" --cytosine_report  A per-base exhaustive report comparable to that produced\n"
+"                  with the same option in Bismark's methylation extractor. The\n"
+"                  output is a tab-separated file with the following columns:\n"
+"                  chromosome, position (1-based), strand, number of alignments\n"
+"                  supporting methylation, number of alignments supporting\n"
+"                  unmethylation, CG/CHG/CHH, trinucleotide context. This is not\n"
+"                  compatible with --fraction, --counts, --methylKit, or\n"
+"                  --mergeContext. The produces a single file with a\n"
+"                  .cytosine_report.txt extension. Note that even bases with no\n"
+"                  coverage will be included in the output.\n"
 " --OT INT,INT,INT,INT Inclusion bounds for methylation calls from reads/pairs\n"
 "                  originating from the original top strand. Suggested values can\n"
 "                  be obtained from the MBias program. Each integer represents a\n"
@@ -530,6 +692,7 @@ int extract_main(int argc, char *argv[]) {
     config.requireFlags = 0;
     config.nThreads = 1;
     config.chunkSize = 1000000;
+    config.cytosine_report = 0;
     for(i=0; i<16; i++) config.bounds[i] = 0;
     for(i=0; i<16; i++) config.absoluteBounds[i] = 0;
 
@@ -559,6 +722,7 @@ int extract_main(int argc, char *argv[]) {
         {"maxVariantFrac", 1, NULL, 18},
         {"chunkSize",    1, NULL,  19},
         {"keepStrand",   0, NULL,  20},
+        {"cytosine_report", 0, NULL, 21},
         {"ignoreFlags",  1, NULL, 'F'},
         {"requireFlags", 1, NULL, 'R'},
         {"help",         0, NULL, 'h'},
@@ -656,6 +820,9 @@ int extract_main(int argc, char *argv[]) {
         case 20:
             keepStrand = 1;
             break;
+        case 21:
+            config.cytosine_report = 1;
+            break;
         case 'F':
             config.ignoreFlags = atoi(optarg);
             break;
@@ -707,13 +874,18 @@ int extract_main(int argc, char *argv[]) {
         fprintf(stderr, "-q %i is invalid. Resetting to 0, which is the lowest possible value.\n", config.minMapq);
         config.minMapq = 0;
     }
-    if(config.fraction+config.counts+config.logit+config.methylKit > 1) {
-        fprintf(stderr, "More than one of --fraction, --counts, --methylKit and --logit were specified. These are mutually exclusive.\n");
+    if(config.fraction+config.counts+config.logit+config.methylKit+config.cytosine_report > 1) {
+        fprintf(stderr, "More than one of --fraction, --counts, --methylKit, --cytosine_report and --logit were specified. These are mutually exclusive.\n");
         extract_usage();
         return 1;
     }
     if(config.methylKit + config.merge == 2) {
         fprintf(stderr, "--mergeContext and --methylKit are mutually exclusive.\n");
+        extract_usage();
+        return 1;
+    }
+    if(config.cytosine_report + config.merge == 2) {
+        fprintf(stderr, "--mergeContext and --cytosine_report are mutually exclusive.\n");
         extract_usage();
         return 1;
     }
@@ -767,11 +939,17 @@ int extract_main(int argc, char *argv[]) {
         oname = malloc(sizeof(char) * (strlen(opref)+20));
     } else if(config.methylKit) {
         oname = malloc(sizeof(char) * (strlen(opref)+15));
+    } else if(config.cytosine_report) {
+        oname = malloc(sizeof(char) * (strlen(opref)+21));
+        sprintf(oname, "%s.cytosine_report.txt", opref);
+        config.output_fp[0] = fopen(oname, "w");
+        config.output_fp[1] = config.output_fp[0];
+        config.output_fp[2] = config.output_fp[0];
     } else { 
         oname = malloc(sizeof(char) * (strlen(opref)+14));
     }
     assert(oname);
-    if(config.keepCpG) {
+    if(config.keepCpG && !config.cytosine_report) {
         if(config.fraction) { 
             sprintf(oname, "%s_CpG.meth.bedGraph", opref);
         } else if(config.counts) {
@@ -794,7 +972,7 @@ int extract_main(int argc, char *argv[]) {
             printHeader(config.output_fp[0], "CpG", opref, config);
         }
     }
-    if(config.keepCHG) {
+    if(config.keepCHG && !config.cytosine_report) {
         if(config.fraction) { 
             sprintf(oname, "%s_CHG.meth.bedGraph", opref);
         } else if(config.counts) {
@@ -817,7 +995,7 @@ int extract_main(int argc, char *argv[]) {
             printHeader(config.output_fp[1], "CHG", opref, config);
         }
     }
-    if(config.keepCHH) {
+    if(config.keepCHH && !config.cytosine_report) {
         if(config.fraction) { 
             sprintf(oname, "%s_CHH.meth.bedGraph", opref);
         } else if(config.counts) {
@@ -893,9 +1071,10 @@ int extract_main(int argc, char *argv[]) {
 
     //Close things up
     hts_close(config.fp);
-    if(config.keepCpG) fclose(config.output_fp[0]);
-    if(config.keepCHG) fclose(config.output_fp[1]);
-    if(config.keepCHH) fclose(config.output_fp[2]);
+    if(config.cytosine_report) fclose(config.output_fp[0]);
+    if(config.keepCpG && !config.cytosine_report) fclose(config.output_fp[0]);
+    if(config.keepCHG && !config.cytosine_report) fclose(config.output_fp[1]);
+    if(config.keepCHH && !config.cytosine_report) fclose(config.output_fp[2]);
     hts_idx_destroy(config.bai);
     free(opref);
     if(config.bed) destroyBED(config.bed);
