@@ -38,6 +38,8 @@ By default, MethylDackel will only calculate metrics for Cytosines in a CpG cont
 
 MethylDackel can filter reads and bases according to MAPQ and Phred score, respectively. The default minimums are MAPQ >= 10 and Phred >= 5, though these can be changed with the -q and -p options. MethylDackel can also account for methylation bias (described below) with the `--OT`, `--OB`, `--CTOT`, and `--CTOB` options.
 
+Only the alignments listed as "first in pair" are relevant when tabulating the number of methylated and unmethylation bases in the context of a C in the reference (and only "second in pair" for G in the reference). The opposite strand reads do not contain any methylation information at that position and are not considered.
+
 A note on overlapping reads
 ===========================
 
