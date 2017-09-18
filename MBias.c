@@ -184,7 +184,7 @@ void *extractMBias(void *foo) {
                 } else {
                     if(base != 'G' && base != 'g') continue;
                 }
-                rv = updateMetrics(config, plp[0]+i);
+                rv = updateMetrics(config, plp[0]+i, NULL);
                 if(rv != 0) {
                     if((plp[0]+i)->qpos >= meths[strand-1]->m)
                         meths[strand-1] = growStrandMeth(meths[strand-1], (plp[0]+i)->qpos);

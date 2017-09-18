@@ -3,6 +3,9 @@
 #include <zlib.h>
 #include "htslib/sam.h"
 #include "htslib/faidx.h"
+#include "htslib/khash.h"
+
+KHASH_MAP_INIT_STR(32, short)
 
 //These are needed to handle multiple threads
 pthread_mutex_t positionMutex;
@@ -61,6 +64,7 @@ typedef struct {
  @field merge   1: Merge Cs in either a CpG or CHG context into single entries
  @field methylKit       Output in a format compatible with methylKit
  @field minOppositeDepth	Minimum depth covering the opposite strand needed to look for variants
+ @field foo	1: We're using the foo protocol
  @field maxVariantFrac	If the fraction of non-Gs on the opposite strand is greater than this then a position is excluded.
  @field fraction	1: Output should be the methylation fraction only, 0: otherwise
  @field counts	1: Output just the coverage
@@ -84,6 +88,7 @@ typedef struct {
     int minMapq, minPhred, keepDupes, maxDepth, minDepth;
     int keepDiscordant, keepSingleton, ignoreFlags, requireFlags;
     int merge, methylKit, minOppositeDepth;
+    int foo;
     double maxVariantFrac;
     int fraction, counts, logit;
     int cytosine_report;
@@ -152,7 +157,7 @@ void destroyBED(bedRegions *regions);
 bedRegions *parseBED(char *fn, bam_hdr_t *hdr, int keepStrand);
 
 //pileup.c
-int cust_mplp_auto(bam_mplp_t iter, int *_tid, int *_pos, int *n_plp, const bam_pileup1_t **plp);
+int cust_mplp_auto(bam_mplp_t iter, int *_tid, int *_pos, int *n_plp, const bam_pileup1_t **plp, int foo);
 
 //svg.c
 /*! @function
@@ -202,7 +207,7 @@ int getStrand(bam1_t *b);
 int filter_func(void *data, bam1_t *b);
 
 //Used internally by the pileup-based functions
-int updateMetrics(Config *config, const bam_pileup1_t *plp);
+int updateMetrics(Config *config, const bam_pileup1_t *plp, khash_t(32) *h);
 
 //Used internally to parse things like --OT 0,1,2,3
 void parseBounds(char *s2, int *vals, int mult);

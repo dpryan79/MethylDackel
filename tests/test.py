@@ -90,3 +90,11 @@ assert op.exists('test9_CpG.bedGraph')
 lines = sum(1 for _ in open('test9_CpG.bedGraph'))
 assert lines == 48
 rm('test9_CpG.bedGraph')
+
+# Check --foo and variants
+rm('foo_CpG.bedGraph')
+check_call('../MethylDackel extract -o test10 --minOppositeDepth 1 --foo cg100.fa foo.bam', shell=True)
+assert op.exists('test10_CpG.bedGraph')
+lines = sum(1 for _ in open('test10_CpG.bedGraph'))
+assert lines == 7
+rm('test10_CpG.bedGraph')

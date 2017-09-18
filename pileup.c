@@ -160,8 +160,7 @@ quit :
 }
 
 //This is a modified version of overlap_push()
-static void cust_overlap_push(bam_plp_t iter, lbnode_t *node)
-{
+static void cust_overlap_push(bam_plp_t iter, lbnode_t *node, int foo) {
     if ( !iter->overlaps ) return;
 
     // mapped mates only
@@ -186,7 +185,7 @@ static void cust_overlap_push(bam_plp_t iter, lbnode_t *node)
     else
     {
         lbnode_t *a = kh_value(iter->overlaps, kitr);
-        cust_tweak_overlap_quality(&a->b, &node->b);
+        if(!foo) cust_tweak_overlap_quality(&a->b, &node->b);
         kh_del(olap_hash, iter->overlaps, kitr);
         assert(a->end-1 == a->s.end);
         a->end = a->b.core.pos + bam_cigar2rlen(a->b.core.n_cigar, bam_get_cigar(&a->b));
@@ -212,8 +211,7 @@ static void cust_overlap_remove(bam_plp_t iter, const bam1_t *b) {
 
 
 //This is essentially just bam_plp_push()
-int cust_plp_push(bam_plp_t iter, const bam1_t *b)
-{
+int cust_plp_push(bam_plp_t iter, const bam1_t *b, int foo) {
     if (iter->error) return -1;
     if (b) {
         if (b->core.tid < 0) { cust_overlap_remove(iter, b); return 0; }
@@ -225,7 +223,7 @@ int cust_plp_push(bam_plp_t iter, const bam1_t *b)
             return 0;
         }
         bam_copy1(&iter->tail->b, b);
-        cust_overlap_push(iter, iter->tail);
+        cust_overlap_push(iter, iter->tail, foo);
         iter->tail->beg = b->core.pos;
         iter->tail->end = b->core.pos + bam_cigar2rlen(b->core.n_cigar, bam_get_cigar(b));
         iter->tail->s = g_cstate_null; iter->tail->s.end = iter->tail->end - 1; // initialize cstate_t
@@ -249,8 +247,7 @@ int cust_plp_push(bam_plp_t iter, const bam1_t *b)
 }
 
 //This is essentially just bam_plp_auto
-const bam_pileup1_t *cust_plp_auto(bam_plp_t iter, int *_tid, int *_pos, int *_n_plp)
-{
+const bam_pileup1_t *cust_plp_auto(bam_plp_t iter, int *_tid, int *_pos, int *_n_plp, int foo) {
     const bam_pileup1_t *plp;
     if (iter->func == 0 || iter->error) { *_n_plp = -1; return 0; }
     if ((plp = bam_plp_next(iter, _tid, _pos, _n_plp)) != 0) return plp;
@@ -259,7 +256,7 @@ const bam_pileup1_t *cust_plp_auto(bam_plp_t iter, int *_tid, int *_pos, int *_n
         if (iter->is_eof) return 0;
         int ret;
         while ( (ret=iter->func(iter->data, iter->b)) >= 0) {
-            if (cust_plp_push(iter, iter->b) < 0) {
+            if (cust_plp_push(iter, iter->b, foo) < 0) {
                 *_n_plp = -1;
                 return 0;
             }
@@ -275,14 +272,14 @@ const bam_pileup1_t *cust_plp_auto(bam_plp_t iter, int *_tid, int *_pos, int *_n
 
 
 //This is essentially just bam_mplp_auto from htslib
-int cust_mplp_auto(bam_mplp_t iter, int *_tid, int *_pos, int *n_plp, const bam_pileup1_t **plp)
+int cust_mplp_auto(bam_mplp_t iter, int *_tid, int *_pos, int *n_plp, const bam_pileup1_t **plp, int foo)
 {
     int i, ret = 0;
     uint64_t new_min = (uint64_t)-1;
     for (i = 0; i < iter->n; ++i) {
         if (iter->pos[i] == iter->min) {
             int tid, pos;
-            iter->plp[i] = cust_plp_auto(iter->iter[i], &tid, &pos, &iter->n_plp[i]);
+            iter->plp[i] = cust_plp_auto(iter->iter[i], &tid, &pos, &iter->n_plp[i], foo);
             if ( iter->iter[i]->error ) return -1;
             iter->pos[i] = iter->plp[i] ? (uint64_t)tid<<32 | pos : 0;
         }

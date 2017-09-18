@@ -23,7 +23,7 @@ inline double logit(double p) {
 //N.B., a tid of -1 means that the lastCall was written
 struct lastCall{
     int32_t tid, pos;
-    uint32_t nmethyl, nunmethyl;
+    uint32_t nmethyl, nunmethyl, nfoo;
 };
 
 const char *quux[2] = {"foo", "bar"};
@@ -32,6 +32,64 @@ const char *TriNucleotideContexts[25] = {"CAA", "CAC", "CAG", "CAT", "CAN", \
                                          "CGA", "CGC", "CGG", "CGT", "CGN", \
                                          "CTA", "CTC", "CTG", "CTT", "CTN", \
                                          "CNA", "CNC", "CNG", "CNT", "CNN"};
+
+//A temporary variant of writeCall that can handle foo in a likely non-ideal manner
+void writeFoo(kstring_t *ks, Config *config, char *chrom, int32_t pos, int32_t width, uint32_t nmethyl, uint32_t nunmethyl, uint32_t nfoo, char base) {
+    char str[10000]; // I don't really like hardcoding it, but given the probability that it ever won't suffice...
+    char strand = (base=='C' || base=='c') ? 'F' : 'R';
+    if(nmethyl+nunmethyl+nfoo < config->minDepth && !config->cytosine_report) return;
+
+    if (!config->fraction && !config->logit && !config->counts && !config->methylKit && !config->cytosine_report) {
+        snprintf(str, 10000, \
+            "%s\t%i\t%i\t%i\t%i\t%" PRIu32 "\t%" PRIu32 "\t%" PRIu32"\n", \
+            chrom, \
+            pos, \
+            pos+width, \
+            (int) (100.0*((double) nmethyl)/(nmethyl+nunmethyl+nfoo)),\
+            (int) (100.0*((double) nfoo)/(nmethyl+nunmethyl+nfoo)),\
+            nmethyl, \
+            nfoo, \
+            nunmethyl);
+    } else if(config->fraction) {
+        snprintf(str, 10000, \
+            "%s\t%i\t%i\t%f\t%f\n", \
+            chrom, \
+            pos, \
+            pos+width, \
+            ((double) nmethyl)/(nmethyl+nunmethyl+nfoo),
+            ((double) nfoo)/(nmethyl+nunmethyl+nfoo));
+    } else if(config->counts) {
+        snprintf(str, 10000, \
+            "%s\t%i\t%i\t%i\n", \
+            chrom, \
+            pos, \
+            pos+width, \
+            nmethyl+nunmethyl+nfoo);
+    } else if(config->logit) {
+        snprintf(str, 10000, \
+            "%s\t%i\t%i\t%f\t%f\n", \
+            chrom, \
+            pos, \
+            pos+width, \
+            logit(((double) nmethyl)/(nmethyl+nunmethyl)),
+            logit(((double) nfoo)/(nmethyl+nunmethyl)));
+    } else if(config->methylKit) {
+        snprintf(str, 10000, \
+            "%s.%i\t%s\t%i\t%c\t%i\t%6.2f\t%6.2f\t%6.2f\n", \
+            chrom, \
+            pos+1, \
+            chrom, \
+            pos+1, \
+            strand, \
+            nmethyl+nunmethyl+nfoo, \
+            100.0 * ((double) nmethyl)/(nmethyl+nunmethyl+nfoo), \
+            100.0 * ((double) nfoo)/(nmethyl+nunmethyl+nfoo), \
+            100.0 * ((double) nunmethyl)/(nmethyl+nunmethyl+nfoo));
+    }
+
+    kputs(str, ks);
+}
+
 
 void writeCall(kstring_t *ks, Config *config, char *chrom, int32_t pos, int32_t width, uint32_t nmethyl, uint32_t nunmethyl, char base, char *context, const char *tnc) { 
     char str[10000]; // I don't really like hardcoding it, but given the probability that it ever won't suffice...
@@ -235,6 +293,37 @@ int isVariant(Config *config, const bam_pileup1_t *plp, uint32_t *coverage, int 
     }
 }
 
+// Incompatible CpG base combination in the foo protocol supporting a variant
+// Only FF and RR pairs are compatible with this!
+// Returns 1 on variant, otherwise 0
+// coverage is incremented in a bit more sophisticated a manner
+int isVariantFoo(Config *config, const bam_pileup1_t *plp, char base, uint32_t *coverage) {
+    uint8_t rbase = bam_seqi(bam_get_seq(plp->b), plp->qpos);
+    if(rbase == 15) return 0; //N is never a SNP
+
+    //Is the phred score even high enough?
+    if(bam_get_qual(plp->b)[plp->qpos] < config->minPhred) return 0;
+
+    if(base == 'C' || base == 'c') {
+        if(plp->b->core.flag & BAM_FREAD1) { // Allowed bases: C
+            *coverage += 1;
+            if(rbase == 2) return 0;
+        } else if(plp->b->core.flag & BAM_FREAD2) { // Allowed bases: C, T
+            if(rbase == 2 || rbase == 8) return 0;
+            else *coverage += 1;
+        }
+    } else {
+        if(plp->b->core.flag & BAM_FREAD1) { // Allowed bases: G, A
+           if(rbase == 1  || rbase == 4) return 0;
+            else *coverage += 1;
+        } else if(plp->b->core.flag & BAM_FREAD2) { // Allowed bases: G
+            *coverage += 1;
+            if(rbase == 4) return 0;
+        }
+    }
+    return 1;
+}
+
 void *extractCalls(void *foo) {
     Config *config = (Config*) foo;
     bam_hdr_t *hdr;
@@ -243,7 +332,7 @@ void *extractCalls(void *foo) {
     int32_t bedIdx = 0;
     int n_plp; //This will need to be modified for multiple input files
     int strand, direction;
-    uint32_t nmethyl = 0, nunmethyl = 0, nOff = 0, nVariant = 0;
+    uint32_t noSkip = 0, nmethyl = 0, nunmethyl = 0, nfoo = 0, nOff = 0, nVariant = 0;
     uint32_t localBin = 0, localPos = 0, localEnd = 0, localTid = 0, localPos2 = 0, lastPos = 0;
     uint64_t nVariantPositions = 0;
     const bam_pileup1_t **plp = NULL;
@@ -257,6 +346,7 @@ void *extractCalls(void *foo) {
     faidx_t *fai;
     hts_idx_t *bai;
     htsFile *fp;
+    khash_t(32) *h = kh_init(32);
 
     os = calloc(3, sizeof(kstring_t*));
     os_CpG = calloc(1, sizeof(kstring_t));
@@ -285,7 +375,7 @@ void *extractCalls(void *foo) {
     }
     hdr = sam_hdr_read(fp);
 
-    if(config->merge) {
+    if(config->merge || config->foo) {
         if(config->keepCpG) {
             lastCpG = calloc(1, sizeof(struct lastCall));
             assert(lastCpG);
@@ -382,7 +472,7 @@ void *extractCalls(void *foo) {
         iter = bam_mplp_init(1, filter_func, (void **) &data);
         bam_mplp_init_overlaps(iter);
         bam_mplp_set_maxcnt(iter, config->maxDepth);
-        while((ret = cust_mplp_auto(iter, &tid, &pos, &n_plp, plp)) > 0) {
+        while((ret = cust_mplp_auto(iter, &tid, &pos, &n_plp, plp, config->foo)) > 0) {
             if(pos < localPos || pos >= localEnd) continue; // out of the region requested
 
             if(config->bed) { //Handle -l
@@ -403,33 +493,53 @@ void *extractCalls(void *foo) {
                 continue;
             }
 
-            nmethyl = nunmethyl = nVariant = nOff = 0;
+            noSkip = nmethyl = nunmethyl = nfoo = nVariant = nOff = 0;
             base = *(seq+pos-localPos2);
+
+            //Reset the hash if needed
+            if(config->foo && type == 0) {
+                if(base == 'C' || base == 'c') {
+                    kh_clear(32, h);
+                } else if(pos - lastCpG->pos > 1) {
+                    kh_clear(32, h);
+                }
+            }
+
             for(i=0; i<n_plp; i++) {
                 if(plp[0][i].is_del) continue;
                 if(plp[0][i].is_refskip) continue;
                 if(config->bed) if(!readStrandOverlapsBED(plp[0][i].b, config->bed->region[bedIdx])) continue;
-                strand = getStrand((plp[0]+i)->b);
-                if(strand & 1) {
-                    if(base != 'C' && base != 'c') {
-                        nVariant += isVariant(config, plp[0]+i, &nOff, strand);
-                        continue;
+                if(!config->foo) {
+                    strand = getStrand((plp[0]+i)->b);
+                    if(strand & 1) {
+                        if(base != 'C' && base != 'c') {
+                            nVariant += isVariant(config, plp[0]+i, &nOff, strand);
+                            continue;
+                        }
+                    } else {
+                        if(base != 'G' && base != 'g') {
+                            nVariant += isVariant(config, plp[0]+i, &nOff, strand);
+                            continue;
+                        }
                     }
                 } else {
-                    if(base != 'G' && base != 'g') {
-                        nVariant += isVariant(config, plp[0]+i, &nOff, strand);
+                    if(isVariantFoo(config, plp[0]+i, base, &nOff)) {
+                        nVariant++;
                         continue;
                     }
                 }
-                rv = updateMetrics(config, plp[0]+i);
-                if(rv > 0) nmethyl++;
-                else if(rv<0) nunmethyl++;
+
+                rv = updateMetrics(config, plp[0]+i, h);
+                if(rv == 1) nmethyl++;
+                else if(rv == 2) nfoo++;
+                else if(rv == -1) nunmethyl++;
+                else if(rv == -2) noSkip++;
             }
 
             // Skip likely variant positions
             if(config->minOppositeDepth > 0 && \
                nOff >= config->minOppositeDepth && \
-               ((double) nVariant) / ((double) nOff) >= config->maxVariantFrac) {
+               ((double) nVariant) / ((double) nOff) > config->maxVariantFrac) {
                 nVariantPositions++;
                 //If we're merging context, then skip an entire merged site
                 if(config->merge) {
@@ -444,7 +554,13 @@ void *extractCalls(void *foo) {
                 continue;
             }
 
-            if(nmethyl+nunmethyl==0 && config->cytosine_report == 0) continue;
+            if(config->foo && noSkip && nmethyl+nunmethyl+nfoo == 0) {
+                lastCpG->pos = pos;
+                lastCpG->nmethyl = nmethyl;
+                lastCpG->nunmethyl = nunmethyl;
+                lastCpG->nfoo = nfoo;
+            }
+            if(nmethyl+nunmethyl+nfoo == 0 && config->cytosine_report == 0) continue;
             if(!config->merge || type==2) { //Also, cytosine report
                 if(config->cytosine_report) {
                     writeBlank(os, config, hdr->target_name[tid], pos, localPos2, &lastPos, seq, seqlen);
@@ -463,7 +579,11 @@ void *extractCalls(void *foo) {
 
                     writeCall(os[0], config, hdr->target_name[tid], pos, 1, nmethyl, nunmethyl, base, context, TriNucleotideContexts[tnc]);
                 } else {
-                    writeCall(os[type], config, hdr->target_name[tid], pos, 1, nmethyl, nunmethyl, base, NULL, NULL);
+                    if(config->foo) {
+                        writeFoo(os[type], config, hdr->target_name[tid], pos, 1, nmethyl, nunmethyl, nfoo, base);
+                    } else {
+                        writeCall(os[type], config, hdr->target_name[tid], pos, 1, nmethyl, nunmethyl, base, NULL, NULL);
+                    }
                 }
             } else {
                 //Merge into per-CpG/CHG metrics
@@ -531,6 +651,7 @@ void *extractCalls(void *foo) {
     hts_idx_destroy(bai);
     free(data);
     free(plp);
+    kh_destroy(32, h);
     if(config->merge) {
         if(config->keepCpG) free(lastCpG);
         if(config->keepCHG) free(lastCHG);
@@ -544,13 +665,131 @@ void *extractCalls(void *foo) {
     return NULL;
 }
 
-void printHeader(FILE *of, char *context, char *opref, Config config) {
+void printHeader(FILE *of, char *context, char *opref, Config *config) {
     fprintf(of, "track type=\"bedGraph\" description=\"%s %s", opref, context);
-    if(config.merge) fprintf(of, " merged");
-    if(config.fraction) fprintf(of, " methylation fractions\"\n");
-    else if(config.counts) fprintf(of, " methylation counts\"\n");
-    else if(config.logit) fprintf(of, " logit transformed methylation fractions\"\n");
+    if(config->merge) fprintf(of, " merged");
+    if(config->fraction) fprintf(of, " methylation fractions\"\n");
+    else if(config->counts) fprintf(of, " methylation counts\"\n");
+    else if(config->logit) fprintf(of, " logit transformed methylation fractions\"\n");
     else fprintf(of, " methylation levels\"\n");
+}
+
+//Open the various output files, returns 1 on error, 0 otherwise
+//This frees opref!
+int setupOutputFiles(Config *config, char *opref, char *argv[], int optind) {
+    char *oname, *p;
+
+    config->output_fp = malloc(sizeof(FILE *) * 3);
+    if(!config->output_fp) {
+        fprintf(stderr, "[setupOutputFiles] Memory allocation error (1)!\n");
+        return 1;
+    }
+
+    if(opref == NULL) {
+        opref = strdup(argv[optind+1]);
+        if(!opref) {
+            free(opref);
+            fprintf(stderr, "[setupOutputFiles] Memory allocation error (1)!\n");
+            return 1;
+        }
+        p = strrchr(opref, '.');
+        if(p != NULL) *p = '\0';
+        fprintf(stderr, "writing to prefix:'%s'\n", opref);
+    }
+
+    if(config->fraction) {
+        oname = malloc(sizeof(char) * (strlen(opref)+19));
+    } else if(config->counts) {
+        oname = malloc(sizeof(char) * (strlen(opref)+21));
+    } else if(config->logit) {
+        oname = malloc(sizeof(char) * (strlen(opref)+20));
+    } else if(config->methylKit) {
+        oname = malloc(sizeof(char) * (strlen(opref)+15));
+    } else if(config->cytosine_report) {
+        oname = malloc(sizeof(char) * (strlen(opref)+21));
+        sprintf(oname, "%s.cytosine_report.txt", opref);
+        config->output_fp[0] = fopen(oname, "w");
+        config->output_fp[1] = config->output_fp[0];
+        config->output_fp[2] = config->output_fp[0];
+    } else {
+        oname = malloc(sizeof(char) * (strlen(opref)+14));
+    }
+    assert(oname);
+    if(config->keepCpG && !config->cytosine_report) {
+        if(config->fraction) {
+            sprintf(oname, "%s_CpG.meth.bedGraph", opref);
+        } else if(config->counts) {
+            sprintf(oname, "%s_CpG.counts.bedGraph", opref);
+        } else if(config->logit) {
+            sprintf(oname, "%s_CpG.logit.bedGraph", opref);
+        } else if(config->methylKit) {
+            sprintf(oname, "%s_CpG.methylKit", opref);
+        } else {
+            sprintf(oname, "%s_CpG.bedGraph", opref);
+        }
+        config->output_fp[0] = fopen(oname, "w");
+        if(config->output_fp[0] == NULL) {
+            fprintf(stderr, "Couldn't open the output CpG metrics file for writing! Insufficient permissions?\n");
+            return -3;
+        }
+        if(config->methylKit) {
+            fprintf(config->output_fp[0], "chrBase\tchr\tbase\tstrand\tcoverage\tfreqC\tfreqT\n");
+        } else {
+            printHeader(config->output_fp[0], "CpG", opref, config);
+        }
+    }
+
+    if(config->keepCHG && !config->cytosine_report) {
+        if(config->fraction) {
+            sprintf(oname, "%s_CHG.meth.bedGraph", opref);
+        } else if(config->counts) {
+            sprintf(oname, "%s_CHG.counts.bedGraph", opref);
+        } else if(config->logit) {
+            sprintf(oname, "%s_CHG.logit.bedGraph", opref);
+        } else if(config->methylKit) {
+            sprintf(oname, "%s_CHG.methylKit", opref);
+        } else {
+            sprintf(oname, "%s_CHG.bedGraph", opref);
+        }
+        config->output_fp[1] = fopen(oname, "w");
+        if(config->output_fp[1] == NULL) {
+            fprintf(stderr, "Couldn't open the output CHG metrics file for writing! Insufficient permissions?\n");
+            return -3;
+        }
+        if(config->methylKit) {
+            fprintf(config->output_fp[1], "chrBase\tchr\tbase\tstrand\tcoverage\tfreqC\tfreqT\n");
+        } else {
+            printHeader(config->output_fp[1], "CHG", opref, config);
+        }
+    }
+
+    if(config->keepCHH && !config->cytosine_report) {
+        if(config->fraction) {
+            sprintf(oname, "%s_CHH.meth.bedGraph", opref);
+        } else if(config->counts) {
+            sprintf(oname, "%s_CHH.counts.bedGraph", opref);
+        } else if(config->logit) {
+            sprintf(oname, "%s_CHH.logit.bedGraph", opref);
+        } else if(config->methylKit) {
+            sprintf(oname, "%s_CHH.methylKit", opref);
+        } else {
+            sprintf(oname, "%s_CHH.bedGraph", opref);
+        }
+        config->output_fp[2] = fopen(oname, "w");
+        if(config->output_fp[2] == NULL) {
+            fprintf(stderr, "Couldn't open the output CHH metrics file for writing! Insufficient permissions?\n");
+            return -3;
+        }
+        if(config->methylKit) {
+            fprintf(config->output_fp[2], "chrBase\tchr\tbase\tstrand\tcoverage\tfreqC\tfreqT\n");
+        } else {
+            printHeader(config->output_fp[2], "CHH", opref, config);
+        }
+    }
+
+    free(opref);
+    free(oname);
+    return 0;
 }
 
 void extract_usage() {
@@ -600,6 +839,13 @@ void extract_usage() {
 " --noCpG          Do not output CpG context methylation metrics\n"
 " --CHG            Output CHG context methylation metrics\n"
 " --CHH            Output CHH context methylation metrics\n"
+" --foo            Foo the bar, with all of the required sniggly. At the moment\n"
+"                  you can't --foo with all of the options (e.g., --keepCHG).\n"
+"                  Note further that the documented output formats are then\n"
+"                  modified to account for foo possibly being present. If there\n"
+"                  are normally columns for mC and C, then there is a column for\n"
+"                  foo added between them. This disables --keepSingleton and\n"
+"                  sets --keepDiscordant.\n"
 " --fraction       Extract fractional methylation (only) at each position. This\n"
 "                  produces a file with a .meth.bedGraph extension.\n"
 " --counts         Extract base counts (only) at each position. This produces a\n"
@@ -663,7 +909,7 @@ void extract_usage() {
 }
 
 int extract_main(int argc, char *argv[]) {
-    char *opref = NULL, *oname, *p;
+    char *opref = NULL;
     int c, i, keepStrand = 0;
     Config config;
     bam_hdr_t *hdr = NULL;
@@ -693,6 +939,7 @@ int extract_main(int argc, char *argv[]) {
     config.nThreads = 1;
     config.chunkSize = 1000000;
     config.cytosine_report = 0;
+    config.foo = 0;
     for(i=0; i<16; i++) config.bounds[i] = 0;
     for(i=0; i<16; i++) config.absoluteBounds[i] = 0;
 
@@ -723,6 +970,7 @@ int extract_main(int argc, char *argv[]) {
         {"chunkSize",    1, NULL,  19},
         {"keepStrand",   0, NULL,  20},
         {"cytosine_report", 0, NULL, 21},
+        {"foo",          0, NULL,  22},
         {"ignoreFlags",  1, NULL, 'F'},
         {"requireFlags", 1, NULL, 'R'},
         {"help",         0, NULL, 'h'},
@@ -823,6 +1071,9 @@ int extract_main(int argc, char *argv[]) {
         case 21:
             config.cytosine_report = 1;
             break;
+        case 22:
+            config.foo = 1;
+            break;
         case 'F':
             config.ignoreFlags = atoi(optarg);
             break;
@@ -889,6 +1140,19 @@ int extract_main(int argc, char *argv[]) {
         extract_usage();
         return 1;
     }
+    //--foo, which only works with CpG and more standard outputs
+    if(config.foo) {
+        config.keepSingleton = 0;
+        config.keepDiscordant = 1;
+    }
+    if(config.foo && (config.keepCHG || config.keepCHH)) {
+        fprintf(stderr, "You can't currently foo CHG or CHH!\n");
+        return 1;
+    }
+    if(config.cytosine_report + config.foo == 2) {
+        fprintf(stderr, "You can't currently foo a cytosine report!\n");
+        return 1;
+    }
 
     //Has more than one output format been requested?
     if(config.fraction + config.counts + config.logit > 1) {
@@ -922,101 +1186,9 @@ int extract_main(int argc, char *argv[]) {
     }
 
     //Output files
-    config.output_fp = malloc(sizeof(FILE *) * 3);
-    assert(config.output_fp);
-    if(opref == NULL) {
-        opref = strdup(argv[optind+1]);
-        assert(opref);
-        p = strrchr(opref, '.');
-        if(p != NULL) *p = '\0';
-        fprintf(stderr, "writing to prefix:'%s'\n", opref);
-    }
-    if(config.fraction) { 
-        oname = malloc(sizeof(char) * (strlen(opref)+19));
-    } else if(config.counts) {
-        oname = malloc(sizeof(char) * (strlen(opref)+21));
-    } else if(config.logit) {
-        oname = malloc(sizeof(char) * (strlen(opref)+20));
-    } else if(config.methylKit) {
-        oname = malloc(sizeof(char) * (strlen(opref)+15));
-    } else if(config.cytosine_report) {
-        oname = malloc(sizeof(char) * (strlen(opref)+21));
-        sprintf(oname, "%s.cytosine_report.txt", opref);
-        config.output_fp[0] = fopen(oname, "w");
-        config.output_fp[1] = config.output_fp[0];
-        config.output_fp[2] = config.output_fp[0];
-    } else { 
-        oname = malloc(sizeof(char) * (strlen(opref)+14));
-    }
-    assert(oname);
-    if(config.keepCpG && !config.cytosine_report) {
-        if(config.fraction) { 
-            sprintf(oname, "%s_CpG.meth.bedGraph", opref);
-        } else if(config.counts) {
-            sprintf(oname, "%s_CpG.counts.bedGraph", opref);
-        } else if(config.logit) {
-            sprintf(oname, "%s_CpG.logit.bedGraph", opref);
-        } else if(config.methylKit) {
-            sprintf(oname, "%s_CpG.methylKit", opref);
-        } else { 
-            sprintf(oname, "%s_CpG.bedGraph", opref);
-        }
-        config.output_fp[0] = fopen(oname, "w");
-        if(config.output_fp[0] == NULL) {
-            fprintf(stderr, "Couldn't open the output CpG metrics file for writing! Insufficient permissions?\n");
-            return -3;
-        }
-        if(config.methylKit) {
-            fprintf(config.output_fp[0], "chrBase\tchr\tbase\tstrand\tcoverage\tfreqC\tfreqT\n");
-        } else {
-            printHeader(config.output_fp[0], "CpG", opref, config);
-        }
-    }
-    if(config.keepCHG && !config.cytosine_report) {
-        if(config.fraction) { 
-            sprintf(oname, "%s_CHG.meth.bedGraph", opref);
-        } else if(config.counts) {
-            sprintf(oname, "%s_CHG.counts.bedGraph", opref);
-        } else if(config.logit) {
-            sprintf(oname, "%s_CHG.logit.bedGraph", opref);
-        } else if(config.methylKit) {
-            sprintf(oname, "%s_CHG.methylKit", opref);
-        } else { 
-            sprintf(oname, "%s_CHG.bedGraph", opref);
-        }
-        config.output_fp[1] = fopen(oname, "w");
-        if(config.output_fp[1] == NULL) {
-            fprintf(stderr, "Couldn't open the output CHG metrics file for writing! Insufficient permissions?\n");
-            return -3;
-        }
-        if(config.methylKit) {
-            fprintf(config.output_fp[1], "chrBase\tchr\tbase\tstrand\tcoverage\tfreqC\tfreqT\n");
-        } else {
-            printHeader(config.output_fp[1], "CHG", opref, config);
-        }
-    }
-    if(config.keepCHH && !config.cytosine_report) {
-        if(config.fraction) { 
-            sprintf(oname, "%s_CHH.meth.bedGraph", opref);
-        } else if(config.counts) {
-            sprintf(oname, "%s_CHH.counts.bedGraph", opref);
-        } else if(config.logit) {
-            sprintf(oname, "%s_CHH.logit.bedGraph", opref);
-        } else if(config.methylKit) {
-            sprintf(oname, "%s_CHH.methylKit", opref);
-        } else { 
-            sprintf(oname, "%s_CHH.bedGraph", opref);
-        }
-        config.output_fp[2] = fopen(oname, "w");
-        if(config.output_fp[2] == NULL) {
-            fprintf(stderr, "Couldn't open the output CHH metrics file for writing! Insufficient permissions?\n");
-            return -3;
-        }
-        if(config.methylKit) {
-            fprintf(config.output_fp[2], "chrBase\tchr\tbase\tstrand\tcoverage\tfreqC\tfreqT\n");
-        } else {
-            printHeader(config.output_fp[2], "CHH", opref, config);
-        }
+    if(setupOutputFiles(&config, opref, argv, optind)) {
+        fprintf(stderr, "Exiting due to an error opening the output files.\n");
+        return -6;
     }
 
     //parse the region, if needed
@@ -1040,6 +1212,7 @@ int extract_main(int argc, char *argv[]) {
         globalTid = bam_name2id(hdr, bar);
         if(globalTid == (uint32_t) -1) {
             fprintf(stderr, "%s did not match a known chromosome/contig name!\n", config.reg);
+            free(bar);
             return -6;
         }
         if(s>0) globalPos = s;
@@ -1076,9 +1249,7 @@ int extract_main(int argc, char *argv[]) {
     if(config.keepCHG && !config.cytosine_report) fclose(config.output_fp[1]);
     if(config.keepCHH && !config.cytosine_report) fclose(config.output_fp[2]);
     hts_idx_destroy(config.bai);
-    free(opref);
     if(config.bed) destroyBED(config.bed);
-    free(oname);
     free(config.output_fp);
 
     return 0;

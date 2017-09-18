@@ -110,17 +110,51 @@ int getStrand(bam1_t *b) {
     }
 }
 
-int updateMetrics(Config *config, const bam_pileup1_t *plp) {
+//Returns 1 if mC, -1 if C, 2 if foo, 0 if skip, -2 if a read is stored in the hash
+int updateMetrics(Config *config, const bam_pileup1_t *plp, khash_t(32) *h) {
     uint8_t base = bam_seqi(bam_get_seq(plp->b), plp->qpos);
     int strand = getStrand(plp->b); //1=OT, 2=OB, 3=CTOT, 4=CTOB
+    khiter_t k;
+    int ret;
+    short val;
+    if(config->foo) strand = 1; //We ignore this at the moment
 
     if(strand==0) {
         fprintf(stderr, "Can't determine the strand of a read!\n");
         assert(strand != 0);
     }
-    //Is the phred score even high enough?
+    //Is the phred score even high enough? For foo, if EITHER read is below this then the base won't be output
     if(bam_get_qual(plp->b)[plp->qpos] < config->minPhred) return 0;
 
+    //foo is handled very differently
+    if(config->foo) {
+        if((plp->b->core.flag & 176) == 176 && (base == 2 || base == 8)) { //Read 2, reverse on C
+            k = kh_put(32, h, bam_get_qname(plp->b), &ret);
+            kh_value(h, k) = base;
+            return -2;
+        } else if((plp->b->core.flag & 112) == 112 && (base == 4 || base == 1)) { //Read 1, reverse on G
+            k = kh_get(32, h, bam_get_qname(plp->b));
+            if(k == kh_end(h)) return 0;
+            val = kh_value(h, k);
+            if(val == 2 && base == 4) return 1; //mC
+            if(val == 8 && base == 4) return 2; //foo
+            if(val == 8 && base == 1) return -1; //C
+        } else if((plp->b->core.flag & BAM_FREAD1) && !(plp->b->core.flag & 48) && (base == 4 || base == 1)) { //Read 1, forward on G/A
+            k = kh_get(32, h, bam_get_qname(plp->b));
+            if(k == kh_end(h)) return 0;
+            val = kh_value(h, k);
+            if(val == 2 && base == 4) return 1; //mC
+            if(val == 2 && base == 1) return 2; //foo
+            if(val == 8 && base == 1) return -1; //C
+        } else if((plp->b->core.flag & BAM_FREAD2) && !(plp->b->core.flag & 48) && (base == 2 || base == 8)) { //Read 2, forward on C/T
+            k = kh_put(32, h, bam_get_qname(plp->b), &ret);
+            kh_value(h, k) = base;
+            return -2;
+        }
+        return 0;
+    }
+
+    //Standard processing
     if(base == 2 && (strand==1 || strand==3)) return 1; //C on an OT/CTOT alignment
     else if(base == 8 && (strand==1 || strand==3)) return -1; //T on an OT/CTOT alignment
     else if(base == 4 && (strand==2 || strand==4)) return 1; //G on an OB/CTOB alignment
@@ -215,6 +249,11 @@ int filter_func(void *data, bam1_t *b) {
         if(b->core.tid == -1 || b->core.flag & BAM_FUNMAP) continue; //Unmapped
         if(b->core.qual < ldata->config->minMapq) continue; //-q
         if(b->core.flag & ldata->config->ignoreFlags) continue; //By default: secondary alignments, QC failed, PCR duplicates, and supplemental alignments
+        if(ldata->config->foo) { //--foo
+            if(b->core.flag & BAM_FUNMAP) continue; //Mate unmapped
+            rv = b->core.flag & (BAM_FREVERSE + BAM_FMREVERSE);
+            if(rv != 0 && rv != (BAM_FREVERSE + BAM_FMREVERSE)) continue; //Not ff or rr
+        }
         if(ldata->config->requireFlags && (b->core.flag & ldata->config->requireFlags) != ldata->config->requireFlags) continue;
         if(!ldata->config->keepDupes && b->core.flag & BAM_FDUP) continue;
         p = bam_aux_get(b, "NH");
