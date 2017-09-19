@@ -82,13 +82,13 @@ Per-CpG/CHG metrics
 In many circumstances, it's desireable for metrics from individual Cytosines in a CpG to be merged, producing per-CpG metrics rather than per-Cytosine metrics. This can be accomplished with the `--mergeContext` option in `MethylDackel extract`. If this is used, then this output:
 
     track type="bedGraph" description="SRR1182519.sorted CpG methylation levels"
-    1	25114	25115	100	2	1
+    1	25114	25115	66	2	1
     1	25115	25116	100	3	0
 
 is changed to this:
 
     track type="bedGraph" description="SRR1182519.sorted merged CpG methylation levels"
-    1	25114	25116	100	5	1
+    1	25114	25116	83	5	1
 
 This also works for CHG-level metrics. If bedGraph files containing per-Cytosine metrics already exist, they can be converted to instead contain per-CpG/CHG metrics with `MethylDackel mergeContext`.
 
