@@ -111,6 +111,7 @@ int getStrand(bam1_t *b) {
 }
 
 //Returns 1 if mC, -1 if C, 2 if foo, 0 if skip, -2 if a read is stored in the hash
+//For --foo reads need to have already been skipped if they can't be informative due to read 1/2 and orientation
 int updateMetrics(Config *config, const bam_pileup1_t *plp, khash_t(32) *h) {
     uint8_t base = bam_seqi(bam_get_seq(plp->b), plp->qpos);
     int strand = getStrand(plp->b); //1=OT, 2=OB, 3=CTOT, 4=CTOB
@@ -128,28 +129,28 @@ int updateMetrics(Config *config, const bam_pileup1_t *plp, khash_t(32) *h) {
 
     //foo is handled very differently
     if(config->foo) {
-        if((plp->b->core.flag & 176) == 176 && (base == 2 || base == 8)) { //Read 2, reverse on C
+        if((plp->b->core.flag & 176) == 176 && (base == 2 || base == 8)) { //Read 2, RR has C/T
             k = kh_put(32, h, bam_get_qname(plp->b), &ret);
             kh_value(h, k) = base;
             return -2;
-        } else if((plp->b->core.flag & 112) == 112 && (base == 4 || base == 1)) { //Read 1, reverse on G
+        } else if((plp->b->core.flag & 112) == 112 && (base == 4 || base == 1)) { //Read 1, RR has G/A
             k = kh_get(32, h, bam_get_qname(plp->b));
             if(k == kh_end(h)) return 0;
             val = kh_value(h, k);
             if(val == 2 && base == 4) return 1; //mC
             if(val == 8 && base == 4) return 2; //foo
             if(val == 8 && base == 1) return -1; //C
-        } else if((plp->b->core.flag & BAM_FREAD1) && !(plp->b->core.flag & 48) && (base == 4 || base == 1)) { //Read 1, forward on G/A
+        } else if((plp->b->core.flag & 112) == 64 && (base == 2 || base == 8)) { //Read 1, FF has C/T
+            k = kh_put(32, h, bam_get_qname(plp->b), &ret);
+            kh_value(h, k) = base;
+            return -2;
+        } else if((plp->b->core.flag & 176) == 128 && (base == 1 || base == 4)) { //Read 2, FF has G/A
             k = kh_get(32, h, bam_get_qname(plp->b));
-            if(k == kh_end(h)) return 0;
+            if(k == kh_end(h)) return 0
             val = kh_value(h, k);
             if(val == 2 && base == 4) return 1; //mC
             if(val == 2 && base == 1) return 2; //foo
             if(val == 8 && base == 1) return -1; //C
-        } else if((plp->b->core.flag & BAM_FREAD2) && !(plp->b->core.flag & 48) && (base == 2 || base == 8)) { //Read 2, forward on C/T
-            k = kh_put(32, h, bam_get_qname(plp->b), &ret);
-            kh_value(h, k) = base;
-            return -2;
         }
         return 0;
     }

@@ -293,6 +293,19 @@ int isVariant(Config *config, const bam_pileup1_t *plp, uint32_t *coverage, int 
     }
 }
 
+// In --foo, we don't alway care what base a read has (unless it's a variant),
+// since they're not all relevant. Return 0 if relevant and 1 otherwise (to skip).
+int skipFoo(const bam_pileup1_t *plp, char base) {
+    if(base == 'C' || base == 'c') {
+        if((plp->b->core.flag & 176) == 128) return 1; // FF #2
+        if((plp->b->core.flag & 112) == 112) return 1; // RR #1
+    } else if(base == 'G' || base == 'g') {
+        if((plp->b->core.flag & 112) == 64) return 1; // FF #1
+        if((plp->b->core.flag & 176) == 176) return 1; // RR #2
+    }
+    return 0;
+}
+
 // Incompatible CpG base combination in the foo protocol supporting a variant
 // Only FF and RR pairs are compatible with this!
 // Returns 1 on variant, otherwise 0
@@ -305,22 +318,35 @@ int isVariantFoo(Config *config, const bam_pileup1_t *plp, char base, uint32_t *
     if(bam_get_qual(plp->b)[plp->qpos] < config->minPhred) return 0;
 
     if(base == 'C' || base == 'c') {
-        if(plp->b->core.flag & BAM_FREAD1) { // Allowed bases: C
+        if((plp->b->core.flag & 112) == 64) { // FF #1 allows C/T
+            if(rbase == 2 || rbase == 8) return 0;
+            else *coverage += 1;
+        } else if((plp->b->core.flag & 176) == 128) { // FF #2 allows C
             *coverage += 1;
             if(rbase == 2) return 0;
-        } else if(plp->b->core.flag & BAM_FREAD2) { // Allowed bases: C, T
+        } else if((plp->b->core.flag & 112) == 112) { // RR #1 allows C
+            *coverage += 1;
+            if(rbase == 2) return 0;
+        } else if((plp->b->core.flag & 176) == 176) { // RR #2 allows C/T
             if(rbase == 2 || rbase == 8) return 0;
             else *coverage += 1;
         }
     } else {
-        if(plp->b->core.flag & BAM_FREAD1) { // Allowed bases: G, A
-           if(rbase == 1  || rbase == 4) return 0;
+        if((plp->b->core.flag & 112) == 64) { // FF #1 allows G
+            *coverage += 1;
+            if(rbase == 4) return 0;
+        } else if((plp->b->core.flag & 176) == 128) { // FF #2 allows G/A
+            if(rbase == 4 || rbase == 1) return 0;
             else *coverage += 1;
-        } else if(plp->b->core.flag & BAM_FREAD2) { // Allowed bases: G
+        } else if((plp->b->core.flag & 112) == 112) { // RR #1 allows G/A
+            if(rbase == 4 || rbase == 1) return 0;
+            else *coverage += 1;
+        } else if((plp->b->core.flag & 176) == 176) { // RR #2 allows G
             *coverage += 1;
             if(rbase == 4) return 0;
         }
     }
+
     return 1;
 }
 
@@ -527,6 +553,9 @@ void *extractCalls(void *foo) {
                         nVariant++;
                         continue;
                     }
+
+                    //If a read isn't informative, then skip
+                    if(skipFoo(plp[0]+i, base)) continue;
                 }
 
                 rv = updateMetrics(config, plp[0]+i, h);
