@@ -146,7 +146,7 @@ int updateMetrics(Config *config, const bam_pileup1_t *plp, khash_t(32) *h) {
             return -2;
         } else if((plp->b->core.flag & 176) == 128 && (base == 1 || base == 4)) { //Read 2, FF has G/A
             k = kh_get(32, h, bam_get_qname(plp->b));
-            if(k == kh_end(h)) return 0
+            if(k == kh_end(h)) return 0;
             val = kh_value(h, k);
             if(val == 2 && base == 4) return 1; //mC
             if(val == 2 && base == 1) return 2; //foo
@@ -286,8 +286,8 @@ int filter_func(void *data, bam1_t *b) {
         * higher phred score at that position.
         *
         ***********************************************************************/
-        if(ldata->config->bounds) b = trimAlignment(b, ldata->config->bounds);
-        if(ldata->config->absoluteBounds) b = trimAbsoluteAlignment(b, ldata->config->absoluteBounds);
+        if(ldata->config->bounds != NULL) b = trimAlignment(b, ldata->config->bounds);
+        if(ldata->config->absoluteBounds != NULL) b = trimAbsoluteAlignment(b, ldata->config->absoluteBounds);
         break;
     }
     return rv;
