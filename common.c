@@ -286,8 +286,8 @@ int filter_func(void *data, bam1_t *b) {
         * higher phred score at that position.
         *
         ***********************************************************************/
-        if(ldata->config->bounds != NULL) b = trimAlignment(b, ldata->config->bounds);
-        if(ldata->config->absoluteBounds != NULL) b = trimAbsoluteAlignment(b, ldata->config->absoluteBounds);
+        b = trimAlignment(b, ldata->config->bounds);
+        b = trimAbsoluteAlignment(b, ldata->config->absoluteBounds);
         break;
     }
     return rv;
