@@ -6,6 +6,7 @@
 int mbias_main(int argc, char *argv[]);
 int extract_main(int argc, char *argv[]);
 int mergeContext_main(int argc, char *argv[]);
+int perRead_main(int argc, char *argv[]);
 void print_version(void);
 
 void usage_main() {
@@ -20,6 +21,7 @@ void usage_main() {
 "             format.\n"
 "    mergeContext   Combine single Cytosine metrics from 'MethylDackel extract' into\n"
 "             per-CpG/CHG metrics.\n"
+"    perRead  Generate a per-read methylation summary.\n"
 );
 }
 
@@ -39,6 +41,8 @@ int main(int argc, char *argv[]) {
         return mbias_main(argc-1, argv+1);
     } else if(strcmp(argv[1], "mergeContext") == 0) {
         return mergeContext_main(argc-1, argv+1);
+    } else if(strcmp(argv[1], "perRead") == 0) {
+        return perRead_main(argc-1, argv+1);
     } else {
         fprintf(stderr, "Unknown command!\n");
         usage_main();
