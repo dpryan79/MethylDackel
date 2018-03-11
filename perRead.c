@@ -228,6 +228,9 @@ void perRead_usage() {
 "  input     An input BAM or CRAM file. This MUST be sorted and should be indexed.\n"
 "\nOptions:\n"
 "  -o STR    Output file name [stdout]\n"
+" -@ nThreads      The number of threads to use, the default 1\n"
+" --chunkSize INT  The size of the genome processed by a single thread at a time.\n"
+"                  The default is 1000000 bases. This value MUST be at least 1.\n"
 "  --version Printer version and quit\n"
 "\n"
 "Note that this program will produce incorrect values for alignments spanning\n"
@@ -259,12 +262,12 @@ int perRead_main(int argc, char *argv[]) {
     static struct option lopts[] = {
         {"help",    0, NULL, 'h'},
         {"version", 0, NULL, 'v'},
+        {"chunkSize",    1, NULL,  19},
         {0,         0, NULL,   0}
     };
     //Add filtering options
     //BED file support
     //region support
-    //multiple threads
     //stdout vs. file name
     while((c = getopt_long(argc, argv, "hvo:", lopts, NULL)) >= 0) {
         switch(c) {
@@ -278,6 +281,16 @@ int perRead_main(int argc, char *argv[]) {
             if((ofile = fopen(optarg, "w")) == NULL) {
                 fprintf(stderr, "Couldn't open %s for writing\n", optarg);
                 return 2;
+            }
+            break;
+        case '@':
+            config.nThreads = atoi(optarg);
+            break;
+        case 19:
+            config.chunkSize = strtoul(optarg, NULL, 10);
+            if(config.chunkSize < 1) {
+                fprintf(stderr, "Error: The chunk size must be at least 1!\n");
+                return 1;
             }
             break;
         default :
