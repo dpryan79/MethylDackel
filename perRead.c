@@ -177,7 +177,8 @@ void *perReadMetrics(void *foo) {
         //Fetch the sequence and then iterate over the reads. There's a 10kb buffer on the end
         seq = faidx_fetch_seq(fai, hdr->target_name[localTid], localPos2, localEnd+10000, &seqlen);
         while(sam_itr_next(fp, iter, b) >= 0) {
-            if(b->core.pos < localPos2) continue;
+            if(b->core.pos < localPos) continue;
+            if(b->core.pos >= localEnd) break;
             nmethyl = 0, nunmethyl = 0;
             processRead(config, b, seq, localPos2, seqlen, &nmethyl, &nunmethyl);
             addRead(os, b, hdr, nmethyl, nunmethyl);
@@ -192,7 +193,7 @@ void *perReadMetrics(void *foo) {
                 pthread_mutex_unlock(&outputMutex);
                 continue;
             }
-            fputs(os->s, config->output_fp[0]);
+            if(os->l) fputs(os->s, config->output_fp[0]);
             os->l = 0;
             outputBin++;
             pthread_mutex_unlock(&outputMutex);
@@ -227,11 +228,18 @@ void perRead_usage() {
 "            samtools faidx\n"
 "  input     An input BAM or CRAM file. This MUST be sorted and should be indexed.\n"
 "\nOptions:\n"
-"  -o STR    Output file name [stdout]\n"
-" -@ nThreads      The number of threads to use, the default 1\n"
+" -r STR     Region string in which to extract methylation\n"
+" -l FILE    A BED file listing regions for inclusion.\n"
+" --keepStrand  If a BED file is specified, then this option will cause the\n"
+"            strand column (column 6) to be utilized, if present. Thus, if\n"
+"            a region has a '+' in this column, then only metrics from the\n"
+"            top strand will be output. Note that the -r option can be used\n"
+"            to limit the regions of -l.\n"
+" -o STR    Output file name [stdout]\n"
+" -@ INT    The number of threads to use, the default 1\n"
 " --chunkSize INT  The size of the genome processed by a single thread at a time.\n"
-"                  The default is 1000000 bases. This value MUST be at least 1.\n"
-"  --version Printer version and quit\n"
+"           The default is 1000000 bases. This value MUST be at least 1.\n"
+" --version Print version and quit\n"
 "\n"
 "Note that this program will produce incorrect values for alignments spanning\n"
 "more than 10kb.\n");
@@ -263,13 +271,14 @@ int perRead_main(int argc, char *argv[]) {
         {"help",    0, NULL, 'h'},
         {"version", 0, NULL, 'v'},
         {"chunkSize",    1, NULL,  19},
+        {"keepStrand",   0, NULL,  20},
         {0,         0, NULL,   0}
     };
     //Add filtering options
     //BED file support
     //region support
     //stdout vs. file name
-    while((c = getopt_long(argc, argv, "hvo:", lopts, NULL)) >= 0) {
+    while((c = getopt_long(argc, argv, "hvo:@:r:l:", lopts, NULL)) >= 0) {
         switch(c) {
         case 'h' :
             perRead_usage();
@@ -286,12 +295,21 @@ int perRead_main(int argc, char *argv[]) {
         case '@':
             config.nThreads = atoi(optarg);
             break;
+        case 'r':
+            config.reg = optarg;
+            break;
+        case 'l':
+            config.bedName = optarg;
+            break;
         case 19:
             config.chunkSize = strtoul(optarg, NULL, 10);
             if(config.chunkSize < 1) {
                 fprintf(stderr, "Error: The chunk size must be at least 1!\n");
                 return 1;
             }
+            break;
+        case 20:
+            keepStrand = 1;
             break;
         default :
             fprintf(stderr, "Invalid option '%c'\n", c);
