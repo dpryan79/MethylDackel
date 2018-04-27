@@ -180,6 +180,8 @@ void *perReadMetrics(void *foo) {
             if(b->core.pos < localPos) continue;
             if(b->core.pos >= localEnd) break;
             nmethyl = 0, nunmethyl = 0;
+            if(config->requireFlags && (config->requireFlags & b->core.flag) == 0) continue;
+            if(config->ignoreFlags && (config->ignoreFlags & b->core.flag) != 0) continue;
             processRead(config, b, seq, localPos2, seqlen, &nmethyl, &nunmethyl);
             addRead(os, b, hdr, nmethyl, nunmethyl);
         }
@@ -235,11 +237,20 @@ void perRead_usage() {
 "            a region has a '+' in this column, then only metrics from the\n"
 "            top strand will be output. Note that the -r option can be used\n"
 "            to limit the regions of -l.\n"
-" -o STR    Output file name [stdout]\n"
-" -@ INT    The number of threads to use, the default 1\n"
+" -o STR     Output file name [stdout]\n"
+" -F, --ignoreFlags    By default, all reads are output. If you would like to\n"
+"            ignore certain classes of reads then simply give a value for their\n"
+"            flags here. Note that an alignment will be logically anded with this\n"
+"            flag, so a single bit overlap will lead to exclusion. The default\n"
+"            for this is 0.\n"
+" -R, --requireFlags   Require each alignment to have all bits in this value\n"
+"            present, or else the alignment is ignored. This is equivalent to the\n"
+"            -f option in samtools. The default is 0, which includes all\n"
+"            alignments.\n"
+" -@ INT     The number of threads to use, the default 1\n"
 " --chunkSize INT  The size of the genome processed by a single thread at a time.\n"
-"           The default is 1000000 bases. This value MUST be at least 1.\n"
-" --version Print version and quit\n"
+"            The default is 1000000 bases. This value MUST be at least 1.\n"
+" --version  Print version and quit\n"
 "\n"
 "Note that this program will produce incorrect values for alignments spanning\n"
 "more than 10kb.\n");
@@ -272,13 +283,15 @@ int perRead_main(int argc, char *argv[]) {
         {"version", 0, NULL, 'v'},
         {"chunkSize",    1, NULL,  19},
         {"keepStrand",   0, NULL,  20},
+        {"ignoreFlags",  1, NULL, 'F'},
+        {"requireFlags", 1, NULL, 'R'},
         {0,         0, NULL,   0}
     };
     //Add filtering options
     //BED file support
     //region support
     //stdout vs. file name
-    while((c = getopt_long(argc, argv, "hvo:@:r:l:", lopts, NULL)) >= 0) {
+    while((c = getopt_long(argc, argv, "hvo:@:r:l:F:R:", lopts, NULL)) >= 0) {
         switch(c) {
         case 'h' :
             perRead_usage();
@@ -300,6 +313,12 @@ int perRead_main(int argc, char *argv[]) {
             break;
         case 'l':
             config.bedName = optarg;
+            break;
+        case 'F':
+            config.ignoreFlags = atoi(optarg);
+            break;
+        case 'R':
+            config.requireFlags = atoi(optarg);
             break;
         case 19:
             config.chunkSize = strtoul(optarg, NULL, 10);
