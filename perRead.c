@@ -40,7 +40,8 @@ void processRead(Config *config, bam1_t *b, char *seq, uint32_t sequenceStart, i
     int cigarOPNumber = 0;
     int cigarOPOffset = 0;
     uint32_t *CIGAR = bam_get_cigar(b);
-    uint8_t *readSeq = bam_get_seq(b); //get_get_qual() too?
+    uint8_t *readSeq = bam_get_seq(b);
+    uint8_t *readQual = bam_get_qual(b);
     int strand = getStrand(b);
     int cigarOPType;
     int direction;
@@ -54,6 +55,13 @@ void processRead(Config *config, bam1_t *b, char *seq, uint32_t sequenceStart, i
         cigarOPType = bam_cigar_type(CIGAR[cigarOPNumber]);
         if(cigarOPType & 2) { //not ISHPB
             if(cigarOPType & 1) { //M=X
+                // Skip poor base calls
+                if(readQual[readPosition] < config->minPhred) {
+                    mappedPosition++;
+                    readPosition++;
+                    cigarOPOffset++;
+                }
+
                 direction = isCpG(seq, mappedPosition - sequenceStart, seqLen);
                 if(direction) {
                     base = bam_seqi(readSeq, readPosition);  // Filtering by quality goes here
@@ -182,6 +190,7 @@ void *perReadMetrics(void *foo) {
             nmethyl = 0, nunmethyl = 0;
             if(config->requireFlags && (config->requireFlags & b->core.flag) == 0) continue;
             if(config->ignoreFlags && (config->ignoreFlags & b->core.flag) != 0) continue;
+            if(b->core.qual < config->minMapq) continue;
             processRead(config, b, seq, localPos2, seqlen, &nmethyl, &nunmethyl);
             addRead(os, b, hdr, nmethyl, nunmethyl);
         }
@@ -230,6 +239,9 @@ void perRead_usage() {
 "            samtools faidx\n"
 "  input     An input BAM or CRAM file. This MUST be sorted and should be indexed.\n"
 "\nOptions:\n"
+" -q INT     Minimum MAPQ threshold to include an alignment (default 10)\n"
+" -p INT     Minimum Phred threshold to include a base (default 5). This must "
+"            be >0.\n"
 " -r STR     Region string in which to extract methylation\n"
 " -l FILE    A BED file listing regions for inclusion.\n"
 " --keepStrand  If a BED file is specified, then this option will cause the\n"
@@ -266,7 +278,7 @@ int perRead_main(int argc, char *argv[]) {
 
     //Defaults
     config.keepCpG = 1; config.keepCHG = 0; config.keepCHH = 0;
-    config.minMapq = 0; config.minPhred = 0; config.keepDupes = 0;
+    config.minMapq = 10; config.minPhred = 5; config.keepDupes = 0;
     config.keepSingleton = 0, config.keepDiscordant = 0;
     config.fp = NULL;
     config.bai = NULL;
@@ -287,11 +299,7 @@ int perRead_main(int argc, char *argv[]) {
         {"requireFlags", 1, NULL, 'R'},
         {0,         0, NULL,   0}
     };
-    //Add filtering options
-    //BED file support
-    //region support
-    //stdout vs. file name
-    while((c = getopt_long(argc, argv, "hvo:@:r:l:F:R:", lopts, NULL)) >= 0) {
+    while((c = getopt_long(argc, argv, "hvq:p:o:@:r:l:F:R:", lopts, NULL)) >= 0) {
         switch(c) {
         case 'h' :
             perRead_usage();
@@ -304,6 +312,12 @@ int perRead_main(int argc, char *argv[]) {
                 fprintf(stderr, "Couldn't open %s for writing\n", optarg);
                 return 2;
             }
+            break;
+        case 'q':
+            config.minMapq = atoi(optarg);
+            break;
+        case 'p':
+            config.minPhred = atoi(optarg);
             break;
         case '@':
             config.nThreads = atoi(optarg);
@@ -346,6 +360,17 @@ int perRead_main(int argc, char *argv[]) {
         perRead_usage();
         return -1;
     }
+
+    //Are the options reasonable?
+    if(config.minPhred < 1) {
+        fprintf(stderr, "-p %i is invalid. resetting to 1, which is the lowest possible value.\n", config.minPhred);
+        config.minPhred = 1;
+    }
+    if(config.minMapq < 0) {
+        fprintf(stderr, "-q %i is invalid. Resetting to 0, which is the lowest possible value.\n", config.minMapq);
+        config.minMapq = 0;
+    }
+
     if((fai = fai_load(argv[optind])) == NULL) {
         fprintf(stderr, "Couldn't open the index for %s!\n", argv[optind]);
         perRead_usage();
