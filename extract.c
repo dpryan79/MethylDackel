@@ -727,9 +727,10 @@ int extract_main(int argc, char *argv[]) {
         {"requireFlags", 1, NULL, 'R'},
         {"help",         0, NULL, 'h'},
         {"version",      0, NULL, 'v'},
+        {"mappability",         1, NULL,  'M'},
         {0,              0, NULL,   0}
     };
-    while((c = getopt_long(argc, argv, "hvq:p:r:l:o:D:f:c:m:d:F:R:@:", lopts,NULL)) >=0){
+    while((c = getopt_long(argc, argv, "hvq:p:r:l:o:D:f:c:m:d:F:R:@:M:", lopts,NULL)) >=0){
         switch(c) {
         case 'h':
             extract_usage();
@@ -822,6 +823,9 @@ int extract_main(int argc, char *argv[]) {
             break;
         case 21:
             config.cytosine_report = 1;
+            break;
+        case 'M':
+            config.BWName = optarg;
             break;
         case 'F':
             config.ignoreFlags = atoi(optarg);
@@ -919,6 +923,10 @@ int extract_main(int argc, char *argv[]) {
             fprintf(stderr, "Still couldn't load the index, quiting.\n");
             return -5;
         }
+    }
+    if(config.BWName && (config.BW_ptr = bwOpen(config.BWName, NULL, "r")) == NULL) {
+        fprintf(stderr, "Couldn't open %s for reading!\n", config.BWName);
+        return -4;
     }
 
     //Output files

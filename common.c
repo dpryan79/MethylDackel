@@ -2,6 +2,7 @@
 #include "version.h"
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <errno.h>
 #include <limits.h>
 #include <assert.h>
@@ -202,6 +203,120 @@ bam1_t *trimAbsoluteAlignment(bam1_t *b, int bounds[16]) {
     return b;
 }
 
+char check_mappability(void *data, bam1_t *b) {
+    mplp_data *ldata = (mplp_data *) data;
+    int r1s;
+    int r1e;
+    int r2s;
+    int r2e;
+    int i;
+    char base_n = 0;
+    bwOverlappingIntervals_t *vals;
+    if(b->core.flag & BAM_FREAD1 || (bam_is_rev(b) && b->core.flag & BAM_FREAD2)) //is this the left read?
+    {
+        //printf("left\n");
+        r1s = b->core.pos;
+        r1e = b->core.pos + b->core.l_qseq;
+        r2s = b->core.mpos;
+        r2e = b->core.mpos + b->core.l_qseq; //assuming both reads same length to avoid issues on right read (doing the same on the left read for consistency)
+        
+    }
+    else
+    {
+        //printf("right\n");
+        r2s = b->core.pos;
+        r2e = b->core.pos + b->core.l_qseq;
+        r1s = b->core.mpos;
+        r1e = b->core.mpos + b->core.l_qseq; //assuming both reads same length to avoid issues on right read
+    }
+    //printf("has it segfaulted yet?\n");
+    /*printf("r1: ");
+    printf(bam_get_qname(b));
+    printf(": ");
+    printf("(%#05x)", b->core.flag);
+    printf(" ");
+    printf("%d", b->core.qual);
+    printf(" ");
+    printf("%d", r1s);
+    printf("-");
+    printf("%d", r1e); //TODO concatenate strings properly
+    printf(" ");
+    printf("r2: %d", r2s);
+    printf("-");
+    printf("%d", r2e); //TODO concatenate strings properly
+    printf("\n");*/
+
+    
+    if(b->core.flag & BAM_FREAD1)
+    {
+        //printf("read1\n");
+        
+    }
+    if(b->core.flag & BAM_FREAD2)
+    {
+        //printf("read2\n");
+
+    }
+    if(ldata->config->BW_ptr == NULL)
+    {
+        //printf("null\n");
+        return 0;
+    }
+    
+    //bam_get_qname
+    pthread_mutex_lock(&positionMutex);
+    vals = bwGetValues(ldata->config->BW_ptr, ldata->hdr->target_name[b->core.tid], r1s, r1e+1, 1);
+    pthread_mutex_unlock(&positionMutex);
+    if(!vals) //not in bigWig at all, therefore 0 to not call reads mappable unless there is data saying they are
+    {
+        //printf("no vals 1\n");
+        return 0;
+    }
+    //printf("b\n");
+    for (i=0; i<=r1e-r1s; i++)
+    {
+        //printf("loop1: %f\n", vals->value[i]);
+        if(vals->value[i] > 0.01) //considering NaN as 0 to not call reads mappable unless there is data saying they are
+        {
+            //printf("pass %f\n", vals->value[i]);
+            base_n++;
+        }
+        if(base_n >= 15)
+        {
+            //printf("mappable\n");
+            return 1;
+        }
+    }
+    //printf("fail1\n");
+    bwDestroyOverlappingIntervals(vals);
+    pthread_mutex_lock(&positionMutex);
+    vals = bwGetValues(ldata->config->BW_ptr, ldata->hdr->target_name[b->core.tid], r2s, r2e+1, 1);
+    pthread_mutex_unlock(&positionMutex);
+    if(!vals) //not in bigWig at all, therefore 0
+    {
+        return 0;
+    }
+    //printf("c\n");
+    base_n = 0;
+    for (i=0; i<=r2e-r2s; i++)
+    {
+        //printf("loop2: %f\n", vals->value[i]);
+        if(vals->value[i] > 0.01) //considering NaN as 0
+        {
+            //printf("pass %f\n", vals->value[i]);
+            base_n++;
+        }
+        if(base_n >= 15)
+        {
+            //printf("mappable\n");
+            return 1;
+        }
+    }
+    //printf("fail2\n");
+    bwDestroyOverlappingIntervals(vals);
+    return 0;
+}
+
 //This will need to be restructured to handle multiple input files
 int filter_func(void *data, bam1_t *b) {
     int rv, NH, overlap;
@@ -222,6 +337,9 @@ int filter_func(void *data, bam1_t *b) {
             NH = bam_aux2i(p);
             if(NH>1) continue; //Ignore obvious multimappers
         }
+        //check_mappability(ldata, b);
+        //printf("%i", !ldata->config->BW_ptr);
+        if(ldata->config->BW_ptr && check_mappability(ldata, b) == 0) continue; //Low mappability
         if(!ldata->config->keepSingleton && (b->core.flag & 0x9) == 0x9) continue; //Singleton
         if(!ldata->config->keepDiscordant && (b->core.flag & 0x3) == 0x1) continue; //Discordant
         if((b->core.flag & 0x9) == 0x1) b->core.flag |= 0x2; //Discordant pairs can cause double counts

@@ -22,10 +22,13 @@ version.h:
 	echo '#define VERSION "$(VERSION)"' > $@
 
 .c.o:
-	$(CC) -c $(OPTS) -Ihtslib $< -o $@
+	$(CC) -c $(OPTS) -Ihtslib -IlibBigWig $< -o $@
 
 htslib: 
 	$(MAKE) -C htslib
+
+libbw: 
+	$(MAKE) -C libBigWig all
 
 libMethylDackel.a: version.h $(OBJS)
 	-@rm -f $@
@@ -33,8 +36,8 @@ libMethylDackel.a: version.h $(OBJS)
 
 lib: libMethylDackel.a
 
-MethylDackel: htslib version.h libMethylDackel.a
-	$(CC) $(OPTS) -Ihtslib -o MethylDackel main.c libMethylDackel.a htslib/libhts.a -lm -lz -lpthread
+MethylDackel: htslib libbw version.h libMethylDackel.a
+	$(CC) $(OPTS) -Ihtslib -IlibBigWig -o MethylDackel main.c libMethylDackel.a htslib/libhts.a libBigWig/libBigWig.so -lm -lz -lpthread
 
 test: MethylDackel 
 	python tests/test.py
@@ -44,6 +47,7 @@ clean:
 
 clean-all: clean
 	make --directory=htslib clean
+	make --directory=libBigWig clean
 
 install: MethylDackel
 	install MethylDackel $(prefix)

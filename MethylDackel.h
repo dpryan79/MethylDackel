@@ -3,6 +3,7 @@
 #include <zlib.h>
 #include "htslib/sam.h"
 #include "htslib/faidx.h"
+#include "libBigWig/bigWig.h"
 
 //These are needed to handle multiple threads
 pthread_mutex_t positionMutex;
@@ -90,6 +91,8 @@ typedef struct {
     FILE **output_fp;
     char *reg;
     char *BAMName;
+    char *BWName;
+    bigWigFile_t *BW_ptr;
     htsFile *fp;
     hts_idx_t *bai;
     char *bedName;
