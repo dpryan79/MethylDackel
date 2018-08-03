@@ -204,115 +204,74 @@ bam1_t *trimAbsoluteAlignment(bam1_t *b, int bounds[16]) {
 }
 
 char check_mappability(void *data, bam1_t *b) {
+    //return value of 1 means mappable, return value of 0 means unmappable
     mplp_data *ldata = (mplp_data *) data;
-    int r1s;
-    int r1e;
-    int r2s;
-    int r2e;
-    int i;
-    char base_n = 0;
+    int read1_start;
+    int read1_end;
+    int read2_start;
+    int read2_end;
+    int i; //loop index
+    char num_mappable_bases = 0; //counter
     bwOverlappingIntervals_t *vals;
     if(b->core.flag & BAM_FREAD1 || (bam_is_rev(b) && b->core.flag & BAM_FREAD2)) //is this the left read?
     {
-        //printf("left\n");
-        r1s = b->core.pos;
-        r1e = b->core.pos + b->core.l_qseq;
-        r2s = b->core.mpos;
-        r2e = b->core.mpos + b->core.l_qseq; //assuming both reads same length to avoid issues on right read (doing the same on the left read for consistency)
+        read1_start = b->core.pos;
+        read1_end = b->core.pos + b->core.l_qseq;
+        read2_start = b->core.mpos;
+        read2_end = b->core.mpos + b->core.l_qseq; //assuming both reads same length to avoid issues finding read2_end on right read (doing the same on the left read for consistency)
         
     }
     else
     {
-        //printf("right\n");
-        r2s = b->core.pos;
-        r2e = b->core.pos + b->core.l_qseq;
-        r1s = b->core.mpos;
-        r1e = b->core.mpos + b->core.l_qseq; //assuming both reads same length to avoid issues on right read
-    }
-    //printf("has it segfaulted yet?\n");
-    /*printf("r1: ");
-    printf(bam_get_qname(b));
-    printf(": ");
-    printf("(%#05x)", b->core.flag);
-    printf(" ");
-    printf("%d", b->core.qual);
-    printf(" ");
-    printf("%d", r1s);
-    printf("-");
-    printf("%d", r1e); //TODO concatenate strings properly
-    printf(" ");
-    printf("r2: %d", r2s);
-    printf("-");
-    printf("%d", r2e); //TODO concatenate strings properly
-    printf("\n");*/
-
-    
-    if(b->core.flag & BAM_FREAD1)
-    {
-        //printf("read1\n");
-        
-    }
-    if(b->core.flag & BAM_FREAD2)
-    {
-        //printf("read2\n");
-
-    }
-    if(ldata->config->BW_ptr == NULL)
-    {
-        //printf("null\n");
-        return 0;
+        read2_start = b->core.pos;
+        read2_end = b->core.pos + b->core.l_qseq;
+        read1_start = b->core.mpos;
+        read1_end = b->core.mpos + b->core.l_qseq; //assuming both reads same length to avoid issues finding read2_end
     }
     
-    //bam_get_qname
-    pthread_mutex_lock(&positionMutex);
-    vals = bwGetValues(ldata->config->BW_ptr, ldata->hdr->target_name[b->core.tid], r1s, r1e+1, 1);
+    if(ldata->config->BW_ptr == NULL) //invalid or missing bigWig
+    {
+        return -1; //this is checked in filter_func as well, so this statement should never run
+    }
+    
+    pthread_mutex_lock(&positionMutex); //locking to avoid threading issues on read
+    vals = bwGetValues(ldata->config->BW_ptr, ldata->hdr->target_name[b->core.tid], read1_start, read1_end+1, 1);
     pthread_mutex_unlock(&positionMutex);
-    if(!vals) //not in bigWig at all, therefore 0 to not call reads mappable unless there is data saying they are
+    if(!vals) //not in bigWig at all, therefore return 0 to not call reads mappable unless there is data saying they are
     {
-        //printf("no vals 1\n");
         return 0;
     }
-    //printf("b\n");
-    for (i=0; i<=r1e-r1s; i++)
+    for (i=0; i<=read1_end-read1_start; i++)
     {
-        //printf("loop1: %f\n", vals->value[i]);
-        if(vals->value[i] > 0.01) //considering NaN as 0 to not call reads mappable unless there is data saying they are
+        if(vals->value[i] > 0.01) //considering NaN as 0 so as to not call reads mappable unless there is data saying they are
         {
-            //printf("pass %f\n", vals->value[i]);
-            base_n++;
+            num_mappable_bases++;
         }
-        if(base_n >= 15)
+        if(num_mappable_bases >= 15)
         {
-            //printf("mappable\n");
             return 1;
         }
     }
-    //printf("fail1\n");
     bwDestroyOverlappingIntervals(vals);
-    pthread_mutex_lock(&positionMutex);
-    vals = bwGetValues(ldata->config->BW_ptr, ldata->hdr->target_name[b->core.tid], r2s, r2e+1, 1);
+    pthread_mutex_lock(&positionMutex); //locking to avoid threading issues on read
+    vals = bwGetValues(ldata->config->BW_ptr, ldata->hdr->target_name[b->core.tid], read2_start, read2_end+1, 1);
     pthread_mutex_unlock(&positionMutex);
-    if(!vals) //not in bigWig at all, therefore 0
+    if(!vals) //not in bigWig at all, therefore return 0
     {
         return 0;
     }
-    //printf("c\n");
-    base_n = 0;
-    for (i=0; i<=r2e-r2s; i++)
+    num_mappable_bases = 0;
+    for (i=0; i<=read2_end-read2_start; i++)
     {
-        //printf("loop2: %f\n", vals->value[i]);
         if(vals->value[i] > 0.01) //considering NaN as 0
         {
-            //printf("pass %f\n", vals->value[i]);
-            base_n++;
+            num_mappable_bases++;
         }
-        if(base_n >= 15)
+        if(num_mappable_bases >= 15)
         {
-            //printf("mappable\n");
             return 1;
         }
     }
-    //printf("fail2\n");
     bwDestroyOverlappingIntervals(vals);
     return 0;
 }
