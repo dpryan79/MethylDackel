@@ -1068,10 +1068,12 @@ int extract_main(int argc, char *argv[]) {
 
     //Run the pileup
     pthread_mutex_init(&positionMutex, NULL);
+    pthread_mutex_init(&bwMutex, NULL);
     pthread_t *threads = calloc(config.nThreads, sizeof(pthread_t));
     for(i=0; i < config.nThreads; i++) pthread_create(threads+i, NULL, &extractCalls, &config);
     for(i=0; i < config.nThreads; i++) pthread_join(threads[i], NULL);
     free(threads);
+    pthread_mutex_destroy(&bwMutex);
     pthread_mutex_destroy(&positionMutex);
 
     //If we've filtered out variant sites

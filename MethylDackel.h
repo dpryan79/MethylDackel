@@ -7,6 +7,7 @@
 
 //These are needed to handle multiple threads
 pthread_mutex_t positionMutex;
+pthread_mutex_t bwMutex;
 pthread_mutex_t outputMutex;
 uint32_t globalTid;
 uint32_t globalPos;

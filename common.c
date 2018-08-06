@@ -234,9 +234,9 @@ char check_mappability(void *data, bam1_t *b) {
         return -1; //this is checked in filter_func as well, so this statement should never run
     }
     
-    pthread_mutex_lock(&positionMutex); //locking to avoid threading issues on read
+    pthread_mutex_lock(&bwMutex); //locking to avoid threading issues on read
     vals = bwGetValues(ldata->config->BW_ptr, ldata->hdr->target_name[b->core.tid], read1_start, read1_end+1, 1);
-    pthread_mutex_unlock(&positionMutex);
+    pthread_mutex_unlock(&bwMutex);
     if(!vals) //not in bigWig at all, therefore return 0 to not call reads mappable unless there is data saying they are
     {
         return 0;
@@ -253,9 +253,9 @@ char check_mappability(void *data, bam1_t *b) {
         }
     }
     bwDestroyOverlappingIntervals(vals);
-    pthread_mutex_lock(&positionMutex); //locking to avoid threading issues on read
+    pthread_mutex_lock(&bwMutex); //locking to avoid threading issues on read
     vals = bwGetValues(ldata->config->BW_ptr, ldata->hdr->target_name[b->core.tid], read2_start, read2_end+1, 1);
-    pthread_mutex_unlock(&positionMutex);
+    pthread_mutex_unlock(&bwMutex);
     if(!vals) //not in bigWig at all, therefore return 0
     {
         return 0;
