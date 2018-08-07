@@ -682,6 +682,7 @@ int extract_main(int argc, char *argv[]) {
     globalTid = globalPos = globalEnd = bin = globalnVariantPositions = 0;
 
     //Defaults
+    config.BWName = NULL;
     config.keepCpG = 1; config.keepCHG = 0; config.keepCHH = 0;
     config.minMapq = 10; config.minPhred = 5; config.keepDupes = 0;
     config.keepSingleton = 0, config.keepDiscordant = 0;
