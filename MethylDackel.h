@@ -93,6 +93,8 @@ typedef struct {
     char *reg;
     char *BAMName;
     char *BWName;
+    float mappabilityCutoff;
+    int minMappableBases;
     bigWigFile_t *BW_ptr;
     htsFile *fp;
     hts_idx_t *bai;

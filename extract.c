@@ -683,6 +683,8 @@ int extract_main(int argc, char *argv[]) {
 
     //Defaults
     config.BWName = NULL;
+    config.mappabilityCutoff = 0.01;
+    config.minMappableBases = 15;
     config.keepCpG = 1; config.keepCHG = 0; config.keepCHH = 0;
     config.minMapq = 10; config.minPhred = 5; config.keepDupes = 0;
     config.keepSingleton = 0, config.keepDiscordant = 0;
@@ -740,9 +742,11 @@ int extract_main(int argc, char *argv[]) {
         {"help",         0, NULL, 'h'},
         {"version",      0, NULL, 'v'},
         {"mappability",         1, NULL,  'M'},
+        {"mappabilityThreshold",         1, NULL,  't'},
+        {"minMappableBases",         1, NULL,  'b'},
         {0,              0, NULL,   0}
     };
-    while((c = getopt_long(argc, argv, "hvq:p:r:l:o:D:f:c:m:d:F:R:@:M:", lopts,NULL)) >=0){
+    while((c = getopt_long(argc, argv, "hvq:p:r:l:o:D:f:c:m:d:F:R:@:M:t:b:", lopts,NULL)) >=0){
         switch(c) {
         case 'h':
             extract_usage();
@@ -838,6 +842,12 @@ int extract_main(int argc, char *argv[]) {
             break;
         case 'M':
             config.BWName = optarg;
+            break;
+        case 't':
+            config.mappabilityCutoff = atof(optarg);
+            break;
+        case 'b':
+            config.minMappableBases = atoi(optarg);
             break;
         case 'F':
             config.ignoreFlags = atoi(optarg);

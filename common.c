@@ -243,11 +243,11 @@ char check_mappability(void *data, bam1_t *b) {
     }
     for (i=0; i<=read1_end-read1_start; i++)
     {
-        if(vals->value[i] > 0.01) //considering NaN as 0 so as to not call reads mappable unless there is data saying they are
+        if(vals->value[i] > ldata->config->mappabilityCutoff) //considering NaN as 0 so as to not call reads mappable unless there is data saying they are
         {
             num_mappable_bases++;
         }
-        if(num_mappable_bases >= 15)
+        if(num_mappable_bases >= ldata->config->minMappableBases)
         {
             return 1;
         }
@@ -263,11 +263,11 @@ char check_mappability(void *data, bam1_t *b) {
     num_mappable_bases = 0;
     for (i=0; i<=read2_end-read2_start; i++)
     {
-        if(vals->value[i] > 0.01) //considering NaN as 0
+        if(vals->value[i] > ldata->config->mappabilityCutoff) //considering NaN as 0
         {
             num_mappable_bases++;
         }
-        if(num_mappable_bases >= 15)
+        if(num_mappable_bases >= ldata->config->minMappableBases)
         {
             return 1;
         }
