@@ -24,6 +24,7 @@ void usage_main() {
 }
 
 int main(int argc, char *argv[]) {
+    //putc((int)('.'), stderr);
     if(argc == 1) {
         usage_main();
         return 0;

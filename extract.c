@@ -236,8 +236,10 @@ int isVariant(Config *config, const bam_pileup1_t *plp, uint32_t *coverage, int 
 }
 
 void *extractCalls(void *foo) {
+    //fprintf(stderr, "in extractCalls\n");
     Config *config = (Config*) foo;
     bam_hdr_t *hdr;
+    //int counter_dbg = 0;
     bam_mplp_t iter;
     int ret, tid, pos, i, seqlen, type, rv, o = 0;
     int32_t bedIdx = 0;
@@ -315,6 +317,7 @@ void *extractCalls(void *foo) {
     }
 
     while(1) {
+        //fprintf(stderr, "in extractCalls big loop\n");
         //Lock and unlock the mutex so we can get/update the tid/position
         pthread_mutex_lock(&positionMutex);
         localBin = bin++;
@@ -325,6 +328,7 @@ void *extractCalls(void *foo) {
             pthread_mutex_unlock(&positionMutex);
             break;
         }
+        //fprintf(stderr, "in extractCalls big loop (2)\n");
         if(globalEnd && localEnd > globalEnd) localEnd = globalEnd;
         adjustBounds(config, hdr, fai, &localTid, &localPos, &localEnd);
         globalPos = localEnd;
@@ -358,6 +362,7 @@ void *extractCalls(void *foo) {
                 continue;
             }
         }
+        //fprintf(stderr, "in extractCalls big loop (3)\n");
         localPos2 = 0;
         if(localPos > 1) {
             localPos2 = localPos - 2;
@@ -379,10 +384,13 @@ void *extractCalls(void *foo) {
         }
 
         //Start the pileup
+        //fprintf(stderr, "starting pileup\n");
         iter = bam_mplp_init(1, filter_func, (void **) &data);
+        //fprintf(stderr, "starting pileup (2)\n");
         bam_mplp_init_overlaps(iter);
         bam_mplp_set_maxcnt(iter, config->maxDepth);
         while((ret = cust_mplp_auto(iter, &tid, &pos, &n_plp, plp)) > 0) {
+            //fprintf(stderr, "looping %d\n", counter_dbg++);
             if(pos < localPos || pos >= localEnd) continue; // out of the region requested
 
             if(config->bed) { //Handle -l
@@ -477,6 +485,7 @@ void *extractCalls(void *foo) {
             }
             lastPos = pos+1;
         }
+        //fprintf(stderr, "starting pileup (3)\n");
         bam_mplp_destroy(iter);
 
         //Don't forget the last CpG/CHG
@@ -541,6 +550,7 @@ void *extractCalls(void *foo) {
         globalnVariantPositions += nVariantPositions;
         pthread_mutex_unlock(&outputMutex);
     }
+    //fprintf(stderr, "done with extractCalls\n");
     return NULL;
 }
 
@@ -663,6 +673,7 @@ void extract_usage() {
 }
 
 int extract_main(int argc, char *argv[]) {
+    //fprintf(stderr, "in extract_main\n");
     char *opref = NULL, *oname, *p;
     int c, i, keepStrand = 0;
     Config config;
