@@ -250,7 +250,11 @@ char check_mappability(void *data, bam1_t *b) {
         }
         if(num_mappable_bases >= ldata->config->minMappableBases)
         {
-            bwDestroyOverlappingIntervals(vals);
+            free(vals->start);
+            free(vals->end);
+            free(vals->value);
+            free(vals);
+            //bwDestroyOverlappingIntervals(vals);
             vals_freed = 1;
             num_mappable_reads++;
             break; //done with this read
