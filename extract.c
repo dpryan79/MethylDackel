@@ -691,6 +691,7 @@ int extract_main(int argc, char *argv[]) {
 
     //Defaults
     config.BWName = NULL;
+    config.BW_ptr = NULL;
     config.mappabilityCutoff = 0.01;
     config.minMappableBases = 15;
     config.keepCpG = 1; config.keepCHG = 0; config.keepCHH = 0;

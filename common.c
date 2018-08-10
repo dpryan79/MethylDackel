@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <limits.h>
 #include <assert.h>
+#include <pthread.h>
 
 void parseBounds(char *s2, int *vals, int mult) {
     char *p, *s = strdup(s2), *end;
@@ -204,15 +205,16 @@ bam1_t *trimAbsoluteAlignment(bam1_t *b, int bounds[16]) {
 }
 
 char check_mappability(void *data, bam1_t *b) {
-    //return value of 1 means mappable, return value of 0 means unmappable
+    //returns number of mappable reads (0-2)
     mplp_data *ldata = (mplp_data *) data;
     int read1_start;
     int read1_end;
     int read2_start;
     int read2_end;
     int i; //loop index
+    int num_mappable_reads = 0;
     char num_mappable_bases = 0; //counter
-    bwOverlappingIntervals_t *vals;
+    bwOverlappingIntervals_t *vals = NULL;
     if(b->core.flag & BAM_FREAD1 || (bam_is_rev(b) && b->core.flag & BAM_FREAD2)) //is this the left read?
     {
         read1_start = b->core.pos;
@@ -237,10 +239,7 @@ char check_mappability(void *data, bam1_t *b) {
     pthread_mutex_lock(&bwMutex); //locking to avoid threading issues on read
     vals = bwGetValues(ldata->config->BW_ptr, ldata->hdr->target_name[b->core.tid], read1_start, read1_end+1, 1);
     pthread_mutex_unlock(&bwMutex);
-    if(!vals) //not in bigWig at all, therefore return 0 to not call reads mappable unless there is data saying they are
-    {
-        return 0;
-    }
+    
     for (i=0; i<=read1_end-read1_start; i++)
     {
         if(vals->value[i] > ldata->config->mappabilityCutoff) //considering NaN as 0 so as to not call reads mappable unless there is data saying they are
@@ -249,17 +248,15 @@ char check_mappability(void *data, bam1_t *b) {
         }
         if(num_mappable_bases >= ldata->config->minMappableBases)
         {
-            return 1;
+            bwDestroyOverlappingIntervals(vals);
+            num_mappable_reads++;
         }
     }
     bwDestroyOverlappingIntervals(vals);
     pthread_mutex_lock(&bwMutex); //locking to avoid threading issues on read
     vals = bwGetValues(ldata->config->BW_ptr, ldata->hdr->target_name[b->core.tid], read2_start, read2_end+1, 1);
     pthread_mutex_unlock(&bwMutex);
-    if(!vals) //not in bigWig at all, therefore return 0
-    {
-        return 0;
-    }
+    
     num_mappable_bases = 0;
     for (i=0; i<=read2_end-read2_start; i++)
     {
@@ -269,11 +266,12 @@ char check_mappability(void *data, bam1_t *b) {
         }
         if(num_mappable_bases >= ldata->config->minMappableBases)
         {
-            return 1;
+            bwDestroyOverlappingIntervals(vals);
+            num_mappable_reads++;
         }
     }
     bwDestroyOverlappingIntervals(vals);
-    return 0;
+    return num_mappable_reads;
 }
 
 //This will need to be restructured to handle multiple input files
