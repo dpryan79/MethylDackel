@@ -1122,6 +1122,6 @@ int extract_main(int argc, char *argv[]) {
     free(oname);
     free(config.output_fp);
     free(config.BWName);
-    free(config.BW_ptr);
+    bwClose(config.BW_ptr);
     return 0;
 }
