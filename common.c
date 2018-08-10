@@ -253,6 +253,7 @@ char check_mappability(void *data, bam1_t *b) {
             bwDestroyOverlappingIntervals(vals);
             vals_freed = 1;
             num_mappable_reads++;
+            break; //done with this read
         }
     }
     if(vals_freed == 0)
@@ -276,6 +277,7 @@ char check_mappability(void *data, bam1_t *b) {
             bwDestroyOverlappingIntervals(vals);
             vals_freed = 1;
             num_mappable_reads++;
+            break; //done with this read
         }
     }
     if(vals_freed == 0)
