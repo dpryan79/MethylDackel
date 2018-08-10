@@ -213,6 +213,7 @@ char check_mappability(void *data, bam1_t *b) {
     int read2_end;
     int i; //loop index
     int num_mappable_reads = 0;
+    char vals_freed = 1;
     char num_mappable_bases = 0; //counter
     bwOverlappingIntervals_t *vals = NULL;
     if(b->core.flag & BAM_FREAD1 || (bam_is_rev(b) && b->core.flag & BAM_FREAD2)) //is this the left read?
@@ -239,6 +240,7 @@ char check_mappability(void *data, bam1_t *b) {
     pthread_mutex_lock(&bwMutex); //locking to avoid threading issues on read
     vals = bwGetValues(ldata->config->BW_ptr, ldata->hdr->target_name[b->core.tid], read1_start, read1_end+1, 1);
     pthread_mutex_unlock(&bwMutex);
+    vals_freed = 0;
     
     for (i=0; i<=read1_end-read1_start; i++)
     {
@@ -249,13 +251,18 @@ char check_mappability(void *data, bam1_t *b) {
         if(num_mappable_bases >= ldata->config->minMappableBases)
         {
             bwDestroyOverlappingIntervals(vals);
+            vals_freed = 1;
             num_mappable_reads++;
         }
     }
-    bwDestroyOverlappingIntervals(vals);
+    if(vals_freed == 0)
+    {
+        bwDestroyOverlappingIntervals(vals);
+    }
     pthread_mutex_lock(&bwMutex); //locking to avoid threading issues on read
     vals = bwGetValues(ldata->config->BW_ptr, ldata->hdr->target_name[b->core.tid], read2_start, read2_end+1, 1);
     pthread_mutex_unlock(&bwMutex);
+    vals_freed = 0;
     
     num_mappable_bases = 0;
     for (i=0; i<=read2_end-read2_start; i++)
@@ -267,8 +274,13 @@ char check_mappability(void *data, bam1_t *b) {
         if(num_mappable_bases >= ldata->config->minMappableBases)
         {
             bwDestroyOverlappingIntervals(vals);
+            vals_freed = 1;
             num_mappable_reads++;
         }
+    }
+    if(vals_freed == 0)
+    {
+        bwDestroyOverlappingIntervals(vals);
     }
     bwDestroyOverlappingIntervals(vals);
     return num_mappable_reads;
