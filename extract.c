@@ -1121,7 +1121,7 @@ int extract_main(int argc, char *argv[]) {
     if(config.bed) destroyBED(config.bed);
     free(oname);
     free(config.output_fp);
-    free(config.BWName);
+    //free(config.BWName);
     bwClose(config.BW_ptr);
     return 0;
 }
