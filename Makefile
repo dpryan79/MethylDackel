@@ -37,7 +37,7 @@ libMethylDackel.a: version.h $(OBJS)
 lib: libMethylDackel.a
 
 MethylDackel: htslib libbw version.h libMethylDackel.a
-	$(CC) $(OPTS) -Ihtslib -IlibBigWig -o MethylDackel main.c libMethylDackel.a htslib/libhts.a libBigWig/libBigWig.so -lm -lz -lpthread
+	$(CC) $(OPTS) -Ihtslib -LlibBigWig -o MethylDackel main.c libMethylDackel.a htslib/libhts.a libBigWig/libBigWig.a -lm -lz -lpthread -lcurl
 
 test: MethylDackel 
 	python tests/test.py
