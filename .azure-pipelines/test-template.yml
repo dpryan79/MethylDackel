@@ -1,3 +1,4 @@
+steps:
 - bash: |
     source activate foo
     make install CC=$CC CFLAGS="-O3 -Wall -I$PREFIX/include" LIBDIRS="$PREFIX/lib" prefix=$PREFIX
