@@ -1,11 +1,9 @@
 prefix ?= /usr/local/bin #This can be changed
 CC ?= gcc
-LIBS ?=
-AR ?= ar
-RANLIB ?= ranlib
+LIBS ?=  # e.g., -L$PREFIX/lib, or where ever htslib is
 CFLAGS ?= -Wall -g -O3 -pthread
 
-.PHONY: all clean install clean-all version.h
+.PHONY: all clean install version.h
 
 .SUFFIXES:.c .o
 
