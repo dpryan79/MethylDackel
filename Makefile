@@ -26,7 +26,7 @@ version.h:
 	$(CC) -c $(CFLAGS) $(LIBS) $< -o $@
 
 MethylDackel: version.h $(OBJS)
-	$(CC) $(CFLAGS) $(LIBS) -o MethylDackel $(OBJS) main.c -lm -lz -lpthread
+	$(CC) $(CFLAGS) $(LIBS) -o MethylDackel $(OBJS) main.c -lm -lz -lpthread -lhts
 
 test: MethylDackel 
 	python tests/test.py
