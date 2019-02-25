@@ -1,14 +1,15 @@
 prefix ?= /usr/local/bin #This can be changed
 CC ?= gcc
+LIBDIRS ?=
 AR ?= ar
 RANLIB ?= ranlib
-OPTS ?= -Wall -g -O3 -pthread
+CFLAGS ?= -Wall -g -O3 -pthread
 
-.PHONY: all clean htslib install clean-all version.h
+.PHONY: all clean install clean-all version.h
 
 .SUFFIXES:.c .o
 
-all: lib MethylDackel
+all: MethylDackel
 
 OBJS = common.o bed.o svg.o pileup.o extract.o MBias.o mergeContext.o
 VERSION = 0.3.0
@@ -22,28 +23,16 @@ version.h:
 	echo '#define VERSION "$(VERSION)"' > $@
 
 .c.o:
-	$(CC) -c $(OPTS) -Ihtslib $< -o $@
+	$(CC) -c $(CFLAGS) $(LIBDIRS) $< -o $@
 
-htslib: 
-	$(MAKE) -C htslib
-
-libMethylDackel.a: version.h $(OBJS)
-	-@rm -f $@
-	$(AR) -rcs $@ $(OBJS)
-
-lib: libMethylDackel.a
-
-MethylDackel: htslib version.h libMethylDackel.a
-	$(CC) $(OPTS) -Ihtslib -o MethylDackel main.c libMethylDackel.a htslib/libhts.a -lm -lz -lpthread
+MethylDackel: version.h $(OBJS)
+	$(CC) $(CFLAGS) $(LIBDIRS) -o MethylDackel $(OBJS) main.c -lm -lz -lpthread
 
 test: MethylDackel 
 	python tests/test.py
 
 clean:
-	rm -f *.o MethylDackel libMethylDackel.a
-
-clean-all: clean
-	make --directory=htslib clean
+	rm -f *.o MethylDackel
 
 install: MethylDackel
 	install MethylDackel $(prefix)
