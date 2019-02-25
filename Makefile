@@ -1,6 +1,6 @@
 prefix ?= /usr/local/bin #This can be changed
 CC ?= gcc
-LIBDIRS ?=
+LIBS ?=
 AR ?= ar
 RANLIB ?= ranlib
 CFLAGS ?= -Wall -g -O3 -pthread
@@ -23,10 +23,10 @@ version.h:
 	echo '#define VERSION "$(VERSION)"' > $@
 
 .c.o:
-	$(CC) -c $(CFLAGS) $(LIBDIRS) $< -o $@
+	$(CC) -c $(CFLAGS) $(LIBS) $< -o $@
 
 MethylDackel: version.h $(OBJS)
-	$(CC) $(CFLAGS) $(LIBDIRS) -o MethylDackel $(OBJS) main.c -lm -lz -lpthread
+	$(CC) $(CFLAGS) $(LIBS) -o MethylDackel $(OBJS) main.c -lm -lz -lpthread
 
 test: MethylDackel 
 	python tests/test.py
