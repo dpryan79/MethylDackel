@@ -1,10 +1,10 @@
 steps:
 - bash: |
-    conda activate foo
+    source activate foo
     env
     make install CC=$CC CFLAGS="-O3 -Wall -I$PREFIX/include" LIBDIRS="$PREFIX/lib" prefix=$PREFIX
   displayName: Installing methylDackel
 - bash: |
-    conda activate foo
+    source activate foo
     make test
   displayName: Test methylDackel

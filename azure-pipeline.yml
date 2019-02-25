@@ -19,18 +19,18 @@ jobs:
     displayName: Installing dependencies
   - template: .azure-pipelines/test-template.yml
 
-- job: 'OSX'
-  pool:
-    vmImage: 'macOS-10.13'
-  strategy:
-    matrix:
-      Python37:
-        python.version: '3.7'
-    maxParallel: 1
-
-  steps:
-  - bash: echo "##vso[task.prependpath]$CONDA/bin"
-    displayName: Add conda to PATH
-  - bash: conda create -n foo -q --yes -c conda-forge -c bioconda clang htslib=1.9 python=3.7
-    displayName: Installing dependencies
-  - template: .azure-pipelines/test-template.yml
+#- job: 'OSX'
+#  pool:
+#    vmImage: 'macOS-10.13'
+#  strategy:
+#    matrix:
+#      Python37:
+#        python.version: '3.7'
+#    maxParallel: 1
+#
+#  steps:
+#  - bash: echo "##vso[task.prependpath]$CONDA/bin"
+#    displayName: Add conda to PATH
+#  - bash: conda create -n foo -q --yes -c conda-forge -c bioconda clang htslib=1.9 python=3.7
+#    displayName: Installing dependencies
+#  - template: .azure-pipelines/test-template.yml
