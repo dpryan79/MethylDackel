@@ -6,5 +6,6 @@ steps:
   displayName: Installing methylDackel
 - bash: |
     source activate foo
+    export LD_LIBRARY_PATH=$CONDA_PREFIX/lib
     make test CC=$CC CFLAGS="-O3 -Wall -I$CONDA_PREFIX/include" LIBS="-L$CONDA_PREFIX/lib"
   displayName: Test methylDackel
