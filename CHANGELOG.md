@@ -2,6 +2,7 @@ Version 0.4.0:
 
    * Switched to an external htslib
    * Added the `--perRead` option, as used in https://www.biorxiv.org/content/10.1101/481283v1
+   * Removed the `--maxDepth` option, it's not longer required.
 
 Version 0.3.0:
 

@@ -9,6 +9,7 @@ int getStrand(bam1_t *b);
 
 /**********************************************
 * Everything below here needs to track htslib!
+* Compatible with htslib 1.9 currently
 **********************************************/
 typedef struct {
     int k, x, y, end;
@@ -21,6 +22,7 @@ typedef struct __linkbuf_t {
     int32_t beg, end;
     cstate_t s;
     struct __linkbuf_t *next;
+    bam_pileup_cd cd;
 } lbnode_t;
 
 typedef struct {
@@ -34,7 +36,7 @@ typedef khash_t(olap_hash) olap_hash_t;
 
 struct __bam_plp_t {
     mempool_t *mp;
-    lbnode_t *head, *tail, *dummy;
+    lbnode_t *head, *tail;
     int32_t tid, pos, max_tid, max_pos;
     int is_eof, max_plp, error, maxcnt;
     uint64_t id;
@@ -44,6 +46,9 @@ struct __bam_plp_t {
     bam_plp_auto_f func;
     void *data;
     olap_hash_t *overlaps;
+
+    int (*plp_construct)(void *data, const bam1_t *b, bam_pileup_cd *cd);
+    int (*plp_destruct )(void *data, const bam1_t *b, bam_pileup_cd *cd);
 };
 
 struct __bam_mplp_t {

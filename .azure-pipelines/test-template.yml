@@ -1,7 +1,6 @@
 steps:
 - bash: |
     source activate foo
-    make -n
     make install CC=$CC CFLAGS="-O3 -Wall -I$CONDA_PREFIX/include" LIBS="-L$CONDA_PREFIX/lib" prefix=$CONDA_PREFIX/bin
   displayName: Installing methylDackel
 - bash: |

@@ -16,7 +16,7 @@
 
 void print_version(void);
 
-inline double logit(double p) { 
+static inline double logit(double p) { 
     return(log(p) - log(1 - p)); 
 }
 
@@ -381,7 +381,7 @@ void *extractCalls(void *foo) {
         //Start the pileup
         iter = bam_mplp_init(1, filter_func, (void **) &data);
         bam_mplp_init_overlaps(iter);
-        bam_mplp_set_maxcnt(iter, config->maxDepth);
+        bam_mplp_set_maxcnt(iter, INT_MAX);
         while((ret = cust_mplp_auto(iter, &tid, &pos, &n_plp, plp)) > 0) {
             if(pos < localPos || pos >= localEnd) continue; // out of the region requested
 
@@ -679,7 +679,6 @@ int extract_main(int argc, char *argv[]) {
     config.merge = 0;
     config.minOppositeDepth = 0;
     config.maxVariantFrac = 0.0;
-    config.maxDepth = 2000;
     config.fp = NULL;
     config.bai = NULL;
     config.reg = NULL;
@@ -741,7 +740,7 @@ int extract_main(int argc, char *argv[]) {
             opref = strdup(optarg);
             break;
         case 'D':
-            config.maxDepth = atoi(optarg);
+            //This is now ignored. It was --maxDepth
             break;
         case 'd':
             config.minDepth = atoi(optarg);
