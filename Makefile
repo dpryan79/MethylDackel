@@ -9,7 +9,7 @@ CFLAGS ?= -Wall -g -O3 -pthread
 
 all: MethylDackel
 
-OBJS = common.o bed.o svg.o pileup.o extract.o MBias.o mergeContext.o
+OBJS = common.o bed.o svg.o pileup.o extract.o MBias.o mergeContext.o perRead.o
 VERSION = 0.3.0
 
 #If we're building from a git repo, then append the most recent tag
