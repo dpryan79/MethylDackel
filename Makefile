@@ -10,7 +10,7 @@ CFLAGS ?= -Wall -g -O3 -pthread
 all: MethylDackel
 
 OBJS = common.o bed.o svg.o pileup.o extract.o MBias.o mergeContext.o perRead.o
-VERSION = 0.3.0
+VERSION = 0.4.0
 
 #If we're building from a git repo, then append the most recent tag
 ifneq "$(wildcard .git)" ""
@@ -25,7 +25,7 @@ version.h:
 
 MethylDackel: version.h $(OBJS)
 	echo $(CFLAGS)
-        echo $(OBJS)
+	echo $(OBJS)
 	$(CC) $(CFLAGS) $(LIBS) -o MethylDackel $(OBJS) main.c -lm -lz -lpthread -lhts
 
 test: MethylDackel 
