@@ -24,6 +24,8 @@ version.h:
 	$(CC) -c $(CFLAGS) $(LIBS) $< -o $@
 
 MethylDackel: version.h $(OBJS)
+	echo $(CFLAGS)
+        echo $(OBJS)
 	$(CC) $(CFLAGS) $(LIBS) -o MethylDackel $(OBJS) main.c -lm -lz -lpthread -lhts
 
 test: MethylDackel 
