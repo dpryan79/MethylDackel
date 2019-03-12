@@ -9,7 +9,7 @@ int getStrand(bam1_t *b);
 
 /**********************************************
 * Everything below here needs to track htslib!
-* Compatible with htslib 1.9 currently
+* Compatible with htslib 1.4->1.9 currently
 **********************************************/
 typedef struct {
     int k, x, y, end;
