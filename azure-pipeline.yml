@@ -15,7 +15,7 @@ jobs:
   steps:
   - bash: echo "##vso[task.prependpath]/usr/share/miniconda/bin"
     displayName: Add conda to PATH
-  - bash: conda create -n foo -q --yes -c conda-forge -c bioconda htslib python gcc_impl_linux-64
+  - bash: conda create -n foo -q --yes -c conda-forge -c bioconda htslib python gcc_impl_linux-64 binutils_impl_linux-64
     displayName: Installing dependencies
   - template: .azure-pipelines/test-template.yml
 
@@ -31,6 +31,6 @@ jobs:
   steps:
   - bash: echo "##vso[task.prependpath]$CONDA/bin"
     displayName: Add conda to PATH
-  - bash: conda create -n foo -q --yes -c conda-forge -c bioconda htslib python clang
+  - bash: conda create -n foo -q --yes -c conda-forge -c bioconda htslib python clang clang_osx-64
     displayName: Installing dependencies
   - template: .azure-pipelines/test-template.yml
