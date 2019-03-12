@@ -171,7 +171,7 @@ void mergeContext_usage() {
 "            - allows reading from a pipe.\n"
 "\nOptions:\n"
 "  -o STR    Output file name [stdout]\n"
-"  --version Printer version and quit\n"
+"  --version Print version and quit\n"
 );
 }
 
