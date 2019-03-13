@@ -30,6 +30,9 @@ jobs:
 
   steps:
   - bash: echo "##vso[task.prependpath]$CONDA/bin"
+    env: {
+      OSX_FORCE_SDK_DOWNLOAD: "1"
+    }
     displayName: Add conda to PATH
   - bash: conda create -n foo -q --yes -c conda-forge -c bioconda htslib python clang clang_osx-64 clangxx
     displayName: Installing dependencies
