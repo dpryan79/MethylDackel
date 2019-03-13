@@ -33,4 +33,6 @@ jobs:
     displayName: Add conda to PATH
   - bash: conda create -n foo -q --yes -c conda-forge -c bioconda htslib python clang clang_osx-64 clangxx
     displayName: Installing dependencies
+  - bash: xcodebuild -version
+    displayName: XCode version
   - template: .azure-pipelines/test-template.yml
