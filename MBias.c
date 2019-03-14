@@ -154,7 +154,7 @@ void *extractMBias(void *foo) {
         //Start the pileup
         iter = bam_mplp_init(1, filter_func, (void **) &data);
 //        bam_mplp_init_overlaps(iter); //This is included in extract but excluded here. The main benefit to exclusion is that you can more accurately gauge overlapping regions.
-        bam_mplp_set_maxcnt(iter, config->maxDepth);
+        bam_mplp_set_maxcnt(iter, INT_MAX);
         while((ret = bam_mplp_auto(iter, &tid, &pos, &n_plp, plp)) > 0) {
             if(pos < localPos || pos >= localEnd) continue; // out of the region requested
 
@@ -301,7 +301,6 @@ int mbias_main(int argc, char *argv[]) {
     config.minMapq = 10; config.minPhred = 5; config.keepDupes = 0;
     config.keepSingleton = 0, config.keepDiscordant = 0;
     
-    config.maxDepth = 2000;
     config.fp = NULL;
     config.bai = NULL;
     config.reg = NULL;
@@ -344,7 +343,7 @@ int mbias_main(int argc, char *argv[]) {
             print_version();
             return 0;
         case 'D' :
-            config.maxDepth = atoi(optarg);
+            // This is now set to INT_MAX, it was --maxDepth
             break;
         case 'r':
             config.reg = optarg;

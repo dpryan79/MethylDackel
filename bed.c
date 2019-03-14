@@ -8,7 +8,7 @@ KSTREAM_INIT(gzFile, gzread, 8192)
 //returns <0 if region0 comes before region1
 //returns >0 if region0 comes after region1
 //returns 0 on overlap
-inline int64_t compareRegions(int32_t tid0, int32_t start0, int32_t end0, int32_t tid1, int32_t start1, int32_t end1) {
+static inline int64_t compareRegions(int32_t tid0, int32_t start0, int32_t end0, int32_t tid1, int32_t start1, int32_t end1) {
     if(tid0 != tid1) return ((int64_t) tid0)-((int64_t) tid1);
     if(start0 < start1 && end0 >= start1) return 0;
     if(start0 >= start1 && start0 < end1) return 0;

@@ -7,7 +7,7 @@
 Prerequisites
 =============
 
-A C compiler, such as gcc.
+A C compiler, such as gcc, and htslib (versions 1.4 through 1.9 are known to be compatible).
 
 Compilation
 ===========
@@ -19,6 +19,9 @@ Compilation and installation can be performed via:
     make
     make install prefix=/some/installation/path
 
+If the linker has issues finding the htslib headers and library, then specify them using `CFLAGS` and `LIBS`:
+
+    make install CFLAGS="-O3 -Wall -I/some/path/include " LIBS="-L/some/path/lib" prefix=/some/installation/path
 
 Methylation Context
 ===================
@@ -144,6 +147,19 @@ Ignored alignments
 ==================
 
 By default, any alignment marked as being secondary (bit 256), having failed QC (bit 512), being a PCR/optical duplicate (bit 1024), or being supplemental (bit 2048) is ignored. This is a reasonable default and should only be changed by expert users. For those needing to change this behaviour, please see the `-F` or `--ignoreFlags` options to both `MethylDackel mbias` and `MethylDackel extract`.
+
+Per-read metrics
+================
+
+As of version 0.4.0, MethyDackel provides a `perRead` subcommand that will produce the per-read CpG methylation level. This has been used by [Stamenova et al.](https://doi.org/10.1101/481283) in their Hi-Culfite method. The output is a tab-separated file with the following fields:
+
+ - read name
+ - chromosome
+ - position
+ - CpG methylation (%)
+ - number of informative bases.
+
+Fragments longer than 10kb are currently not handled correctly.
 
 Citing MethylDackel
 ===================

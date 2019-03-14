@@ -1,4 +1,10 @@
-Vesion 0.3.0:
+Version 0.4.0:
+
+   * Switched to an external htslib. It is currently compatible with htslib versions 1.4 through 1.9 (the latest one at the time of release).
+   * Added the `--perRead` option, as used in https://www.biorxiv.org/content/10.1101/481283v1
+   * Removed the `--maxDepth` option, it's not longer required.
+
+Version 0.3.0:
 
    * Added `--nOT`, `--nOB`, `--nCTOT` and `--nCTOB`, which are related to `--OT` and similar. The difference is that the specified number of bases will be ignored, regardless of read length. So `--nOT 5,5,5,5` will result in the 5 bases on either end of both reads being ignored.
 
