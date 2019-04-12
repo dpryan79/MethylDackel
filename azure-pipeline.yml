@@ -22,7 +22,7 @@ jobs:
 #This tries to link against 32-bit libraries for some reason
 - job: 'OSX'
   pool:
-    vmImage: 'macOS-10.13'
+    vmImage: 'macOS-10.14'
   strategy:
     matrix:
       Python37:
