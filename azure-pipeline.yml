@@ -32,6 +32,6 @@ jobs:
   steps:
   - bash: echo "##vso[task.prependpath]$CONDA/bin"
     displayName: Add conda to PATH
-  - bash: conda create -n foo -q --yes -c conda-forge -c bioconda htslib python clang clang_osx-64 clangxx cctools compiler-rt ld64
+  - bash: conda create -n foo -q --yes -c conda-forge -c bioconda htslib python clang clang_osx-64 clangxx cctools compiler-rt ld64 && env
     displayName: Installing dependencies
   - template: .azure-pipelines/test-template.yml
