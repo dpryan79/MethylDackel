@@ -45,7 +45,7 @@ strandMeth *mergeStrandMeth(strandMeth *target, strandMeth *source) {
     if(target->m < source->l) target = growStrandMeth(target, source->m);
     if(target->l < source->l) target->l = source->l;
 
-    for(i=0; i<target->l; i++) {
+    for(i=0; i<source->l; i++) {
         target->unmeth1[i] += source->unmeth1[i];
         target->meth1[i] += source->meth1[i];
         target->unmeth2[i] += source->unmeth2[i];
