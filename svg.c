@@ -8,7 +8,7 @@
 //Agresti-Coull confidence interval around a methylation value
 //If which is 1, return the upper 99.9% CI, otherwise the return the lower 99.9% CI
 double CI(uint32_t um, uint32_t m, int which) {
-    double ZZ, Z, N_dot, P_dot, X, N;
+    double ZZ, Z, N_dot, P_dot, X, N, rv;
 
     X = (double) m;
     N = (double) (m+um);
@@ -16,10 +16,14 @@ double CI(uint32_t um, uint32_t m, int which) {
     Z = 3.2905267315; //qnorm(0.9995)
     N_dot = N + ZZ;
     P_dot = (1.0/N_dot)*(X+0.5*ZZ);
-    if(which)
-        return P_dot + Z*sqrt((P_dot/N_dot)*(1-P_dot));
-    else
-        return P_dot - Z*sqrt((P_dot/N_dot)*(1-P_dot));
+    if(which) {
+        rv = P_dot + Z*sqrt((P_dot/N_dot)*(1-P_dot));
+        if(rv>1.) rv = 1.0;
+    } else {
+        rv = P_dot - Z*sqrt((P_dot/N_dot)*(1-P_dot));
+        if(rv<0.) rv = 0.0;
+    }
+    return rv;
 }
 
 double getMaxY(strandMeth *m) {
