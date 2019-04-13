@@ -580,7 +580,8 @@ void extract_usage() {
 " -o, --opref STR  Output filename prefix. CpG/CHG/CHH context metrics will be\n"
 "                  output to STR_CpG.bedGraph and so on.\n"
 " --keepDupes      By default, any alignment marked as a duplicate is ignored.\n"
-"                  This option causes them to be incorporated.\n"
+"                  This option causes them to be incorporated. This will unset\n"
+"                  bit 0x400 in --ignoreFlags.\n"
 " --keepSingleton  By default, if only one read in a pair aligns (a singleton)\n"
 "                  then it's ignored.\n"
 " --keepDiscordant By default, paired-end alignments with the properly-paired bit\n"
@@ -872,6 +873,9 @@ int extract_main(int argc, char *argv[]) {
     if(config.minMapq < 0) {
         fprintf(stderr, "-q %i is invalid. Resetting to 0, which is the lowest possible value.\n", config.minMapq);
         config.minMapq = 0;
+    }
+    if(config.keepDupes > 0 && (config.ignoreFlags & 0x400)) {
+        config.ignoreFlags -= 0x400;
     }
     if(config.fraction+config.counts+config.logit+config.methylKit+config.cytosine_report > 1) {
         fprintf(stderr, "More than one of --fraction, --counts, --methylKit, --cytosine_report and --logit were specified. These are mutually exclusive.\n");
