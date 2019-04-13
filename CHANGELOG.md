@@ -3,6 +3,8 @@ Version 0.4.0:
    * Switched to an external htslib. It is currently compatible with htslib versions 1.4 through 1.9 (the latest one at the time of release).
    * Added the `--perRead` option, as used in https://www.biorxiv.org/content/10.1101/481283v1
    * Removed the `--maxDepth` option, it's not longer required.
+   * Fixed issue #58, the `--keepDupes` flag now changes `--ignoreFlags`.
+   * Fixed issue #59, the confidence intervals should no longer extend outside of [0, 1].
 
 Version 0.3.0:
 
