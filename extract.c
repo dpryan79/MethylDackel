@@ -959,43 +959,45 @@ int extract_main(int argc, char *argv[]) {
         fprintf(stderr, "Couldn't open %s for reading!\n", config.BWName);
         return -4;
     }
-    
-    config.bw_data = malloc(config.BW_ptr->cl->nKeys*sizeof(char*)); //init outer array
-    
-    fprintf(stderr, "chrom, len\n");
-    for(int i = 0; i<config.BW_ptr->cl->nKeys; i++)
+    if(config.BWName)
     {
-        int arrlen;
-        fprintf(stderr, "%s: %d\n", config.BW_ptr->cl->chrom[i], config.BW_ptr->cl->len[i]);
-        arrlen = config.BW_ptr->cl->len[i]/8;
-        if(config.BW_ptr->cl->len[i]%8 > 0)
-        {
-            arrlen++;
-        }
-        config.bw_data[i] = malloc(arrlen*sizeof(char)); //init inner array
-        fprintf(stderr, "getting values...\n");
-        bwOverlappingIntervals_t *vals = bwGetValues(config.BW_ptr, config.BW_ptr->cl->chrom[i], 0, config.BW_ptr->cl->len[i], 1);
-        fprintf(stderr, "loaded values, saving...\n");
-        for(int j = 0; j<config.BW_ptr->cl->len[i]; j++)
-        {
-            /*if(!(j%10000000))
-            {
-                fprintf(stderr, "%d/%d\n", j, config.BW_ptr->cl->len[i]);
-            }*/
-            char offset;
-            int index;
-            char aboveCutoff;
-            index = j/8;
-            offset = j%8;
-            if(offset == 0) //starting new byte
-            {
-                config.bw_data[i][index] = 0; //init new byte
-            }
-            aboveCutoff = vals->value[j] > config.mappabilityCutoff; //check if above cutoff
-            config.bw_data[i][index] = config.bw_data[i][index] | (aboveCutoff >> offset); //set bit
-        }
-        bwDestroyOverlappingIntervals(vals);
+        config.bw_data = malloc(config.BW_ptr->cl->nKeys*sizeof(char*)); //init outer array
         
+        fprintf(stderr, "chrom, len\n");
+        for(int i = 0; i<config.BW_ptr->cl->nKeys; i++)
+        {
+            int arrlen;
+            fprintf(stderr, "%s: %d\n", config.BW_ptr->cl->chrom[i], config.BW_ptr->cl->len[i]);
+            arrlen = config.BW_ptr->cl->len[i]/8;
+            if(config.BW_ptr->cl->len[i]%8 > 0)
+            {
+                arrlen++;
+            }
+            config.bw_data[i] = malloc(arrlen*sizeof(char)); //init inner array
+            fprintf(stderr, "getting values...\n");
+            bwOverlappingIntervals_t *vals = bwGetValues(config.BW_ptr, config.BW_ptr->cl->chrom[i], 0, config.BW_ptr->cl->len[i], 1);
+            fprintf(stderr, "loaded values, saving...\n");
+            for(int j = 0; j<config.BW_ptr->cl->len[i]; j++)
+            {
+                /*if(!(j%10000000))
+                {
+                    fprintf(stderr, "%d/%d\n", j, config.BW_ptr->cl->len[i]);
+                }*/
+                char offset;
+                int index;
+                char aboveCutoff;
+                index = j/8;
+                offset = j%8;
+                if(offset == 0) //starting new byte
+                {
+                    config.bw_data[i][index] = 0; //init new byte
+                }
+                aboveCutoff = vals->value[j] > config.mappabilityCutoff; //check if above cutoff
+                config.bw_data[i][index] = config.bw_data[i][index] | (aboveCutoff >> offset); //set bit
+            }
+            bwDestroyOverlappingIntervals(vals);
+            
+        }
     }
 
     //Output files
