@@ -96,6 +96,7 @@ typedef struct {
     float mappabilityCutoff;
     int minMappableBases;
     bigWigFile_t *BW_ptr;
+    char** bw_data;
     htsFile *fp;
     hts_idx_t *bai;
     char *bedName;

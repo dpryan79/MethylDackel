@@ -259,7 +259,6 @@ void *extractCalls(void *foo) {
     faidx_t *fai;
     hts_idx_t *bai;
     htsFile *fp;
-
     os = calloc(3, sizeof(kstring_t*));
     os_CpG = calloc(1, sizeof(kstring_t));
     os_CHG = calloc(1, sizeof(kstring_t));
@@ -286,7 +285,6 @@ void *extractCalls(void *foo) {
         return NULL;
     }
     hdr = sam_hdr_read(fp);
-
     if(config->merge) {
         if(config->keepCpG) {
             lastCpG = calloc(1, sizeof(struct lastCall));
@@ -388,7 +386,9 @@ void *extractCalls(void *foo) {
         iter = bam_mplp_init(1, filter_func, (void **) &data);
         //fprintf(stderr, "starting pileup (2)\n");
         bam_mplp_init_overlaps(iter);
+        //fprintf(stderr, "starting pileup (2b)\n");
         bam_mplp_set_maxcnt(iter, config->maxDepth);
+        //fprintf(stderr, "starting pileup (2c)\n");
         while((ret = cust_mplp_auto(iter, &tid, &pos, &n_plp, plp)) > 0) {
             //fprintf(stderr, "looping %d\n", counter_dbg++);
             if(pos < localPos || pos >= localEnd) continue; // out of the region requested
@@ -959,6 +959,44 @@ int extract_main(int argc, char *argv[]) {
         fprintf(stderr, "Couldn't open %s for reading!\n", config.BWName);
         return -4;
     }
+    
+    config.bw_data = malloc(config.BW_ptr->cl->nKeys*sizeof(char*)); //init outer array
+    
+    fprintf(stderr, "chrom, len\n");
+    for(int i = 0; i<config.BW_ptr->cl->nKeys; i++)
+    {
+        int arrlen;
+        fprintf(stderr, "%s: %d\n", config.BW_ptr->cl->chrom[i], config.BW_ptr->cl->len[i]);
+        arrlen = config.BW_ptr->cl->len[i]/8;
+        if(config.BW_ptr->cl->len[i]%8 > 0)
+        {
+            arrlen++;
+        }
+        config.bw_data[i] = malloc(arrlen*sizeof(char)); //init inner array
+        fprintf(stderr, "getting values...\n");
+        bwOverlappingIntervals_t *vals = bwGetValues(config.BW_ptr, config.BW_ptr->cl->chrom[i], 0, config.BW_ptr->cl->len[i], 1);
+        fprintf(stderr, "loaded values, saving...\n");
+        for(int j = 0; j<config.BW_ptr->cl->len[i]; j++)
+        {
+            /*if(!(j%10000000))
+            {
+                fprintf(stderr, "%d/%d\n", j, config.BW_ptr->cl->len[i]);
+            }*/
+            char offset;
+            int index;
+            char aboveCutoff;
+            index = j/8;
+            offset = j%8;
+            if(offset == 0) //starting new byte
+            {
+                config.bw_data[i][index] = 0; //init new byte
+            }
+            aboveCutoff = vals->value[j] > config.mappabilityCutoff; //check if above cutoff
+            config.bw_data[i][index] = config.bw_data[i][index] | (aboveCutoff >> offset); //set bit
+        }
+        bwDestroyOverlappingIntervals(vals);
+        
+    }
 
     //Output files
     config.output_fp = malloc(sizeof(FILE *) * 3);
@@ -1057,7 +1095,6 @@ int extract_main(int argc, char *argv[]) {
             printHeader(config.output_fp[2], "CHH", opref, config);
         }
     }
-
     //parse the region, if needed
     if(config.reg) {
         const char *foo;
@@ -1096,7 +1133,6 @@ int extract_main(int argc, char *argv[]) {
             return 1;
         }
     }
-
     //Run the pileup
     pthread_mutex_init(&positionMutex, NULL);
     pthread_mutex_init(&bwMutex, NULL);
@@ -1109,7 +1145,6 @@ int extract_main(int argc, char *argv[]) {
 
     //If we've filtered out variant sites
     if(globalnVariantPositions) printf("%"PRIu64" positions were excluded due to likely being variants.\n", globalnVariantPositions);
-
     //Close things up
     hts_close(config.fp);
     if(config.cytosine_report) fclose(config.output_fp[0]);
@@ -1121,7 +1156,11 @@ int extract_main(int argc, char *argv[]) {
     if(config.bed) destroyBED(config.bed);
     free(oname);
     free(config.output_fp);
-    //free(config.BWName);
     bwClose(config.BW_ptr);
+    for(int i = 0; i<config.BW_ptr->cl->nKeys; i++)
+    {
+        free(config.bw_data[i]);
+    }
+    free(config.bw_data);
     return 0;
 }

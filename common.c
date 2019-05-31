@@ -204,8 +204,42 @@ bam1_t *trimAbsoluteAlignment(bam1_t *b, int bounds[16]) {
     return b;
 }
 
+char* getMappabilityValue(Config* config, char* chrom_n, uint32_t start, uint32_t end)
+{
+    uint32_t chrom = -1;
+    for(int i = 0; i<config->BW_ptr->cl->nKeys; i++) //loop over chromosomes
+    {
+        if(!strcmp(config->BW_ptr->cl->chrom[i], chrom_n)) //found the chromosome
+        {
+            chrom = i;
+            break;
+        }
+    }
+    char* data = malloc((end-start)*sizeof(char)); //allocate array for data
+    int index = start/8;
+    int offset = start%8;
+    for(int i = 0; i<end-start; i++)
+    {
+        char byte = config->bw_data[chrom][index];
+        char mask = 1 >> offset;
+        char val = (byte & mask) << offset;
+        data[i] = val;
+        if(offset == 7)
+        {
+            index++;
+            offset = 0;
+        }
+        else
+        {
+            offset++;
+        }
+        
+    }
+    return data;
+}
+
 char check_mappability(void *data, bam1_t *b) {
-    //returns number of mappable reads (0-2)
+    //returns number of mappable reads in read pair (0-2)
     mplp_data *ldata = (mplp_data *) data;
     int read1_start;
     int read1_end;
@@ -214,7 +248,7 @@ char check_mappability(void *data, bam1_t *b) {
     int i; //loop index
     int num_mappable_reads = 0;
     char num_mappable_bases = 0; //counter
-    bwOverlappingIntervals_t *vals = NULL;
+    char *vals = NULL;
     if(b->core.flag & BAM_FREAD1 || (bam_is_rev(b) && b->core.flag & BAM_FREAD2)) //is this the left read?
     {
         read1_start = b->core.pos;
@@ -223,26 +257,25 @@ char check_mappability(void *data, bam1_t *b) {
         read2_end = b->core.mpos + b->core.l_qseq; //assuming both reads same length to avoid issues finding read2_end on right read (doing the same on the left read for consistency)
         
     }
-    else
+    else //get pos for right read
     {
         read2_start = b->core.pos;
         read2_end = b->core.pos + b->core.l_qseq;
         read1_start = b->core.mpos;
         read1_end = b->core.mpos + b->core.l_qseq; //assuming both reads same length to avoid issues finding read2_end
     }
-    
     if(ldata->config->BW_ptr == NULL) //invalid or missing bigWig
     {
         return -1; //this is checked in filter_func as well, so this statement should never run
     }
-    
-    pthread_mutex_lock(&bwMutex); //locking to avoid threading issues on read
-    vals = bwGetValues(ldata->config->BW_ptr, ldata->hdr->target_name[b->core.tid], read1_start, read1_end+1, 1);
-    pthread_mutex_unlock(&bwMutex);
+    //pthread_mutex_lock(&bwMutex); //locking to avoid threading issues on read
+    vals = getMappabilityValue(ldata->config, ldata->hdr->target_name[b->core.tid], read1_start, read1_end+1);
+    //bwGetValues(ldata->config->BW_ptr, ldata->hdr->target_name[b->core.tid], read1_start, read1_end+1, 1);
+    //pthread_mutex_unlock(&bwMutex);
     
     for (i=0; i<=read1_end-read1_start; i++)
     {
-        if(vals->value[i] > ldata->config->mappabilityCutoff) //considering NaN as 0 so as to not call reads mappable unless there is data saying they are
+        if(vals[i] > ldata->config->mappabilityCutoff) //considering NaN as 0 so as to not call reads mappable unless there is data saying they are
         {
             num_mappable_bases++;
         }
@@ -252,18 +285,19 @@ char check_mappability(void *data, bam1_t *b) {
             break; //done with this read
         }
     }
-    free(vals->start);
-    free(vals->end);
-    free(vals->value);
+    //free(vals->start);
+    //free(vals->end);
+    //free(vals->value);
     free(vals);
-    pthread_mutex_lock(&bwMutex); //locking to avoid threading issues on read
-    vals = bwGetValues(ldata->config->BW_ptr, ldata->hdr->target_name[b->core.tid], read2_start, read2_end+1, 1);
-    pthread_mutex_unlock(&bwMutex);
+    //pthread_mutex_lock(&bwMutex); //locking to avoid threading issues on read
+    vals = getMappabilityValue(ldata->config, ldata->hdr->target_name[b->core.tid], read2_start, read2_end+1);
+    //bwGetValues(ldata->config->BW_ptr, ldata->hdr->target_name[b->core.tid], read2_start, read2_end+1, 1);
+    //pthread_mutex_unlock(&bwMutex);
     
     num_mappable_bases = 0;
     for (i=0; i<=read2_end-read2_start; i++)
     {
-        if(vals->value[i] > ldata->config->mappabilityCutoff) //considering NaN as 0
+        if(vals[i] > ldata->config->mappabilityCutoff) //considering NaN as 0
         {
             num_mappable_bases++;
         }
@@ -273,9 +307,9 @@ char check_mappability(void *data, bam1_t *b) {
             break; //done with this read
         }
     }
-    free(vals->start);
-    free(vals->end);
-    free(vals->value);
+    //free(vals->start);
+    //free(vals->end);
+    //free(vals->value);
     free(vals);
     return num_mappable_reads;
 }
