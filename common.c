@@ -206,35 +206,49 @@ bam1_t *trimAbsoluteAlignment(bam1_t *b, int bounds[16]) {
 
 char* getMappabilityValue(Config* config, char* chrom_n, uint32_t start, uint32_t end)
 {
+    fprintf(stderr, "started getMappabilityValue\n");
     uint32_t chrom = -1;
     for(int i = 0; i<config->BW_ptr->cl->nKeys; i++) //loop over chromosomes
     {
+        fprintf(stderr, "getting chrom idv");
         if(!strcmp(config->BW_ptr->cl->chrom[i], chrom_n)) //found the chromosome
         {
+            fprintf(stderr, "found chrom id\n");
             chrom = i;
             break;
         }
     }
+    fprintf(stderr, "out of chrom id loop\n");
     char* data = malloc((end-start)*sizeof(char)); //allocate array for data
+    fprintf(stderr, "data array allocated\n");
     int index = start/8;
     int offset = start%8;
+    fprintf(stderr, "calculated idex and offset\n");
     for(int i = 0; i<end-start; i++)
     {
+        fprintf(stderr, "looping over data\n");
         char byte = config->bw_data[chrom][index];
+        fprintf(stderr, "got data byte\n");
         char mask = 1 >> offset;
+        fprintf(stderr, "created mask\n");
         char val = (byte & mask) << offset;
+        fprintf(stderr, "masked data byte and did offset\n");
         data[i] = val;
+        fprintf(stderr, "assigned to data arr\n");
         if(offset == 7)
         {
+            fprintf(stderr, "moving to next byte\n");
             index++;
             offset = 0;
         }
         else
         {
+            fprintf(stderr, "incrementing offset\n");
             offset++;
         }
         
     }
+    fprintf(stderr, "done with getting data\n");
     return data;
 }
 
@@ -275,7 +289,7 @@ char check_mappability(void *data, bam1_t *b) {
     
     for (i=0; i<=read1_end-read1_start; i++)
     {
-        if(vals[i] > ldata->config->mappabilityCutoff) //considering NaN as 0 so as to not call reads mappable unless there is data saying they are
+        if(vals[i]) //considering NaN as 0 so as to not call reads mappable unless there is data saying they are
         {
             num_mappable_bases++;
         }
@@ -297,7 +311,7 @@ char check_mappability(void *data, bam1_t *b) {
     num_mappable_bases = 0;
     for (i=0; i<=read2_end-read2_start; i++)
     {
-        if(vals[i] > ldata->config->mappabilityCutoff) //considering NaN as 0
+        if(vals[i]) //considering NaN as 0
         {
             num_mappable_bases++;
         }
