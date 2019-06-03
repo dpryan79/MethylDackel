@@ -210,10 +210,10 @@ char* getMappabilityValue(Config* config, char* chrom_n, uint32_t start, uint32_
     uint32_t chrom = -1;
     for(int i = 0; i<config->BW_ptr->cl->nKeys; i++) //loop over chromosomes
     {
-        fprintf(stderr, "getting chrom idv");
+        //fprintf(stderr, "getting chrom id\n");
         if(!strcmp(config->BW_ptr->cl->chrom[i], chrom_n)) //found the chromosome
         {
-            fprintf(stderr, "found chrom id\n");
+            //fprintf(stderr, "found chrom id\n");
             chrom = i;
             break;
         }
@@ -223,27 +223,27 @@ char* getMappabilityValue(Config* config, char* chrom_n, uint32_t start, uint32_
     fprintf(stderr, "data array allocated\n");
     int index = start/8;
     int offset = start%8;
-    fprintf(stderr, "calculated idex and offset\n");
+    fprintf(stderr, "calculated index and offset\n");
     for(int i = 0; i<end-start; i++)
     {
-        fprintf(stderr, "looping over data\n");
+        //fprintf(stderr, "looping over data\n");
         char byte = config->bw_data[chrom][index];
-        fprintf(stderr, "got data byte\n");
+        //fprintf(stderr, "got data byte\n");
         char mask = 1 >> offset;
-        fprintf(stderr, "created mask\n");
+        //fprintf(stderr, "created mask\n");
         char val = (byte & mask) << offset;
-        fprintf(stderr, "masked data byte and did offset\n");
+        //fprintf(stderr, "masked data byte and did offset\n");
         data[i] = val;
-        fprintf(stderr, "assigned to data arr\n");
+        //fprintf(stderr, "assigned to data arr\n");
         if(offset == 7)
         {
-            fprintf(stderr, "moving to next byte\n");
+            //fprintf(stderr, "moving to next byte\n");
             index++;
             offset = 0;
         }
         else
         {
-            fprintf(stderr, "incrementing offset\n");
+            //fprintf(stderr, "incrementing offset\n");
             offset++;
         }
         
