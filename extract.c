@@ -236,10 +236,10 @@ int isVariant(Config *config, const bam_pileup1_t *plp, uint32_t *coverage, int 
 }
 
 void *extractCalls(void *foo) {
-    fprintf(stderr, "in extractCalls\n");
+    //fprintf(stderr, "in extractCalls\n");
     Config *config = (Config*) foo;
     bam_hdr_t *hdr;
-    int counter_dbg = 0;
+    //int counter_dbg = 0;
     bam_mplp_t iter;
     int ret, tid, pos, i, seqlen, type, rv, o = 0;
     int32_t bedIdx = 0;
@@ -315,7 +315,7 @@ void *extractCalls(void *foo) {
     }
 
     while(1) {
-        fprintf(stderr, "in extractCalls big loop\n");
+        //fprintf(stderr, "in extractCalls big loop\n");
         //Lock and unlock the mutex so we can get/update the tid/position
         pthread_mutex_lock(&positionMutex);
         localBin = bin++;
@@ -326,7 +326,7 @@ void *extractCalls(void *foo) {
             pthread_mutex_unlock(&positionMutex);
             break;
         }
-        fprintf(stderr, "in extractCalls big loop (2)\n");
+        //fprintf(stderr, "in extractCalls big loop (2)\n");
         if(globalEnd && localEnd > globalEnd) localEnd = globalEnd;
         adjustBounds(config, hdr, fai, &localTid, &localPos, &localEnd);
         globalPos = localEnd;
@@ -360,7 +360,7 @@ void *extractCalls(void *foo) {
                 continue;
             }
         }
-        fprintf(stderr, "in extractCalls big loop (3)\n");
+        //fprintf(stderr, "in extractCalls big loop (3)\n");
         localPos2 = 0;
         if(localPos > 1) {
             localPos2 = localPos - 2;
@@ -382,15 +382,15 @@ void *extractCalls(void *foo) {
         }
 
         //Start the pileup
-        fprintf(stderr, "starting pileup\n");
+        //fprintf(stderr, "starting pileup\n");
         iter = bam_mplp_init(1, filter_func, (void **) &data);
-        fprintf(stderr, "starting pileup (2)\n");
+        //fprintf(stderr, "starting pileup (2)\n");
         bam_mplp_init_overlaps(iter);
-        fprintf(stderr, "starting pileup (2b)\n");
+        //fprintf(stderr, "starting pileup (2b)\n");
         bam_mplp_set_maxcnt(iter, config->maxDepth);
-        fprintf(stderr, "starting pileup (2c)\n");
+        //fprintf(stderr, "starting pileup (2c)\n");
         while((ret = cust_mplp_auto(iter, &tid, &pos, &n_plp, plp)) > 0) {
-            fprintf(stderr, "looping %d\n", counter_dbg++);
+            //fprintf(stderr, "looping %d\n", counter_dbg++);
             if(pos < localPos || pos >= localEnd) continue; // out of the region requested
 
             if(config->bed) { //Handle -l
@@ -485,7 +485,7 @@ void *extractCalls(void *foo) {
             }
             lastPos = pos+1;
         }
-        fprintf(stderr, "starting pileup (3)\n");
+        //fprintf(stderr, "starting pileup (3)\n");
         bam_mplp_destroy(iter);
 
         //Don't forget the last CpG/CHG
@@ -550,7 +550,7 @@ void *extractCalls(void *foo) {
         globalnVariantPositions += nVariantPositions;
         pthread_mutex_unlock(&outputMutex);
     }
-    fprintf(stderr, "done with extractCalls\n");
+    //fprintf(stderr, "done with extractCalls\n");
     return NULL;
 }
 
@@ -961,35 +961,50 @@ int extract_main(int argc, char *argv[]) {
     }
     if(config.BWName)
     {
+        double lastVal = 0;
         config.bw_data = malloc(config.BW_ptr->cl->nKeys*sizeof(char*)); //init outer array
-        
-        fprintf(stderr, "chrom, len\n");
+        fprintf(stderr, "loading mappability data from %s\n", config.BWName);
+        //fprintf(stderr, "chrom, len\n");
         for(int i = 0; i<config.BW_ptr->cl->nKeys; i++)
         {
             int arrlen;
-            fprintf(stderr, "%s: %d\n", config.BW_ptr->cl->chrom[i], config.BW_ptr->cl->len[i]);
+            //fprintf(stderr, "%s: %d\n", config.BW_ptr->cl->chrom[i], config.BW_ptr->cl->len[i]);
             arrlen = config.BW_ptr->cl->len[i]/8;
             if(config.BW_ptr->cl->len[i]%8 > 0)
             {
                 arrlen++;
             }
             config.bw_data[i] = malloc(arrlen*sizeof(char)); //init inner array
-            fprintf(stderr, "getting values...\n");
+            //fprintf(stderr, "getting values...\n");
             bwOverlappingIntervals_t *vals = bwGetValues(config.BW_ptr, config.BW_ptr->cl->chrom[i], 0, config.BW_ptr->cl->len[i], 1);
-            fprintf(stderr, "loaded values, saving...\n");
+            //fprintf(stderr, "loaded values, saving...\n");
             for(int j = 0; j<config.BW_ptr->cl->len[i]; j++)
             {
                 char offset;
                 int index;
                 char aboveCutoff;
+                double val;
                 index = j/8;
                 offset = j%8;
+                //fprintf(stderr, "index: %d, offset: %d\n", index, offset);
                 if(offset == 0) //starting new byte
                 {
                     config.bw_data[i][index] = 0; //init new byte
                 }
-                aboveCutoff = vals->value[j] > config.mappabilityCutoff; //check if above cutoff
-                config.bw_data[i][index] = config.bw_data[i][index] | (aboveCutoff >> offset); //set bit
+                val = vals->value[j];
+                if(isnan(val))
+                {
+                    val = lastVal; //convert NA to previous value
+                }
+                else
+                {
+                    //fprintf(stderr, "new value: %f\n", val);
+                    lastVal = val; //set new previous value
+                }
+                aboveCutoff = (char)(val > config.mappabilityCutoff); //check if above cutoff
+                //fprintf(stderr, "val: %f, cutoff: %f, aboveCutoff: %d\n", val, config.mappabilityCutoff, aboveCutoff);
+                config.bw_data[i][index] = config.bw_data[i][index] | (aboveCutoff << offset); //set bit
+                //fprintf(stderr, "byte: 0x%x\n", config.bw_data[i][index]);
             }
             bwDestroyOverlappingIntervals(vals);
             
@@ -997,7 +1012,7 @@ int extract_main(int argc, char *argv[]) {
     }
 
     //Output files
-    fprintf(stderr, "setting up output file\n");
+    //fprintf(stderr, "setting up output file\n");
     config.output_fp = malloc(sizeof(FILE *) * 3);
     assert(config.output_fp);
     if(opref == NULL) {
@@ -1006,9 +1021,9 @@ int extract_main(int argc, char *argv[]) {
         p = strrchr(opref, '.');
         if(p != NULL) *p = '\0';
         fprintf(stderr, "writing to prefix:'%s'\n", opref);
-        fprintf(stderr, "printed \"writing to prefix\" message\n");
+        //fprintf(stderr, "printed \"writing to prefix\" message\n");
     }
-    fprintf(stderr, "starting processing\n");
+    //fprintf(stderr, "starting processing\n");
     if(config.fraction) { 
         oname = malloc(sizeof(char) * (strlen(opref)+19));
     } else if(config.counts) {
@@ -1026,7 +1041,7 @@ int extract_main(int argc, char *argv[]) {
     } else { 
         oname = malloc(sizeof(char) * (strlen(opref)+14));
     }
-    fprintf(stderr, "read some config stuff\n");
+    //fprintf(stderr, "read some config stuff\n");
     assert(oname);
     if(config.keepCpG && !config.cytosine_report) {
         if(config.fraction) { 
@@ -1051,7 +1066,7 @@ int extract_main(int argc, char *argv[]) {
             printHeader(config.output_fp[0], "CpG", opref, config);
         }
     }
-    fprintf(stderr, "more config stuff\n");
+    //fprintf(stderr, "more config stuff\n");
     if(config.keepCHG && !config.cytosine_report) {
         if(config.fraction) { 
             sprintf(oname, "%s_CHG.meth.bedGraph", opref);
@@ -1075,7 +1090,7 @@ int extract_main(int argc, char *argv[]) {
             printHeader(config.output_fp[1], "CHG", opref, config);
         }
     }
-    fprintf(stderr, "more config stuff (2)\n");
+    //fprintf(stderr, "more config stuff (2)\n");
     if(config.keepCHH && !config.cytosine_report) {
         if(config.fraction) { 
             sprintf(oname, "%s_CHH.meth.bedGraph", opref);
@@ -1099,7 +1114,7 @@ int extract_main(int argc, char *argv[]) {
             printHeader(config.output_fp[2], "CHH", opref, config);
         }
     }
-    fprintf(stderr, "about to parse BED region (or not)\n");
+    //fprintf(stderr, "about to parse BED region (or not)\n");
     //parse the region, if needed
     if(config.reg) {
         const char *foo;
@@ -1138,17 +1153,17 @@ int extract_main(int argc, char *argv[]) {
             return 1;
         }
     }
-    fprintf(stderr, "starting pileup\n");
+    //fprintf(stderr, "starting pileup\n");
     //Run the pileup
     pthread_mutex_init(&positionMutex, NULL);
     pthread_mutex_init(&bwMutex, NULL);
-    fprintf(stderr, "starting threads\n");
+    //fprintf(stderr, "starting threads\n");
     pthread_t *threads = calloc(config.nThreads, sizeof(pthread_t));
-    fprintf(stderr, "starting threads2\n");
+    //fprintf(stderr, "starting threads2\n");
     for(i=0; i < config.nThreads; i++) pthread_create(threads+i, NULL, &extractCalls, &config);
-    fprintf(stderr, "starting threads3\n");
+    //fprintf(stderr, "starting threads3\n");
     for(i=0; i < config.nThreads; i++) pthread_join(threads[i], NULL);
-    fprintf(stderr, "done with threads\n");
+    //fprintf(stderr, "done with threads\n");
     free(threads);
     pthread_mutex_destroy(&bwMutex);
     pthread_mutex_destroy(&positionMutex);
