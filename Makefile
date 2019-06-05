@@ -2,7 +2,7 @@ prefix ?= /usr/local/bin #This can be changed
 CC ?= gcc
 AR ?= ar
 RANLIB ?= ranlib
-OPTS ?= -Wall -g -O0 -pthread
+OPTS ?= -Wall -g -O3 -pthread
 
 .PHONY: all clean htslib install clean-all version.h
 

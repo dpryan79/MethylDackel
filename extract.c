@@ -16,7 +16,7 @@
 
 void print_version(void);
 
-inline double logit(double p) { 
+extern inline double logit(double p) { 
     return(log(p) - log(1 - p)); 
 }
 
