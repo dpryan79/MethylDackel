@@ -109,7 +109,7 @@ char revcomp(char b) {
         case 'T':
         case 't':
             return 'A';
-        default:
+
             return 'N';
     }
 }
@@ -1181,11 +1181,14 @@ int extract_main(int argc, char *argv[]) {
     if(config.bed) destroyBED(config.bed);
     free(oname);
     free(config.output_fp);
-    bwClose(config.BW_ptr);
+    //fprintf(stderr, "there should be %d chromosomes\n", config.BW_ptr->cl->nKeys); 
+    //fprintf(stderr, "config.bw_data[0] is \"%s\"\n", config.bw_data[0]);
     for(int i = 0; i<config.BW_ptr->cl->nKeys; i++)
     {
+	//fprintf(stderr, "config.bw_data[%d] is \"%s\"\n", i, config.bw_data[i]);
         free(config.bw_data[i]);
     }
     free(config.bw_data);
+    bwClose(config.BW_ptr);
     return 0;
 }
