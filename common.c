@@ -219,12 +219,12 @@ unsigned char* getMappabilityValue(Config* config, char* chrom_n, uint32_t start
         }
     }
     //fprintf(stderr, "out of chrom id loop\n");
-    unsigned char* data = malloc((end-start)*sizeof(char)); //allocate array for data
+    unsigned char* data = malloc((end-start)*sizeof(unsigned char)); //allocate array for data
     //fprintf(stderr, "data array allocated\n");
     int index = start/8;
     int offset = start%8;
     //fprintf(stderr, "calculated index and offset\n");
-    for(int i = 0; i<end-start; i++)
+    for(int i = 0; i<(end-start)-1; i++)
     {
         //fprintf(stderr, "looping over data\n");
         unsigned char byte = config->bw_data[chrom][index];
