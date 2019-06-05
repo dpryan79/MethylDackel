@@ -224,7 +224,7 @@ unsigned char* getMappabilityValue(Config* config, char* chrom_n, uint32_t start
     int index = start/8;
     int offset = start%8;
     //fprintf(stderr, "calculated index and offset\n");
-    for(int i = 0; i<(end-start)-1; i++)
+    for(int i = 0; i<end-start; i++)
     {
         //fprintf(stderr, "looping over data\n");
         unsigned char byte = config->bw_data[chrom][index];
@@ -232,7 +232,11 @@ unsigned char* getMappabilityValue(Config* config, char* chrom_n, uint32_t start
         unsigned char mask = 1 << offset;
         //fprintf(stderr, "created mask\n");
         unsigned char val = (byte & mask) >> offset;
-        //fprintf(stderr, "masked data byte and did offset\n");
+	if(!strcmp(chrom_n, "chrM")) //only print logs closer to the crash to not fill up the file with log-spam
+	{
+		fprintf(stderr, "start=%d, end=%d, index=%d, offset=%d, i=%d, chrom=%d, chrom_n=%s\n", start, end, index, offset, i, chrom, chrom_n);
+        }
+	//fprintf(stderr, "masked data byte and did offset\n");
         data[i] = val;
         //fprintf(stderr, "assigned to data arr\n");
         if(offset == 7)
@@ -261,6 +265,7 @@ unsigned char* getMappabilityValue(Config* config, char* chrom_n, uint32_t start
 char check_mappability(void *data, bam1_t *b) {
     //returns number of mappable reads in read pair (0-2)
     mplp_data *ldata = (mplp_data *) data;
+    //fprintf(stderr, "chrom name: %s", ldata->hdr->target_name[b->core.tid]);
     int read1_start;
     int read1_end;
     int read2_start;

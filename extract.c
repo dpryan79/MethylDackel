@@ -320,6 +320,7 @@ void *extractCalls(void *foo) {
         pthread_mutex_lock(&positionMutex);
         localBin = bin++;
         localTid = globalTid;
+        fprintf(stderr, "chrom name: %s\n", data->hdr->target_name[localTid]);
         localPos = globalPos;
         localEnd = localPos + config->chunkSize;
         if(localTid >= hdr->n_targets) {
