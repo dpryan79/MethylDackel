@@ -226,8 +226,16 @@ unsigned char* getMappabilityValue(Config* config, char* chrom_n, uint32_t start
     //fprintf(stderr, "calculated index and offset\n");
     for(int i = 0; i<end-start; i++)
     {
+        unsigned char byte;
         //fprintf(stderr, "looping over data\n");
-        unsigned char byte = config->bw_data[chrom][index];
+        if(chrom > 0) //is chrom a valid chrom ID, or -1 i.e. chrom not found
+        {
+            byte = config->bw_data[chrom][index];
+        }
+        else
+        {
+            byte = 0; //if not a valid chrom, mappability is N/A i.e. 0
+        }
         //fprintf(stderr, "got data byte\n");
         unsigned char mask = 1 << offset;
         //fprintf(stderr, "created mask\n");
