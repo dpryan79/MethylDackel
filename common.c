@@ -242,10 +242,10 @@ unsigned char* getMappabilityValue(Config* config, char* chrom_n, uint32_t start
         unsigned char mask = 1 << offset;
         //fprintf(stderr, "created mask\n");
         unsigned char val = (byte & mask) >> offset;
-	if(!strcmp(chrom_n, "chrM")) //only print logs closer to the crash to not fill up the file with log-spam
-	{
-		fprintf(stderr, "start=%d, end=%d, index=%d, offset=%d, i=%d, chrom=%d, chrom_n=%s\n", start, end, index, offset, i, chrom, chrom_n);
-        }
+        //if(!strcmp(chrom_n, "chrM")) //only print logs closer to the crash to not fill up the file with log-spam
+        //{
+        //    fprintf(stderr, "start=%d, end=%d, index=%d, offset=%d, i=%d, chrom=%d, chrom_n=%s\n", start, end, index, offset, i, chrom, chrom_n);
+        //}
 	//fprintf(stderr, "masked data byte and did offset\n");
         data[i] = val;
         //fprintf(stderr, "assigned to data arr\n");
