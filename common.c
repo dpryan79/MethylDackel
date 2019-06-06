@@ -207,6 +207,7 @@ bam1_t *trimAbsoluteAlignment(bam1_t *b, int bounds[16]) {
 unsigned char* getMappabilityValue(Config* config, char* chrom_n, uint32_t start, uint32_t end)
 {
     //fprintf(stderr, "started getMappabilityValue\n");
+    char chromFound = 0;
     uint32_t chrom = -1;
     for(int i = 0; i<config->BW_ptr->cl->nKeys; i++) //loop over chromosomes
     {
@@ -215,6 +216,7 @@ unsigned char* getMappabilityValue(Config* config, char* chrom_n, uint32_t start
         {
             //fprintf(stderr, "found chrom id\n");
             chrom = i;
+            chromFound = 1;
             break;
         }
     }
@@ -228,7 +230,7 @@ unsigned char* getMappabilityValue(Config* config, char* chrom_n, uint32_t start
     {
         unsigned char byte;
         //fprintf(stderr, "looping over data\n");
-        if(chrom > 0) //is chrom a valid chrom ID, or -1 i.e. chrom not found
+        if(chromFound) //was a chrom ID found for chrom_n, or is chrom still -1 (or here 4,294,967,295) i.e. chrom not found
         {
             byte = config->bw_data[chrom][index];
         }
