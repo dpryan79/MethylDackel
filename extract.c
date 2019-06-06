@@ -1149,11 +1149,14 @@ int extract_main(int argc, char *argv[]) {
     if(config.bed) destroyBED(config.bed);
     free(oname);
     free(config.output_fp);
-    for(int i = 0; i<config.BW_ptr->cl->nKeys; i++)
+    if(config.BW_ptr)
     {
-        free(config.bw_data[i]);
+        for(int i = 0; i<config.BW_ptr->cl->nKeys; i++)
+        {
+            free(config.bw_data[i]);
+        }
+        free(config.bw_data);
     }
-    free(config.bw_data);
     bwClose(config.BW_ptr);
     return 0;
 }
