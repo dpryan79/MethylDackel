@@ -206,30 +206,23 @@ bam1_t *trimAbsoluteAlignment(bam1_t *b, int bounds[16]) {
 
 unsigned char* getMappabilityValue(Config* config, char* chrom_n, uint32_t start, uint32_t end)
 {
-    //fprintf(stderr, "started getMappabilityValue\n");
     char chromFound = 0;
     uint32_t chrom = -1;
     for(int i = 0; i<config->BW_ptr->cl->nKeys; i++) //loop over chromosomes
     {
-        //fprintf(stderr, "getting chrom id\n");
         if(!strcmp(config->BW_ptr->cl->chrom[i], chrom_n)) //found the chromosome
         {
-            //fprintf(stderr, "found chrom id\n");
             chrom = i;
             chromFound = 1;
             break;
         }
     }
-    //fprintf(stderr, "out of chrom id loop\n");
     unsigned char* data = malloc((end-start)*sizeof(unsigned char)); //allocate array for data
-    //fprintf(stderr, "data array allocated\n");
     int index = start/8;
     int offset = start%8;
-    //fprintf(stderr, "calculated index and offset\n");
     for(int i = 0; i<end-start; i++)
     {
         unsigned char byte;
-        //fprintf(stderr, "looping over data\n");
         if(chromFound) //was a chrom ID found for chrom_n, or is chrom still -1 (or here 4,294,967,295) i.e. chrom not found
         {
             byte = config->bw_data[chrom][index];
@@ -238,44 +231,26 @@ unsigned char* getMappabilityValue(Config* config, char* chrom_n, uint32_t start
         {
             byte = 0; //if not a valid chrom, mappability is N/A i.e. 0
         }
-        //fprintf(stderr, "got data byte\n");
         unsigned char mask = 1 << offset;
-        //fprintf(stderr, "created mask\n");
         unsigned char val = (byte & mask) >> offset;
-        //if(!strcmp(chrom_n, "chrM")) //only print logs closer to the crash to not fill up the file with log-spam
-        //{
-        //    fprintf(stderr, "start=%d, end=%d, index=%d, offset=%d, i=%d, chrom=%d, chrom_n=%s\n", start, end, index, offset, i, chrom, chrom_n);
-        //}
-	//fprintf(stderr, "masked data byte and did offset\n");
         data[i] = val;
-        //fprintf(stderr, "assigned to data arr\n");
-        if(offset == 7)
+        if(offset == 7) //at end of byte
         {
-            //fprintf(stderr, "moving to next byte\n");
             index++;
             offset = 0;
         }
         else
         {
-            //fprintf(stderr, "incrementing offset\n");
             offset++;
         }
         
     }
-    //fprintf(stderr, "done with getting data\n");
-    /*fprintf(stderr, "data: ", data);
-    for(int i = 0; i<(end-start)-1; i++)
-    {
-        fprintf(stderr, "%d, ", data[i]);
-    }
-    fprintf(stderr, "%d\n", data[(end-start)-1]);*/
     return data;
 }
 
 char check_mappability(void *data, bam1_t *b) {
     //returns number of mappable reads in read pair (0-2)
     mplp_data *ldata = (mplp_data *) data;
-    //fprintf(stderr, "chrom name: %s", ldata->hdr->target_name[b->core.tid]);
     int read1_start;
     int read1_end;
     int read2_start;
@@ -303,61 +278,36 @@ char check_mappability(void *data, bam1_t *b) {
     {
         return -1; //this is checked in filter_func as well, so this statement should never run
     }
-    //pthread_mutex_lock(&bwMutex); //locking to avoid threading issues on read
     vals = getMappabilityValue(ldata->config, ldata->hdr->target_name[b->core.tid], read1_start, read1_end+1);
-    //bwGetValues(ldata->config->BW_ptr, ldata->hdr->target_name[b->core.tid], read1_start, read1_end+1, 1);
-    //pthread_mutex_unlock(&bwMutex);
     
     for (i=0; i<=read1_end-read1_start; i++)
     {
-        if(vals[i] > 0) //considering NaN as 0 so as to not call reads mappable unless there is data saying they are
+        if(vals[i] > 0) //is base above threshold?
         {
             num_mappable_bases++;
-            //fprintf(stderr, "%s:%d-%d, mappable base (1), num_mappable_bases is %d, cutoff is %d\n", ldata->hdr->target_name[b->core.tid], read1_start, read1_end+1, num_mappable_bases, ldata->config->minMappableBases);
-        }
-        else
-        {
-            //fprintf(stderr, "%s:%d-%d, NON-mappable base (1)\n", ldata->hdr->target_name[b->core.tid], read1_start, read1_end+1);
         }
         if(num_mappable_bases >= ldata->config->minMappableBases)
         {
             num_mappable_reads++;
-            //fprintf(stderr, "mappable read (1)\n");
             break; //done with this read
         }
     }
-    //free(vals->start);
-    //free(vals->end);
-    //free(vals->value);
     free(vals);
-    //pthread_mutex_lock(&bwMutex); //locking to avoid threading issues on read
     vals = getMappabilityValue(ldata->config, ldata->hdr->target_name[b->core.tid], read2_start, read2_end+1);
-    //bwGetValues(ldata->config->BW_ptr, ldata->hdr->target_name[b->core.tid], read2_start, read2_end+1, 1);
-    //pthread_mutex_unlock(&bwMutex);
     
     num_mappable_bases = 0;
     for (i=0; i<=read2_end-read2_start; i++)
     {
-        if(vals[i] > 0) //considering NaN as 0
+        if(vals[i] > 0) //is base above threshold?
         {
-            //fprintf(stderr, "mappable base (2)\n");
             num_mappable_bases++;
-            //fprintf(stderr, "%s:%d-%d, mappable base (2), num_mappable_bases is %d, cutoff is %d\n", ldata->hdr->target_name[b->core.tid], read1_start, read1_end+1, num_mappable_bases, ldata->config->minMappableBases);
-        }
-        else
-        {
-            //fprintf(stderr, "%s:%d-%d, NON-mappable base (2)\n", ldata->hdr->target_name[b->core.tid], read1_start, read1_end+1);
         }
         if(num_mappable_bases >= ldata->config->minMappableBases)
         {
             num_mappable_reads++;
-            //fprintf(stderr, "mappable read (2)\n");
             break; //done with this read
         }
     }
-    //free(vals->start);
-    //free(vals->end);
-    //free(vals->value);
     free(vals);
     return num_mappable_reads;
 }
@@ -382,8 +332,6 @@ int filter_func(void *data, bam1_t *b) {
             NH = bam_aux2i(p);
             if(NH>1) continue; //Ignore obvious multimappers
         }
-        //check_mappability(ldata, b);
-        //printf("%i", !ldata->config->BW_ptr);
         if(ldata->config->BW_ptr && check_mappability(ldata, b) == 0) continue; //Low mappability
         if(!ldata->config->keepSingleton && (b->core.flag & 0x9) == 0x9) continue; //Singleton
         if(!ldata->config->keepDiscordant && (b->core.flag & 0x3) == 0x1) continue; //Discordant
