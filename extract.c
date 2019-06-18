@@ -579,6 +579,15 @@ void extract_usage() {
 " -b, --minMappableBases INT    If a bigWig file is provided, this sets the\n"
 "                  number of mappable bases needed for a read to be considered\n"
 "                  mappable (default 15).\n"
+" -O, --outputBBFile    If this is specified, a Binary Bismap (.bb) file will\n"
+"                  be written with the same base name as the provided bigWig file,\n"
+"                  but with the .bb extension. Neither this option nor -N have any\n"
+"                  effect if a bigWig is not specified with -M.\n"
+" -N, --outputBBFileName FILE    If this is specified, a Binary Bismap (.bb) file will\n"
+"                  be written at the provided filename. Neither this option nor -O\n"
+"                  have any effect if a bigWig is not specified with -M.\n"
+" -B, --mappabilityBB FILE    A .bb file containing mappability data for\n"
+"                  filtering reads.\n"
 " -@ nThreads      The number of threads to use, the default 1\n"
 " --chunkSize INT  The size of the genome processed by a single thread at a time.\n"
 "                  The default is 1000000 bases. This value MUST be at least 1.\n"
@@ -679,6 +688,7 @@ int extract_main(int argc, char *argv[]) {
 
     //Defaults
     config.BWName = NULL;
+    config.BBName = NULL;
     config.BW_ptr = NULL;
     config.mappabilityCutoff = 0.01;
     config.minMappableBases = 15;
@@ -741,9 +751,11 @@ int extract_main(int argc, char *argv[]) {
         {"mappability",         1, NULL,  'M'},
         {"mappabilityThreshold",         1, NULL,  't'},
         {"minMappableBases",         1, NULL,  'b'},
+        {"outputBBFile",         1, NULL,  'O'},
+        {"outputBBFileName",         1, NULL,  'N'},
         {0,              0, NULL,   0}
     };
-    while((c = getopt_long(argc, argv, "hvq:p:r:l:o:D:f:c:m:d:F:R:@:M:t:b:", lopts,NULL)) >=0){
+    while((c = getopt_long(argc, argv, "hvq:p:r:l:o:D:f:c:m:d:F:R:@:M:t:b:ON:", lopts,NULL)) >=0){
         switch(c) {
         case 'h':
             extract_usage();
@@ -846,6 +858,14 @@ int extract_main(int argc, char *argv[]) {
         case 'b':
             config.minMappableBases = atoi(optarg);
             break;
+        case 'O':
+            config.BBName = NULL;
+            config.outputBB = 1;
+            break;
+        case 'N':
+            config.BBName = optarg;
+            config.outputBB = 1;
+            break;
         case 'F':
             config.ignoreFlags = atoi(optarg);
             break;
@@ -878,11 +898,18 @@ int extract_main(int argc, char *argv[]) {
         }
     }
 
+    if(config.outputBB && (!config.BBName && config.BWName))
+    {
+        char* tmp = strdup(config.BWName);
+        char* p = strrchr(tmp, '.');
+        if(p != NULL) *p = '\0';
+        config.BBName = strcat(tmp, ".bb");
+    }
     if(argc == 1) {
         extract_usage();
         return 0;
     }
-    if(argc-optind != 2) {
+    if(argc-optind < 2) {
         fprintf(stderr, "You must supply a reference genome in fasta format and an input BAM file!!!\n");
         extract_usage();
         return -1;
@@ -949,11 +976,43 @@ int extract_main(int argc, char *argv[]) {
     }
     if(config.BWName)
     {
-        double lastVal = 0;
+        FILE* f;
+        uint16_t runlen;
+        uint16_t chromNameLen;
+        unsigned char lastval;
+        unsigned char flag;
+        int RUNOFFSET = 100;
+        if(config.BBName)
+        {
+            f = fopen(config.BBName, "wb");
+            if(f == NULL)
+            {
+                fprintf(stderr, "Couldn't open %s for writing!\n", config.BBName);
+                return -7;
+            }
+        }
         config.bw_data = malloc(config.BW_ptr->cl->nKeys*sizeof(char*)); //init outer array
         fprintf(stderr, "loading mappability data from %s\n", config.BWName);
+        if(config.BBName)
+        {
+            fwrite(&config.BW_ptr->cl->nKeys, sizeof(uint32_t), 1, f); //write chrom count
+            fprintf(stderr, "writing BB file to %s\n", config.BBName);
+        }
         for(int i = 0; i<config.BW_ptr->cl->nKeys; i++)
         {
+            if(config.BBName)
+            {
+                lastval = 255; //255 here is an placeholder value since there is no last value yet
+                runlen = 0;
+                chromNameLen = (uint16_t)(strlen(config.BW_ptr->cl->chrom[i]));
+                fwrite(&chromNameLen, sizeof(chromNameLen), 1, f);
+                fwrite(config.BW_ptr->cl->chrom[i], sizeof(char), chromNameLen, f);
+                flag = 0;
+                fwrite(&flag, sizeof(unsigned char), 1, f);
+                uint32_t chromLen = (uint32_t)(config.BW_ptr->cl->len[i]);
+                fwrite(&chromLen, sizeof(uint32_t), 1, f);
+            }
+            
             int arrlen;
             arrlen = config.BW_ptr->cl->len[i]/8;
             if(config.BW_ptr->cl->len[i]%8 > 0)
@@ -967,29 +1026,129 @@ int extract_main(int argc, char *argv[]) {
                 char offset;
                 int index;
                 char aboveCutoff;
-                double val;
+                double val_raw;
+                char val;
                 index = j/8;
                 offset = j%8;
                 if(offset == 0) //starting new byte
                 {
                     config.bw_data[i][index] = 0; //init new byte
                 }
-                val = vals->value[j];
+                val_raw = vals->value[j];
+                val = (char)((val_raw*100)+0.5); //0.5 is to prevent roundoff error issues
                 if(isnan(val))
                 {
-                    val = lastVal; //convert NA to previous value
+                    val = (lastval==255?0:lastval); //convert NA to previous value
+                    val_raw = (lastval==255?0:((double)(lastval)/100.0)); //convert NA to previous value
+                }
+                if(config.BBName)
+                {
+                    if(val == lastval && runlen < 65535)
+                    {
+                        runlen++;
+                        /*if((j>248000000 && i == 0) || (j<10000 && i == 1))
+                        {
+                            printf("Value (%f) %d == lastval %d, runlen=%d at %s:%d-%d\n", val_raw*100, val, lastval, runlen, config.BW_ptr->cl->chrom[i], j, j+1);
+                        }*/
+                        
+                    }
+                    else
+                    {
+                        if(runlen > 1) //a run just ended
+                        {
+                            if(runlen < 155) //short run (2 byte format)
+                            {
+                                unsigned char runval = (unsigned char)(runlen)+RUNOFFSET;
+                                /*if((j>248000000 && i == 0) || (j<10000 && i == 1))
+                                {
+                                    printf("Ending run, lastval=%d, runlen=%d, runval=%d\n", lastval, runlen, runval);}*/
+                                //printf("Writing %2X %2X\n", runval, lastval);
+                                fwrite(&runval, sizeof(char), 1, f);
+                                fwrite(&lastval, sizeof(char), 1, f);
+                            }
+                            else //long run (4 byte format)
+                            {
+                                unsigned char flag = 255; //flag for long run
+                                /*if((j>248000000 && i == 0) || (j<10000 && i == 1))
+                                {
+                                    printf("Ending LONG run, lastval=%d, runlen=%d\n", lastval, runlen);
+                                }*/
+                                //printf("Writing %2X %2X\n", runval, lastval);
+                                fwrite(&flag, sizeof(char), 1, f);
+                                fwrite(&runlen, sizeof(uint16_t), 1, f);
+                                fwrite(&lastval, sizeof(char), 1, f);
+                            }
+                            runlen = 0;
+                        }
+                        if(j<((config.BW_ptr->cl->len[i])-1) && (char)(((vals->value[j+1])*100)+0.5) == val) //starting a run
+                        {
+                            /*if((j>248000000 && i == 0) || (j<10000 && i == 1))
+                            {
+                                printf("Starting run of (%f) %d at %s:%d-%d\n", val_raw*100, val, config.BW_ptr->cl->chrom[i], j, j+1);
+                            }*/
+                            lastval = val;
+                            runlen = 1;
+                        }
+                        else
+                        {
+                            /*if((j>248000000 && i == 0) || (j<10000 && i == 1))
+                            {
+                                printf("New value (%f) %d at %s:%d-%d\n", val_raw*100, val, config.BW_ptr->cl->chrom[i], j, j+1);
+                            }*/
+                            //printf("Writing %2X\n", val);
+                            fwrite(&val, sizeof(char), 1, f);
+                            lastval = val;
+                            runlen = 0;
+                        }
+                    }
                 }
                 else
                 {
-                    lastVal = val; //set new previous value
+                    lastval = val;
                 }
-                aboveCutoff = (char)(val > config.mappabilityCutoff); //check if above cutoff
+                aboveCutoff = (char)(val_raw > config.mappabilityCutoff); //check if above cutoff
                 config.bw_data[i][index] = config.bw_data[i][index] | (aboveCutoff << offset); //set bit
+            }
+            if(config.BBName)
+            {
+                if(runlen > 1) //a run just ended
+                {
+                    if(runlen < 155) //short run (2 byte format)
+                    {
+                        unsigned char runval = (unsigned char)(runlen)+RUNOFFSET;
+                        /*if((i == 0) || (i == 1))
+                        {
+                            printf("Ending run, lastval=%d, runlen=%d, runval=%d\n", lastval, runlen, runval);
+                        }*/
+                        //printf("Writing %2X %2X\n", runval, lastval);
+                        fwrite(&runval, sizeof(char), 1, f);
+                        fwrite(&lastval, sizeof(char), 1, f);
+                    }
+                    else //long run (4 byte format)
+                    {
+                        unsigned char flag = 255; //flag for long run
+                        /*if((i == 0) || (i == 1))
+                        {
+                            printf("Ending LONG run, lastval=%d, runlen=%d\n", lastval, runlen);
+                        }*/
+                        //printf("Writing %2X %2X\n", runval, lastval);
+                        fwrite(&flag, sizeof(char), 1, f);
+                        fwrite(&runlen, sizeof(uint16_t), 1, f);
+                        fwrite(&lastval, sizeof(char), 1, f);
+                    }
+                    runlen = 0;
+                }
             }
             bwDestroyOverlappingIntervals(vals);
             
         }
+        if(config.BBName)
+        {
+            fclose(f);
+        }
+        
     }
+
 
     //Output files
     config.output_fp = malloc(sizeof(FILE *) * 3);
