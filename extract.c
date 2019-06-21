@@ -1066,18 +1066,14 @@ int extract_main(int argc, char *argv[]) {
                 val = (char)((val_raw*100)+0.5); //0.5 is to prevent roundoff error issues
                 if(isnan(val_raw))
                 {
-                    val = 0; //(lastval==255?0:lastval); //convert NA to previous value
-                    val_raw = 0; //(lastval==255?0:((double)(lastval)/100.0)); //convert NA to previous value
+                    val = 0; //convert NA to 0
+                    val_raw = 0; //convert NA to 0
                 }
                 if(config.outBBMName)
                 {
                     if(val == lastval && runlen < 65535)
                     {
                         runlen++;
-                        /*if((j>248000000 && i == 0) || (j<10000 && i == 1))
-                        {
-                            printf("Value (%f) %d == lastval %d, runlen=%d at %s:%d-%d\n", val_raw*100, val, lastval, runlen, config.BW_ptr->cl->chrom[i], j, j+1);
-                        }*/
                         
                     }
                     else
@@ -1087,21 +1083,12 @@ int extract_main(int argc, char *argv[]) {
                             if(runlen < 156) //short run (2 byte format)
                             {
                                 unsigned char runval = (unsigned char)(runlen)+RUNOFFSET;
-                                /*if((j>248000000 && i == 0) || (j<10000 && i == 1))
-                                {
-                                    printf("Ending run, lastval=%d, runlen=%d, runval=%d\n", lastval, runlen, runval);}*/
-                                //printf("Writing %2X %2X\n", runval, lastval);
                                 fwrite(&runval, sizeof(char), 1, f);
                                 fwrite(&lastval, sizeof(char), 1, f);
                             }
                             else //long run (4 byte format)
                             {
                                 unsigned char flag = 255; //flag for long run
-                                /*if((j>248000000 && i == 0) || (j<10000 && i == 1))
-                                {
-                                    printf("Ending LONG run, lastval=%d, runlen=%d\n", lastval, runlen);
-                                }*/
-                                //printf("Writing %2X %2X\n", runval, lastval);
                                 fwrite(&flag, sizeof(char), 1, f);
                                 fwrite(&runlen, sizeof(uint16_t), 1, f);
                                 fwrite(&lastval, sizeof(char), 1, f);
@@ -1110,20 +1097,11 @@ int extract_main(int argc, char *argv[]) {
                         }
                         if(j<((config.BW_ptr->cl->len[i])-1) && (char)(((vals->value[j+1])*100)+0.5) == val) //starting a run
                         {
-                            /*if((j>248000000 && i == 0) || (j<10000 && i == 1))
-                            {
-                                printf("Starting run of (%f) %d at %s:%d-%d\n", val_raw*100, val, config.BW_ptr->cl->chrom[i], j, j+1);
-                            }*/
                             lastval = val;
                             runlen = 1;
                         }
                         else
                         {
-                            /*if((j>248000000 && i == 0) || (j<10000 && i == 1))
-                            {
-                                printf("New value (%f) %d at %s:%d-%d\n", val_raw*100, val, config.BW_ptr->cl->chrom[i], j, j+1);
-                            }*/
-                            //printf("Writing %2X\n", val);
                             fwrite(&val, sizeof(char), 1, f);
                             lastval = val;
                             runlen = 0;
@@ -1135,10 +1113,6 @@ int extract_main(int argc, char *argv[]) {
                     lastval = val;
                 }
                 aboveCutoff = (char)(val > config.mappabilityCutoff*100.0); //check if above cutoff
-                /*if(i == 17)
-                {
-                    printf("%d,%d\n", val, aboveCutoff);
-                }*/
                 config.bw_data[i][index] = config.bw_data[i][index] | (aboveCutoff << offset); //set bit
             }
             if(config.outBBMName)
@@ -1148,22 +1122,12 @@ int extract_main(int argc, char *argv[]) {
                     if(runlen < 155) //short run (2 byte format)
                     {
                         unsigned char runval = (unsigned char)(runlen)+RUNOFFSET;
-                        /*if((i == 0) || (i == 1))
-                        {
-                            printf("Ending run, lastval=%d, runlen=%d, runval=%d\n", lastval, runlen, runval);
-                        }*/
-                        //printf("Writing %2X %2X\n", runval, lastval);
                         fwrite(&runval, sizeof(char), 1, f);
                         fwrite(&lastval, sizeof(char), 1, f);
                     }
                     else //long run (4 byte format)
                     {
                         unsigned char flag = 255; //flag for long run
-                        /*if((i == 0) || (i == 1))
-                        {
-                            printf("Ending LONG run, lastval=%d, runlen=%d\n", lastval, runlen);
-                        }*/
-                        //printf("Writing %2X %2X\n", runval, lastval);
                         fwrite(&flag, sizeof(char), 1, f);
                         fwrite(&runlen, sizeof(uint16_t), 1, f);
                         fwrite(&lastval, sizeof(char), 1, f);
@@ -1178,7 +1142,6 @@ int extract_main(int argc, char *argv[]) {
         {
             fclose(f);
         }
-        //return 0;
         
     }
     
@@ -1202,7 +1165,6 @@ int extract_main(int argc, char *argv[]) {
         {
             uint16_t nameLen;
             readlen = fread(&nameLen, sizeof(uint16_t), 1, config.BBM_ptr);
-            //printf("nameLen=%d\n", nameLen);
             config.chromNames[chromID] = malloc((nameLen+1)*sizeof(char)); //one more to make space for null terminator
             for(int i = 0; i<nameLen; i++)
             {
@@ -1215,10 +1177,8 @@ int extract_main(int argc, char *argv[]) {
             {
                 return error(); //malformed file
             }
-            //printf("name=%s\n", config.chromNames[chromID]);
             
             readlen = fread(&(config.chromLengths[chromID]), sizeof(uint32_t), 1, config.BBM_ptr);
-            //printf("length=%d\n", config.chromLengths[chromID]);
             uint32_t pos = 0;
             int arrlen;
             arrlen = config.chromLengths[chromID]/8;
@@ -1226,7 +1186,6 @@ int extract_main(int argc, char *argv[]) {
             {
                 arrlen++;
             }
-            //printf("arrlen=%d\n", arrlen);
             config.bw_data[chromID] = malloc(arrlen*sizeof(char)); //init inner array
             while(pos<(config.chromLengths[chromID]))
             {
@@ -1245,11 +1204,6 @@ int extract_main(int argc, char *argv[]) {
                 unsigned char val;
                 uint16_t runlen;
                 readlen = fread(&val, sizeof(val), 1, config.BBM_ptr);
-                //printf("val=%d (%x), at pos %s:%d-%d (out of %d) (chromID=%d, chromCount=%d, index=%d, arrlen=%d, offset=%d)\n", val, val, config.chromNames[chromID], pos, pos+1, config.chromLengths[chromID], chromID, config.chromCount, index, arrlen, offset);
-                /*for(int k = 0; k<config.chromCount; k++)
-                {
-                    printf("chrom %d name: %s\n", k, config.chromNames[k]);
-                }*/
                 if(val > 100)
                 {
                     if(val == 255) //long run
@@ -1262,38 +1216,25 @@ int extract_main(int argc, char *argv[]) {
                         runlen = val-RUNOFFSET;
                         readlen = fread(&val, sizeof(val), 1, config.BBM_ptr);
                     }
-                    //printf("Got run of %d with length %d\n", val, runlen);
                     aboveCutoff = (char)(val > config.mappabilityCutoff*100.0); //check if above cutoff
-                    //printf("Is %f (%f/100) (%d) above cutoff %f? %d\n", (double)(val), ((double)(val))/100.0, val, config.mappabilityCutoff, aboveCutoff);
                     for(int i = 0; i<runlen; i++)
                     {
                         int tempindex;
                         char tempoffset;
                         tempindex = (pos+i)/8;
                         tempoffset = (pos+i)%8;
-                        /*if(chromID == 17)
-                        {
-                            printf("%d,%d\n", val, aboveCutoff);
-                        }*/
                         config.bw_data[chromID][tempindex] = config.bw_data[chromID][tempindex] | (aboveCutoff << tempoffset); //set bit
                     }
                     pos+=runlen;
                 }
                 else
                 {
-                    //printf("Got single value %d\n", val);
                     aboveCutoff = (char)(val > config.mappabilityCutoff*100.0); //check if above cutoff
-                    /*if(chromID == 17)
-                    {
-                        printf("%d,%d\n", val, aboveCutoff);
-                    }*/
                     config.bw_data[chromID][index] = config.bw_data[chromID][index] | (aboveCutoff << offset); //set bit
                     pos++;
                 }
             }
-            //printf("End of chromosome %s\n", config.chromNames[chromID]);
             chromID++;
-            //return 0;
         }
         
         fclose(config.BBM_ptr);
