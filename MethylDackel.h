@@ -93,7 +93,13 @@ typedef struct {
     char *reg;
     char *BAMName;
     char *BWName;
-    char *BBName;
+    char *outBBMName;
+    char *BBMName;
+    FILE *BBM_ptr;
+    char** chromNames;
+    uint32_t chromCount;
+    uint32_t* chromLengths;
+    char filterMappability;
     char outputBB;
     float mappabilityCutoff;
     int minMappableBases;

@@ -208,9 +208,9 @@ unsigned char* getMappabilityValue(Config* config, char* chrom_n, uint32_t start
 {
     char chromFound = 0;
     uint32_t chrom = -1;
-    for(int i = 0; i<config->BW_ptr->cl->nKeys; i++) //loop over chromosomes
+    for(int i = 0; i<config->chromCount; i++) //loop over chromosomes
     {
-        if(!strcmp(config->BW_ptr->cl->chrom[i], chrom_n)) //found the chromosome
+        if(!strcmp(config->chromNames[i], chrom_n)) //found the chromosome
         {
             chrom = i;
             chromFound = 1;
@@ -274,10 +274,6 @@ char check_mappability(void *data, bam1_t *b) {
         read1_start = b->core.mpos;
         read1_end = b->core.mpos + b->core.l_qseq; //assuming both reads same length to avoid issues finding read2_end
     }
-    if(ldata->config->BW_ptr == NULL) //invalid or missing bigWig
-    {
-        return -1; //this is checked in filter_func as well, so this statement should never run
-    }
     vals = getMappabilityValue(ldata->config, ldata->hdr->target_name[b->core.tid], read1_start, read1_end+1);
     
     for (i=0; i<=read1_end-read1_start; i++)
@@ -332,7 +328,7 @@ int filter_func(void *data, bam1_t *b) {
             NH = bam_aux2i(p);
             if(NH>1) continue; //Ignore obvious multimappers
         }
-        if(ldata->config->BW_ptr && check_mappability(ldata, b) == 0) continue; //Low mappability
+        if((ldata->config->filterMappability) && check_mappability(ldata, b) == 0) continue; //Low mappability
         if(!ldata->config->keepSingleton && (b->core.flag & 0x9) == 0x9) continue; //Singleton
         if(!ldata->config->keepDiscordant && (b->core.flag & 0x3) == 0x1) continue; //Discordant
         if((b->core.flag & 0x9) == 0x1) b->core.flag |= 0x2; //Discordant pairs can cause double counts
