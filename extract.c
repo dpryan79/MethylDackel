@@ -1064,7 +1064,7 @@ int extract_main(int argc, char *argv[]) {
                 }
                 val_raw = vals->value[j];
                 val = (char)((val_raw*100)+0.5); //0.5 is to prevent roundoff error issues
-                if(isnan(val))
+                if(isnan(val_raw))
                 {
                     val = 0; //(lastval==255?0:lastval); //convert NA to previous value
                     val_raw = 0; //(lastval==255?0:((double)(lastval)/100.0)); //convert NA to previous value
@@ -1176,7 +1176,7 @@ int extract_main(int argc, char *argv[]) {
         }
         if(config.outBBMName)
         {
-            fclose(config.BBM_ptr);
+            fclose(f);
         }
         //return 0;
         
