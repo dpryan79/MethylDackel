@@ -1135,10 +1135,10 @@ int extract_main(int argc, char *argv[]) {
                     lastval = val;
                 }
                 aboveCutoff = (char)(val > config.mappabilityCutoff*100.0); //check if above cutoff
-                if(i == 17)
+                /*if(i == 17)
                 {
                     printf("%d,%d\n", val, aboveCutoff);
-                }
+                }*/
                 config.bw_data[i][index] = config.bw_data[i][index] | (aboveCutoff << offset); //set bit
             }
             if(config.outBBMName)
@@ -1271,10 +1271,10 @@ int extract_main(int argc, char *argv[]) {
                         char tempoffset;
                         tempindex = (pos+i)/8;
                         tempoffset = (pos+i)%8;
-                        if(chromID == 17)
+                        /*if(chromID == 17)
                         {
                             printf("%d,%d\n", val, aboveCutoff);
-                        }
+                        }*/
                         config.bw_data[chromID][tempindex] = config.bw_data[chromID][tempindex] | (aboveCutoff << tempoffset); //set bit
                     }
                     pos+=runlen;
@@ -1283,10 +1283,10 @@ int extract_main(int argc, char *argv[]) {
                 {
                     //printf("Got single value %d\n", val);
                     aboveCutoff = (char)(val > config.mappabilityCutoff*100.0); //check if above cutoff
-                    if(chromID == 17)
+                    /*if(chromID == 17)
                     {
                         printf("%d,%d\n", val, aboveCutoff);
-                    }
+                    }*/
                     config.bw_data[chromID][index] = config.bw_data[chromID][index] | (aboveCutoff << offset); //set bit
                     pos++;
                 }
