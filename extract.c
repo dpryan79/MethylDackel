@@ -727,6 +727,7 @@ int extract_main(int argc, char *argv[]) {
     config.nThreads = 1;
     config.chunkSize = 1000000;
     config.cytosine_report = 0;
+    config.noBAM = 0;
     for(i=0; i<16; i++) config.bounds[i] = 0;
     for(i=0; i<16; i++) config.absoluteBounds[i] = 0;
 
@@ -927,9 +928,16 @@ int extract_main(int argc, char *argv[]) {
         return 0;
     }
     if(argc-optind < 2) {
-        fprintf(stderr, "You must supply a reference genome in fasta format and an input BAM file!!!\n");
-        extract_usage();
-        return -1;
+        if(config.outputBB)
+        {
+             config.noBAM = 1; //just write BBM, don't extract
+        }
+        else
+        {
+            fprintf(stderr, "You must supply a reference genome in fasta format and an input BAM file!!!\n");
+            extract_usage();
+            return -1;
+        }
     }
 
     //Are the options reasonable?
@@ -972,24 +980,27 @@ int extract_main(int argc, char *argv[]) {
     //Open the files
     config.FastaName = argv[optind];
     config.BAMName = argv[optind+1];
-    if((config.fp = hts_open(argv[optind+1], "rb")) == NULL) {
-        fprintf(stderr, "Couldn't open %s for reading!\n", argv[optind+1]);
-        return -4;
-    }
-    if((config.bai = sam_index_load(config.fp, argv[optind+1])) == NULL) {
-        fprintf(stderr, "Couldn't load the index for %s, will attempt to build it.\n", argv[optind+1]);
-        if(bam_index_build(argv[optind+1], 0) < 0) {
-            fprintf(stderr, "Couldn't build the index for %s! File corrupted?\n", argv[optind+1]);
-            return -5;
+    if(!config.noBAM)
+    {
+        if((config.fp = hts_open(argv[optind+1], "rb")) == NULL) {
+            fprintf(stderr, "Couldn't open %s for reading!\n", argv[optind+1]);
+            return -4;
         }
         if((config.bai = sam_index_load(config.fp, argv[optind+1])) == NULL) {
-            fprintf(stderr, "Still couldn't load the index, quiting.\n");
-            return -5;
+            fprintf(stderr, "Couldn't load the index for %s, will attempt to build it.\n", argv[optind+1]);
+            if(bam_index_build(argv[optind+1], 0) < 0) {
+                fprintf(stderr, "Couldn't build the index for %s! File corrupted?\n", argv[optind+1]);
+                return -5;
+            }
+            if((config.bai = sam_index_load(config.fp, argv[optind+1])) == NULL) {
+                fprintf(stderr, "Still couldn't load the index, quiting.\n");
+                return -5;
+            }
         }
-    }
-    if(config.BBMName && (config.BBM_ptr = fopen(config.BBMName, "rb")) == NULL) {
-        fprintf(stderr, "Couldn't open %s for reading!\n", config.BBMName);
-        return -8;
+        if(config.BBMName && (config.BBM_ptr = fopen(config.BBMName, "rb")) == NULL) {
+            fprintf(stderr, "Couldn't open %s for reading!\n", config.BBMName);
+            return -8;
+        }
     }
     
     
@@ -1142,6 +1153,18 @@ int extract_main(int argc, char *argv[]) {
         if(config.outBBMName) //are we writing a BBM?
         {
             fclose(f); //close the BBM file
+            if(config.noBAM)
+            {
+                for(int i = 0; i<config.chromCount; i++)
+                {
+                    free(config.bw_data[i]);
+                    free(config.chromNames[i]);
+                }
+                free(config.chromLengths);
+                free(config.bw_data);
+                bwClose(config.BW_ptr);
+                return 0;
+            }
         }
         
     }

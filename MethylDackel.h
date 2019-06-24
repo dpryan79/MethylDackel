@@ -113,6 +113,7 @@ typedef struct {
     int bounds[16];
     int absoluteBounds[16];
     int nThreads;
+    char noBAM;
     unsigned long chunkSize;
 } Config;
 
