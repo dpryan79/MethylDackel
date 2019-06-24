@@ -1163,6 +1163,7 @@ int extract_main(int argc, char *argv[]) {
                     free(config.chromNames[i]);
                 }
                 free(config.chromLengths);
+                free(config.chromNames);
                 free(config.bw_data);
                 bwClose(config.BW_ptr);
                 return 0;
@@ -1434,6 +1435,7 @@ int extract_main(int argc, char *argv[]) {
             free(config.chromNames[i]);
         }
         free(config.chromLengths);
+        free(config.chromNames);
         free(config.bw_data);
     }
     bwClose(config.BW_ptr);
