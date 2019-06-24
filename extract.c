@@ -1047,7 +1047,7 @@ int extract_main(int argc, char *argv[]) {
                 chromNameLen = (uint16_t)(strlen(config.BW_ptr->cl->chrom[i])); //get length of chrom name (excluding null terminator)
                 fwrite(&chromNameLen, sizeof(chromNameLen), 1, f); //write length of name to file
                 fwrite(config.BW_ptr->cl->chrom[i], sizeof(char), chromNameLen, f); //write name to file
-                fwrite(&flag, sizeof(unsigned char), 1, f); //write null terminator to file
+                fwrite(&nullterm, sizeof(unsigned char), 1, f); //write null terminator to file
                 uint32_t chromLen = (uint32_t)(config.BW_ptr->cl->len[i]); //get length of actual chromosome
                 fwrite(&chromLen, sizeof(uint32_t), 1, f); //write chromosome length to file
             }
@@ -1205,7 +1205,7 @@ int extract_main(int argc, char *argv[]) {
             uint32_t pos = 0;
             int arrlen; //variable to store the length of the array used for the data (this is not the same as the chromosome length, as each value is one bit and this is an array of characters, i.e. bytes)
             arrlen = config.chromLengths[chromID]/8; //array length is chromosome length over 8 (number of bits to number of bytes)
-            if(config.config.chromLengths[chromID]%8 > 0) //if there is a remainder that didn't divide evenly
+            if(config.chromLengths[chromID]%8 > 0) //if there is a remainder that didn't divide evenly
             {
                 arrlen++; //add an extra byte to store it
             }
