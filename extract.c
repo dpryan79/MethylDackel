@@ -695,7 +695,9 @@ int extract_main(int argc, char *argv[]) {
     globalTid = globalPos = globalEnd = bin = globalnVariantPositions = 0;
 
     //Defaults
+    config.outputBB = 0;
     config.BWName = NULL;
+    config.BBMName = NULL;
     config.outBBMName = NULL;
     config.BW_ptr = NULL;
     config.BBM_ptr = NULL;
@@ -1424,12 +1426,14 @@ int extract_main(int argc, char *argv[]) {
     if(config.bed) destroyBED(config.bed);
     free(oname);
     free(config.output_fp);
-    if(config.BW_ptr)
+    if(config.filterMappability)
     {
-        for(int i = 0; i<config.BW_ptr->cl->nKeys; i++)
+        for(int i = 0; i<config.chromCount; i++)
         {
             free(config.bw_data[i]);
+            free(config.chromNames[i]);
         }
+        free(config.chromLengths);
         free(config.bw_data);
     }
     bwClose(config.BW_ptr);
