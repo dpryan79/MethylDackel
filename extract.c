@@ -696,6 +696,7 @@ int extract_main(int argc, char *argv[]) {
 
     //Defaults
     config.outputBB = 0;
+    config.chromCount = 0;
     config.BWName = NULL;
     config.BBMName = NULL;
     config.outBBMName = NULL;
