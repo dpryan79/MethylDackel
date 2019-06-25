@@ -1250,6 +1250,10 @@ int extract_main(int argc, char *argv[]) {
                         char tempoffset;
                         tempindex = (pos+i)/8;
                         tempoffset = (pos+i)%8;
+                        if(tempoffset == 0) //starting new byte
+                        {
+                            config.bw_data[chromID][tempindex] = 0; //init new byte
+                        }
                         config.bw_data[chromID][tempindex] = config.bw_data[chromID][tempindex] | (aboveCutoff << tempoffset); //set bit
                     }
                     pos+=runlen; //move ahead to after the run
