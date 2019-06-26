@@ -881,7 +881,7 @@ int extract_main(int argc, char *argv[]) {
             config.outputBB = 1;
             break;
         case 'N':
-            config.outBBMName = optarg;
+            config.outBBMName = strcat(optarg, ".bbm");
             config.outputBB = 1;
             break;
         case 'B':
