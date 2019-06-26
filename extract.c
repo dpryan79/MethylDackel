@@ -18,7 +18,7 @@ int RUNOFFSET = 99; //used to calculate the run length value to store in a BBM f
 
 void print_version(void);
 
-extern inline double logit(double p) { 
+extern inline double logit(double p) {
     return(log(p) - log(1 - p)); 
 }
 
@@ -388,7 +388,7 @@ void *extractCalls(void *foo) {
         //Start the pileup
         iter = bam_mplp_init(1, filter_func, (void **) &data);
         bam_mplp_init_overlaps(iter);
-        bam_mplp_set_maxcnt(iter, config->maxDepth);
+        bam_mplp_set_maxcnt(iter, INT_MAX);
         while((ret = cust_mplp_auto(iter, &tid, &pos, &n_plp, plp)) > 0) {
             if(pos < localPos || pos >= localEnd) continue; // out of the region requested
 
@@ -604,7 +604,8 @@ void extract_usage() {
 " -o, --opref STR  Output filename prefix. CpG/CHG/CHH context metrics will be\n"
 "                  output to STR_CpG.bedGraph and so on.\n"
 " --keepDupes      By default, any alignment marked as a duplicate is ignored.\n"
-"                  This option causes them to be incorporated.\n"
+"                  This option causes them to be incorporated. This will unset\n"
+"                  bit 0x400 in --ignoreFlags.\n"
 " --keepSingleton  By default, if only one read in a pair aligns (a singleton)\n"
 "                  then it's ignored.\n"
 " --keepDiscordant By default, paired-end alignments with the properly-paired bit\n"
@@ -713,7 +714,6 @@ int extract_main(int argc, char *argv[]) {
     config.merge = 0;
     config.minOppositeDepth = 0;
     config.maxVariantFrac = 0.0;
-    config.maxDepth = 2000;
     config.chromNames = NULL;
     config.chromLengths = NULL;
     config.chromCount = 0;
@@ -785,7 +785,7 @@ int extract_main(int argc, char *argv[]) {
             opref = strdup(optarg);
             break;
         case 'D':
-            config.maxDepth = atoi(optarg);
+            //This is now ignored. It was --maxDepth
             break;
         case 'd':
             config.minDepth = atoi(optarg);
@@ -951,6 +951,9 @@ int extract_main(int argc, char *argv[]) {
     if(config.minMapq < 0) {
         fprintf(stderr, "-q %i is invalid. Resetting to 0, which is the lowest possible value.\n", config.minMapq);
         config.minMapq = 0;
+    }
+    if(config.keepDupes > 0 && (config.ignoreFlags & 0x400)) {
+        config.ignoreFlags -= 0x400;
     }
     if(config.fraction+config.counts+config.logit+config.methylKit+config.cytosine_report > 1) {
         fprintf(stderr, "More than one of --fraction, --counts, --methylKit, --cytosine_report and --logit were specified. These are mutually exclusive.\n");
