@@ -1188,7 +1188,7 @@ int extract_main(int argc, char *argv[]) {
         readlen = fread(&bbm_version, sizeof(char), 1, config.BBM_ptr); //get BBM version
         if(bbm_version != 1)
         {
-            fprintf(stderr, "fatal: file is wrong BBM version or malformed", config.BBMName);
+            fprintf(stderr, "fatal: file is wrong BBM version or malformed\n", config.BBMName);
             return -10;
         }
         readlen = fread(&config.chromCount, sizeof(config.chromCount), 1, config.BBM_ptr); //get chrom count
