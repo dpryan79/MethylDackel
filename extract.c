@@ -1255,7 +1255,7 @@ int extract_main(int argc, char *argv[]) {
                         runlen = val-RUNOFFSET; //calculate run length
                         readlen = fread(&val, sizeof(val), 1, config.BBM_ptr); //read value
                     }
-                    aboveCutoff = (char)(val > config.mappabilityCutoff*100.0); //check if above cutoff
+                    aboveCutoff = (char)(val >= config.mappabilityCutoff*100.0); //check if above cutoff
                     for(int i = 0; i<runlen; i++) //loop runlen times to store a run of the value
                     {
                         int tempindex;
@@ -1272,7 +1272,7 @@ int extract_main(int argc, char *argv[]) {
                 }
                 else //individual value
                 {
-                    aboveCutoff = (char)(val > config.mappabilityCutoff*100.0); //check if above cutoff
+                    aboveCutoff = (char)(val >= config.mappabilityCutoff*100.0); //check if above cutoff
                     config.bw_data[chromID][index] = config.bw_data[chromID][index] | (aboveCutoff << offset); //set bit
                     pos++;
                 }
