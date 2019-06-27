@@ -6,7 +6,9 @@ BBM is a binary format for storing a single data track for a genome. Its main re
 
 ([bracketed] items will be explained below, <angle bracketed> items are simply markers of the beginning and end of the file, and items in {curly braces} contain other items and are explained in their own sections)
 
-```<beginning of file>[chromCount]{chrom record}{chrom record}{chrom record}{chrom record}...<end of file>```
+```<beginning of file>[version][chromCount]{chrom record}{chrom record}{chrom record}{chrom record}...<end of file>```
+
+* version: an unsigned character denoting the version of the BBM format used by this file. The version described here has an ID of 1.
 
 * chromCount: an unsigned little-endian 32-bit integer, reprensenting the number of chromosomes in the file
 

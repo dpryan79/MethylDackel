@@ -1034,6 +1034,8 @@ int extract_main(int argc, char *argv[]) {
                 fprintf(stderr, "Couldn't open %s for writing! Insufficient permissions?\n", config.outBBMName);
                 return -7;
             }
+            unsigned char bbm_version = 1;
+            fwrite(&bbm_version, sizeof(char), 1, f); //write version
         }
         config.bw_data = malloc(config.BW_ptr->cl->nKeys*sizeof(char*)); //init outer array
         fprintf(stderr, "loading mappability data from %s\n", config.BWName);
@@ -1182,6 +1184,13 @@ int extract_main(int argc, char *argv[]) {
         config.filterMappability = 1; //set flag to filter mappability
         fprintf(stderr, "loading mappability data from %s\n", config.BBMName);
         char readlen; //used to store the length of data read from the file. Could be used in the future to detect unexpected EOF throughout reading the file, but it is currently only used to check for blank files and incorrect chrom name null terminators
+        unsigned char bbm_version;
+        readlen = fread(&bbm_version, sizeof(char), 1, config.BBM_ptr); //get BBM version
+        if(bbm_version != 1)
+        {
+            fprintf(stderr, "fatal: file is wrong BBM version or malformed", config.BBMName);
+            return -10;
+        }
         readlen = fread(&config.chromCount, sizeof(config.chromCount), 1, config.BBM_ptr); //get chrom count
         config.chromNames = malloc(config.chromCount*sizeof(char*));
         config.chromLengths = malloc(config.chromCount*sizeof(uint32_t));
