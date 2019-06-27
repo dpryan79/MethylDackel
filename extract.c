@@ -1132,7 +1132,7 @@ int extract_main(int argc, char *argv[]) {
                 {
                     lastval = val;
                 }
-                aboveCutoff = (char)(val > config.mappabilityCutoff*100.0); //check if above cutoff
+                aboveCutoff = (char)(val >= config.mappabilityCutoff*100.0); //check if above cutoff
                 config.bw_data[i][index] = config.bw_data[i][index] | (aboveCutoff << offset); //set bit
             }
             if(config.outBBMName)
