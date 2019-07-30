@@ -111,7 +111,7 @@ char revcomp(char b) {
         case 'T':
         case 't':
             return 'A';
-
+        default:
             return 'N';
     }
 }
