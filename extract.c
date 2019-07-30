@@ -244,7 +244,6 @@ int error()
 }
 
 void *extractCalls(void *foo) {
-    //fprintf(stderr, "in extractCalls\n");
     Config *config = (Config*) foo;
     bam_hdr_t *hdr;
     bam_mplp_t iter;
