@@ -2,9 +2,11 @@
 #include "version.h"
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <errno.h>
 #include <limits.h>
 #include <assert.h>
+#include <pthread.h>
 
 void parseBounds(char *s2, int *vals, int mult) {
     char *p, *s = strdup(s2), *end;
@@ -202,6 +204,110 @@ bam1_t *trimAbsoluteAlignment(bam1_t *b, int bounds[16]) {
     return b;
 }
 
+unsigned char* getMappabilityValue(Config* config, char* chrom_n, uint32_t start, uint32_t end)
+{
+    char chromFound = 0;
+    uint32_t chrom = -1;
+    for(int i = 0; i<config->chromCount; i++) //loop over chromosomes
+    {
+        if(!strcmp(config->chromNames[i], chrom_n)) //found the chromosome
+        {
+            chrom = i;
+            chromFound = 1;
+            break;
+        }
+    }
+    unsigned char* data = malloc((end-start)*sizeof(unsigned char)); //allocate array for data
+    int index = start/8;
+    int offset = start%8;
+    for(int i = 0; i<end-start; i++)
+    {
+        unsigned char byte;
+        if(chromFound) //was a chrom ID found for chrom_n, or is chrom still -1 (or here 4,294,967,295) i.e. chrom not found
+        {
+            byte = config->bw_data[chrom][index];
+        }
+        else
+        {
+            byte = 0; //if not a valid chrom, mappability is N/A i.e. 0
+        }
+        unsigned char mask = 1 << offset;
+        unsigned char val = (byte & mask) >> offset;
+        data[i] = val;
+        if(offset == 7) //at end of byte
+        {
+            index++;
+            offset = 0;
+        }
+        else
+        {
+            offset++;
+        }
+        
+    }
+    return data;
+}
+
+char check_mappability(void *data, bam1_t *b) {
+    //returns number of mappable reads in read pair (0-2)
+    mplp_data *ldata = (mplp_data *) data;
+    int read1_start;
+    int read1_end;
+    int read2_start;
+    int read2_end;
+    int i; //loop index
+    int num_mappable_reads = 0;
+    char num_mappable_bases = 0; //counter
+    unsigned char *vals = NULL;
+    if(b->core.flag & BAM_FREAD1 || (bam_is_rev(b) && b->core.flag & BAM_FREAD2)) //is this the left read?
+    {
+        read1_start = b->core.pos;
+        read1_end = b->core.pos + b->core.l_qseq;
+        read2_start = b->core.mpos;
+        read2_end = b->core.mpos + b->core.l_qseq; //assuming both reads same length to avoid issues finding read2_end on right read (doing the same on the left read for consistency)
+        
+    }
+    else //get pos for right read
+    {
+        read2_start = b->core.pos;
+        read2_end = b->core.pos + b->core.l_qseq;
+        read1_start = b->core.mpos;
+        read1_end = b->core.mpos + b->core.l_qseq; //assuming both reads same length to avoid issues finding read2_end
+    }
+    vals = getMappabilityValue(ldata->config, ldata->hdr->target_name[b->core.tid], read1_start, read1_end+1);
+    
+    for (i=0; i<=read1_end-read1_start; i++)
+    {
+        if(vals[i] > 0) //is base above threshold?
+        {
+            num_mappable_bases++;
+        }
+        if(num_mappable_bases >= ldata->config->minMappableBases)
+        {
+            num_mappable_reads++;
+            break; //done with this read
+        }
+    }
+    free(vals);
+    vals = getMappabilityValue(ldata->config, ldata->hdr->target_name[b->core.tid], read2_start, read2_end+1);
+    
+    num_mappable_bases = 0;
+    for (i=0; i<=read2_end-read2_start; i++)
+    {
+        if(vals[i] > 0) //is base above threshold?
+        {
+            num_mappable_bases++;
+        }
+        if(num_mappable_bases >= ldata->config->minMappableBases)
+        {
+            num_mappable_reads++;
+            break; //done with this read
+        }
+    }
+    free(vals);
+    return num_mappable_reads;
+}
+
 //This will need to be restructured to handle multiple input files
 int filter_func(void *data, bam1_t *b) {
     int rv, NH, overlap;
@@ -222,6 +328,7 @@ int filter_func(void *data, bam1_t *b) {
             NH = bam_aux2i(p);
             if(NH>1) continue; //Ignore obvious multimappers
         }
+        if((ldata->config->filterMappability) && check_mappability(ldata, b) == 0) continue; //Low mappability
         if(!ldata->config->keepSingleton && (b->core.flag & 0x9) == 0x9) continue; //Singleton
         if(!ldata->config->keepDiscordant && (b->core.flag & 0x3) == 0x1) continue; //Discordant
         if((b->core.flag & 0x9) == 0x1) b->core.flag |= 0x2; //Discordant pairs can cause double counts

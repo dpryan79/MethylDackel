@@ -14,9 +14,11 @@
 #include <pthread.h>
 #include "MethylDackel.h"
 
+int RUNOFFSET = 99; //used to calculate the run length value to store in a BBM file, as value-to-store = actual-run-length + RUNOFFSET. Placed up here as it's a constant.
+
 void print_version(void);
 
-static inline double logit(double p) { 
+extern inline double logit(double p) {
     return(log(p) - log(1 - p)); 
 }
 
@@ -235,6 +237,12 @@ int isVariant(Config *config, const bam_pileup1_t *plp, uint32_t *coverage, int 
     }
 }
 
+int error()
+{
+    printf("fatal: malformed BBM file\n");
+    return -9;
+}
+
 void *extractCalls(void *foo) {
     Config *config = (Config*) foo;
     bam_hdr_t *hdr;
@@ -257,7 +265,6 @@ void *extractCalls(void *foo) {
     faidx_t *fai;
     hts_idx_t *bai;
     htsFile *fp;
-
     os = calloc(3, sizeof(kstring_t*));
     os_CpG = calloc(1, sizeof(kstring_t));
     os_CHG = calloc(1, sizeof(kstring_t));
@@ -284,7 +291,6 @@ void *extractCalls(void *foo) {
         return NULL;
     }
     hdr = sam_hdr_read(fp);
-
     if(config->merge) {
         if(config->keepCpG) {
             lastCpG = calloc(1, sizeof(struct lastCall));
@@ -572,6 +578,23 @@ void extract_usage() {
 "                  a region has a '+' in this column, then only metrics from the\n"
 "                  top strand will be output. Note that the -r option can be used\n"
 "                  to limit the regions of -l.\n"
+" -M, --mappability FILE    A bigWig file containing mappability data for\n"
+"                  filtering reads.\n"
+" -t, --mappabilityThreshold FLOAT    If a bigWig file is provided, this sets the\n"
+"                  threshold mappability value above which a base is considered\n"
+"                  mappable (default 0.01).\n"
+" -b, --minMappableBases INT    If a bigWig file is provided, this sets the\n"
+"                  number of mappable bases needed for a read to be considered\n"
+"                  mappable (default 15).\n"
+" -O, --outputBBFile    If this is specified, a Binary Bismap (.bbm) file will\n"
+"                  be written with the same base name as the provided bigWig file,\n"
+"                  but with the .bbm extension. Neither this option nor -N have any\n"
+"                  effect if a bigWig is not specified with -M.\n"
+" -N, --outputBBFileName FILE    If this is specified, a Binary Bismap (.bbm) file will\n"
+"                  be written at the provided filename. Neither this option nor -O\n"
+"                  have any effect if a bigWig is not specified with -M.\n"
+" -B, --mappabilityBB FILE    A .bbm file containing mappability data for\n"
+"                  filtering reads.\n"
 " -@ nThreads      The number of threads to use, the default 1\n"
 " --chunkSize INT  The size of the genome processed by a single thread at a time.\n"
 "                  The default is 1000000 bases. This value MUST be at least 1.\n"
@@ -588,7 +611,7 @@ void extract_usage() {
 "                  unset in the FLAG field are ignored. Note that the definition\n"
 "                  of concordant and discordant is based on your aligner\n"
 "                  settings.\n"
-" -F, --ignoreFlags    By deault, any alignment marked as secondary (bit 0x100),\n"
+" -F, --ignoreFlags    By default, any alignment marked as secondary (bit 0x100),\n"
 "                  failing QC (bit 0x200), a PCR/optical duplicate (0x400) or\n"
 "                  supplemental (0x800) is ignored. This equates to a value of\n"
 "                  0xF00 or 3840 in decimal. If you would like to change that,\n"
@@ -656,9 +679,9 @@ void extract_usage() {
 "                  certain length bias at one or more ends.\n"
 " --nOB INT,INT,INT,INT\n"
 " --nCTOT INT,INT,INT,INT\n"
-" --nCTOB INT,INT,INT,INT As with --nOT, but for the original bottom, complementary\n"
-"                  to the original top, and complementary to the original bottom\n"
-"                  strands, respectively.\n"
+" --nCTOB INT,INT,INT,INT As with --nOT, but for the original bottom,\n"
+"                  complementary to the original top, and complementary to the\n"
+"                  original bottom strands, respectively.\n"
 " --version        Print version and then quit.\n"
 "\nNote that --fraction, --counts, and --logit are mutually exclusive!\n");
 }
@@ -672,6 +695,16 @@ int extract_main(int argc, char *argv[]) {
     globalTid = globalPos = globalEnd = bin = globalnVariantPositions = 0;
 
     //Defaults
+    config.outputBB = 0;
+    config.chromCount = 0;
+    config.BWName = NULL;
+    config.BBMName = NULL;
+    config.outBBMName = NULL;
+    config.BW_ptr = NULL;
+    config.BBM_ptr = NULL;
+    config.filterMappability = 0;
+    config.mappabilityCutoff = 0.01;
+    config.minMappableBases = 15;
     config.keepCpG = 1; config.keepCHG = 0; config.keepCHH = 0;
     config.minMapq = 10; config.minPhred = 5; config.keepDupes = 0;
     config.keepSingleton = 0, config.keepDiscordant = 0;
@@ -680,6 +713,9 @@ int extract_main(int argc, char *argv[]) {
     config.merge = 0;
     config.minOppositeDepth = 0;
     config.maxVariantFrac = 0.0;
+    config.chromNames = NULL;
+    config.chromLengths = NULL;
+    config.chromCount = 0;
     config.fp = NULL;
     config.bai = NULL;
     config.reg = NULL;
@@ -693,6 +729,7 @@ int extract_main(int argc, char *argv[]) {
     config.nThreads = 1;
     config.chunkSize = 1000000;
     config.cytosine_report = 0;
+    config.noBAM = 0;
     for(i=0; i<16; i++) config.bounds[i] = 0;
     for(i=0; i<16; i++) config.absoluteBounds[i] = 0;
 
@@ -727,9 +764,15 @@ int extract_main(int argc, char *argv[]) {
         {"requireFlags", 1, NULL, 'R'},
         {"help",         0, NULL, 'h'},
         {"version",      0, NULL, 'v'},
+        {"mappability",         1, NULL,  'M'},
+        {"mappabilityThreshold",         1, NULL,  't'},
+        {"minMappableBases",         1, NULL,  'b'},
+        {"outputBBMFile",         1, NULL,  'O'},
+        {"outputBBMFileName",         1, NULL,  'N'},
+        {"mappabilityBBM",         1, NULL,  'B'},
         {0,              0, NULL,   0}
     };
-    while((c = getopt_long(argc, argv, "hvq:p:r:l:o:D:f:c:m:d:F:R:@:", lopts,NULL)) >=0){
+    while((c = getopt_long(argc, argv, "hvq:p:r:l:o:D:f:c:m:d:F:R:@:M:t:b:ON:B:", lopts,NULL)) >=0){
         switch(c) {
         case 'h':
             extract_usage();
@@ -823,6 +866,26 @@ int extract_main(int argc, char *argv[]) {
         case 21:
             config.cytosine_report = 1;
             break;
+        case 'M':
+            config.BWName = optarg;
+            break;
+        case 't':
+            config.mappabilityCutoff = atof(optarg);
+            break;
+        case 'b':
+            config.minMappableBases = atoi(optarg);
+            break;
+        case 'O':
+            config.outBBMName = NULL;
+            config.outputBB = 1;
+            break;
+        case 'N':
+            config.outBBMName = strcat(optarg, ".bbm");
+            config.outputBB = 1;
+            break;
+        case 'B':
+            config.BBMName = optarg;
+            break;
         case 'F':
             config.ignoreFlags = atoi(optarg);
             break;
@@ -855,14 +918,28 @@ int extract_main(int argc, char *argv[]) {
         }
     }
 
+    if(config.outputBB && (!config.outBBMName && config.BWName))
+    {
+        char* tmp = strdup(config.BWName);
+        char* p = strrchr(tmp, '.');
+        if(p != NULL) *p = '\0';
+        config.outBBMName = strcat(tmp, ".bbm");
+    }
     if(argc == 1) {
         extract_usage();
         return 0;
     }
-    if(argc-optind != 2) {
-        fprintf(stderr, "You must supply a reference genome in fasta format and an input BAM file!!!\n");
-        extract_usage();
-        return -1;
+    if(argc-optind < 2) {
+        if(config.outputBB)
+        {
+             config.noBAM = 1; //just write BBM, don't extract
+        }
+        else
+        {
+            fprintf(stderr, "You must supply a reference genome in fasta format and an input BAM file!!!\n");
+            extract_usage();
+            return -1;
+        }
     }
 
     //Are the options reasonable?
@@ -908,21 +985,305 @@ int extract_main(int argc, char *argv[]) {
     //Open the files
     config.FastaName = argv[optind];
     config.BAMName = argv[optind+1];
-    if((config.fp = hts_open(argv[optind+1], "rb")) == NULL) {
-        fprintf(stderr, "Couldn't open %s for reading!\n", argv[optind+1]);
-        return -4;
-    }
-    if((config.bai = sam_index_load(config.fp, argv[optind+1])) == NULL) {
-        fprintf(stderr, "Couldn't load the index for %s, will attempt to build it.\n", argv[optind+1]);
-        if(bam_index_build(argv[optind+1], 0) < 0) {
-            fprintf(stderr, "Couldn't build the index for %s! File corrupted?\n", argv[optind+1]);
-            return -5;
+    if(!config.noBAM)
+    {
+        if((config.fp = hts_open(argv[optind+1], "rb")) == NULL) {
+            fprintf(stderr, "Couldn't open %s for reading!\n", argv[optind+1]);
+            return -4;
         }
         if((config.bai = sam_index_load(config.fp, argv[optind+1])) == NULL) {
-            fprintf(stderr, "Still couldn't load the index, quiting.\n");
-            return -5;
+            fprintf(stderr, "Couldn't load the index for %s, will attempt to build it.\n", argv[optind+1]);
+            if(bam_index_build(argv[optind+1], 0) < 0) {
+                fprintf(stderr, "Couldn't build the index for %s! File corrupted?\n", argv[optind+1]);
+                return -5;
+            }
+            if((config.bai = sam_index_load(config.fp, argv[optind+1])) == NULL) {
+                fprintf(stderr, "Still couldn't load the index, quiting.\n");
+                return -5;
+            }
+        }
+        if(config.BBMName && (config.BBM_ptr = fopen(config.BBMName, "rb")) == NULL) {
+            fprintf(stderr, "Couldn't open %s for reading!\n", config.BBMName);
+            return -8;
         }
     }
+    
+    
+    if(config.BWName && (config.BW_ptr = bwOpen(config.BWName, NULL, "r")) == NULL) {
+        fprintf(stderr, "Couldn't open %s for reading!\n", config.BWName);
+        return -4;
+    }
+    
+    if(config.BWName) //has a bigWig file
+    {
+        config.filterMappability = 1; //set flag to do filtering
+        config.chromCount = config.BW_ptr->cl->nKeys; //same chromosome count
+        config.chromNames = malloc(config.chromCount*sizeof(char*));
+        config.chromLengths = malloc(config.chromCount*sizeof(uint32_t));
+        FILE* f; //this file pointer is only used when writing a BBM file, declared here to make sure it is in scope where it is needed
+        uint16_t runlen; //length of a run of the same value, declared here for the same reasons as the above file pointer
+        uint16_t chromNameLen; //length of the name of a chromosome, declared here for the same reasons as the above file pointer
+        unsigned char lastval; //the previous value read
+        unsigned char nullterm = 0; //this just stores a null terminator which is used in writing a BBM file
+        if(config.outBBMName) //are we writing a BBM?
+        {
+            f = fopen(config.outBBMName, "wb"); //open the BBM file for writing
+            if(f == NULL)
+            {
+                fprintf(stderr, "Couldn't open %s for writing! Insufficient permissions?\n", config.outBBMName);
+                return -7;
+            }
+            unsigned char bbm_version = 1;
+            fwrite(&bbm_version, sizeof(char), 1, f); //write version
+        }
+        config.bw_data = malloc(config.BW_ptr->cl->nKeys*sizeof(char*)); //init outer array
+        fprintf(stderr, "loading mappability data from %s\n", config.BWName);
+        if(config.outBBMName) //are we writing a BBM?
+        {
+            fwrite(&config.BW_ptr->cl->nKeys, sizeof(uint32_t), 1, f); //write chrom count
+            fprintf(stderr, "writing .bbm file to %s\n", config.outBBMName);
+        }
+        for(int i = 0; i<config.BW_ptr->cl->nKeys; i++) //loop over chroms
+        {
+            config.chromNames[i] = strdup(config.BW_ptr->cl->chrom[i]); //store chrom name
+            config.chromLengths[i] = config.BW_ptr->cl->len[i]; //store chrom length
+            if(config.outBBMName) //are we writing a BBM?
+            {
+                lastval = 255; //255 here is an placeholder value since there is no last value yet
+                runlen = 0;
+                chromNameLen = (uint16_t)(strlen(config.BW_ptr->cl->chrom[i])); //get length of chrom name (excluding null terminator)
+                fwrite(&chromNameLen, sizeof(chromNameLen), 1, f); //write length of name to file
+                fwrite(config.BW_ptr->cl->chrom[i], sizeof(char), chromNameLen, f); //write name to file
+                fwrite(&nullterm, sizeof(unsigned char), 1, f); //write null terminator to file
+                uint32_t chromLen = (uint32_t)(config.BW_ptr->cl->len[i]); //get length of actual chromosome
+                fwrite(&chromLen, sizeof(uint32_t), 1, f); //write chromosome length to file
+            }
+            
+            int arrlen; //variable to store the length of the array used for the data (this is not the same as the chromosome length, as each value is one bit and this is an array of characters, i.e. bytes)
+            arrlen = config.BW_ptr->cl->len[i]/8; //array length is chromosome length over 8 (number of bits to number of bytes)
+            if(config.BW_ptr->cl->len[i]%8 > 0) //if there is a remainder that didn't divide evenly
+            {
+                arrlen++; //add an extra byte to store it
+            }
+            config.bw_data[i] = malloc(arrlen*sizeof(char)); //init inner array
+            bwOverlappingIntervals_t *vals = bwGetValues(config.BW_ptr, config.BW_ptr->cl->chrom[i], 0, config.BW_ptr->cl->len[i], 1); //get data from bigWig
+            for(int j = 0; j<config.BW_ptr->cl->len[i]; j++) //loop over data
+            {
+                int index; //index in array
+                char offset; //offset in byte at index
+                char aboveCutoff;
+                double val_raw; //value from bigWig, goes from 0.00 thru 1.00
+                unsigned char val; //integer form of the value, goes from 1 thru 100
+                index = j/8;
+                offset = j%8;
+                if(offset == 0) //starting new byte
+                {
+                    config.bw_data[i][index] = 0; //init new byte
+                }
+                val_raw = vals->value[j];
+                val = (char)((val_raw*100)+0.5); //0.5 is to prevent roundoff error issues
+                if(isnan(val_raw))
+                {
+                    //convert NaN to 0
+                    val = 0;
+                    val_raw = 0;
+                }
+                if(config.outBBMName) //are we writing a BBM?
+                {
+                    if(val == lastval && runlen < 65535) //in a run and haven't maxed out the run length
+                    {
+                        runlen++;
+                        
+                    }
+                    else
+                    {
+                        if(runlen > 1) //a run just ended
+                        {
+                            if(runlen < 156) //short run (2 byte format)
+                            {
+                                unsigned char runlen_towrite = (unsigned char)(runlen)+RUNOFFSET;
+                                fwrite(&runlen_towrite, sizeof(char), 1, f); //write run length + RUNOFFSET
+                                fwrite(&lastval, sizeof(char), 1, f); //write run value
+                            }
+                            else //long run (4 byte format)
+                            {
+                                unsigned char flag = 255; //flag for long run
+                                fwrite(&flag, sizeof(char), 1, f); //write 255 to file
+                                fwrite(&runlen, sizeof(uint16_t), 1, f); //write run length
+                                fwrite(&lastval, sizeof(char), 1, f); //write run value
+                            }
+                            runlen = 0;
+                        }
+                        if(j<((config.BW_ptr->cl->len[i])-1) && (char)(((vals->value[j+1])*100)+0.5) == val) //starting a run
+                        {
+                            lastval = val;
+                            runlen = 1;
+                        }
+                        else //individual value
+                        {
+                            fwrite(&val, sizeof(char), 1, f);
+                            lastval = val;
+                            runlen = 0;
+                        }
+                    }
+                }
+                else
+                {
+                    lastval = val;
+                }
+                aboveCutoff = (char)(val >= config.mappabilityCutoff*100.0); //check if above cutoff
+                config.bw_data[i][index] = config.bw_data[i][index] | (aboveCutoff << offset); //set bit
+            }
+            if(config.outBBMName)
+            {
+                if(runlen > 1) //a run just ended
+                {
+                    if(runlen < 155) //short run (2 byte format)
+                    {
+                        unsigned char runval = (unsigned char)(runlen)+RUNOFFSET;
+                        fwrite(&runval, sizeof(char), 1, f); //write run length + RUNOFFSET
+                        fwrite(&lastval, sizeof(char), 1, f); //write run value
+                    }
+                    else //long run (4 byte format)
+                    {
+                        unsigned char flag = 255; //flag for long run
+                        fwrite(&flag, sizeof(char), 1, f); //write 255 to file
+                        fwrite(&runlen, sizeof(uint16_t), 1, f); //write run length
+                        fwrite(&lastval, sizeof(char), 1, f); //write run value
+                    }
+                    runlen = 0;
+                }
+            }
+            bwDestroyOverlappingIntervals(vals); //free memory from bigWig read
+            
+        }
+        if(config.outBBMName) //are we writing a BBM?
+        {
+            fclose(f); //close the BBM file
+            if(config.noBAM)
+            {
+                for(int i = 0; i<config.chromCount; i++)
+                {
+                    free(config.bw_data[i]);
+                    free(config.chromNames[i]);
+                }
+                free(config.chromLengths);
+                free(config.chromNames);
+                free(config.bw_data);
+                bwClose(config.BW_ptr);
+                return 0;
+            }
+        }
+        
+    }
+    
+    
+    if(config.BBM_ptr) //reading a BBM
+    {
+        config.filterMappability = 1; //set flag to filter mappability
+        fprintf(stderr, "loading mappability data from %s\n", config.BBMName);
+        char readlen; //used to store the length of data read from the file. Could be used in the future to detect unexpected EOF throughout reading the file, but it is currently only used to check for blank files and incorrect chrom name null terminators
+        unsigned char bbm_version;
+        readlen = fread(&bbm_version, sizeof(char), 1, config.BBM_ptr); //get BBM version
+        if(bbm_version != 1)
+        {
+            fprintf(stderr, "fatal: file is wrong BBM version or malformed\n", config.BBMName);
+            return -10;
+        }
+        readlen = fread(&config.chromCount, sizeof(config.chromCount), 1, config.BBM_ptr); //get chrom count
+        config.chromNames = malloc(config.chromCount*sizeof(char*));
+        config.chromLengths = malloc(config.chromCount*sizeof(uint32_t));
+        if(readlen <= 0) //if the data from the file came back blank
+        {
+            return error(); //the file is empty, fail
+        }
+        int chromID = 0; //init chrom id
+        config.bw_data = malloc(config.chromCount*sizeof(char*)); //init outer array
+        while(chromID < config.chromCount) //loop over chroms
+        {
+            uint16_t nameLen;
+            readlen = fread(&nameLen, sizeof(uint16_t), 1, config.BBM_ptr); //read in length of name
+            config.chromNames[chromID] = malloc((nameLen+1)*sizeof(char)); //one more than length to make space for null terminator
+            for(int i = 0; i<nameLen; i++)
+            {
+                readlen = fread(&(config.chromNames[chromID][i]), sizeof(char), 1, config.BBM_ptr); //read in character of name
+            }
+            config.chromNames[chromID][nameLen] = 0; //null-terminate string
+            char nullterm;
+            readlen = fread(&nullterm, sizeof(char), 1, config.BBM_ptr); //read in null terminator from file
+            if(nullterm) //file null terminator wasn't \0
+            {
+                return error(); //malformed file, fail
+            }
+            
+            readlen = fread(&(config.chromLengths[chromID]), sizeof(uint32_t), 1, config.BBM_ptr); //get chromosome length
+            uint32_t pos = 0;
+            int arrlen; //variable to store the length of the array used for the data (this is not the same as the chromosome length, as each value is one bit and this is an array of characters, i.e. bytes)
+            arrlen = config.chromLengths[chromID]/8; //array length is chromosome length over 8 (number of bits to number of bytes)
+            if(config.chromLengths[chromID]%8 > 0) //if there is a remainder that didn't divide evenly
+            {
+                arrlen++; //add an extra byte to store it
+            }
+            config.bw_data[chromID] = malloc(arrlen*sizeof(char)); //init inner array
+            while(pos<(config.chromLengths[chromID])) //loop over chrom
+            {
+                
+                int index; //index in array
+                char offset; //offset in byte at index
+                char aboveCutoff;
+                index = pos/8;
+                offset = pos%8;
+                if(offset == 0) //starting new byte
+                {
+                    config.bw_data[chromID][index] = 0; //init new byte
+                }
+
+                
+                unsigned char val; //data value from file
+                uint16_t runlen; //length of a run of the same value
+                readlen = fread(&val, sizeof(val), 1, config.BBM_ptr); //read value
+                if(val > 100) //if the value is >100, this is a flag for a run, not a standard value
+                {
+                    if(val == 255) //long run
+                    {
+                        readlen = fread(&runlen, sizeof(uint16_t), 1, config.BBM_ptr); //read in run length
+                        readlen = fread(&val, sizeof(val), 1, config.BBM_ptr); //read value
+                    }
+                    else //short run
+                    {
+                        runlen = val-RUNOFFSET; //calculate run length
+                        readlen = fread(&val, sizeof(val), 1, config.BBM_ptr); //read value
+                    }
+                    aboveCutoff = (char)(val >= config.mappabilityCutoff*100.0); //check if above cutoff
+                    for(int i = 0; i<runlen; i++) //loop runlen times to store a run of the value
+                    {
+                        int tempindex;
+                        char tempoffset;
+                        tempindex = (pos+i)/8;
+                        tempoffset = (pos+i)%8;
+                        if(tempoffset == 0) //starting new byte
+                        {
+                            config.bw_data[chromID][tempindex] = 0; //init new byte
+                        }
+                        config.bw_data[chromID][tempindex] = config.bw_data[chromID][tempindex] | (aboveCutoff << tempoffset); //set bit
+                    }
+                    pos+=runlen; //move ahead to after the run
+                }
+                else //individual value
+                {
+                    aboveCutoff = (char)(val >= config.mappabilityCutoff*100.0); //check if above cutoff
+                    config.bw_data[chromID][index] = config.bw_data[chromID][index] | (aboveCutoff << offset); //set bit
+                    pos++;
+                }
+            }
+            chromID++; //next chromosome
+        }
+        
+        fclose(config.BBM_ptr); //done with the file
+
+    }
+
+
 
     //Output files
     config.output_fp = malloc(sizeof(FILE *) * 3);
@@ -1021,7 +1382,6 @@ int extract_main(int argc, char *argv[]) {
             printHeader(config.output_fp[2], "CHH", opref, config);
         }
     }
-
     //parse the region, if needed
     if(config.reg) {
         const char *foo;
@@ -1060,18 +1420,18 @@ int extract_main(int argc, char *argv[]) {
             return 1;
         }
     }
-
     //Run the pileup
     pthread_mutex_init(&positionMutex, NULL);
+    pthread_mutex_init(&bwMutex, NULL);
     pthread_t *threads = calloc(config.nThreads, sizeof(pthread_t));
     for(i=0; i < config.nThreads; i++) pthread_create(threads+i, NULL, &extractCalls, &config);
     for(i=0; i < config.nThreads; i++) pthread_join(threads[i], NULL);
     free(threads);
+    pthread_mutex_destroy(&bwMutex);
     pthread_mutex_destroy(&positionMutex);
 
     //If we've filtered out variant sites
     if(globalnVariantPositions) printf("%"PRIu64" positions were excluded due to likely being variants.\n", globalnVariantPositions);
-
     //Close things up
     hts_close(config.fp);
     if(config.cytosine_report) fclose(config.output_fp[0]);
@@ -1083,6 +1443,17 @@ int extract_main(int argc, char *argv[]) {
     if(config.bed) destroyBED(config.bed);
     free(oname);
     free(config.output_fp);
-
+    if(config.filterMappability)
+    {
+        for(int i = 0; i<config.chromCount; i++)
+        {
+            free(config.bw_data[i]);
+            free(config.chromNames[i]);
+        }
+        free(config.chromLengths);
+        free(config.chromNames);
+        free(config.bw_data);
+    }
+    bwClose(config.BW_ptr);
     return 0;
 }

@@ -41,6 +41,10 @@ By default, MethylDackel will only calculate metrics for Cytosines in a CpG cont
 
 MethylDackel can filter reads and bases according to MAPQ and Phred score, respectively. The default minimums are MAPQ >= 10 and Phred >= 5, though these can be changed with the -q and -p options. MethylDackel can also account for methylation bias (described below) with the `--OT`, `--OB`, `--CTOT`, and `--CTOB` options.
 
+Given a bigWig of Bismap mappability data (using the `-M` option), MethylDackel can also filter out reads with a mappability score which is too low to support methylation calling. With default settings, a read would be rejected if less than 15 bases have mappability &ge; 0.01, but this can be configured with the `-t` and `-b` options.
+
+This mappability data can also be read in from a BBM file. A BBM file (short for "Binary BisMap") is a custom compressed version of the data from the bigWig which is used by MethylDackel. It can be read in much faster than a bigWig and takes up less disk space. These files can be created by specifying the `-O` or `-N` options when running MethylDackel extract, and can be read in using the `-B` option (instead of `-M`).
+
 A note on overlapping reads
 ===========================
 
@@ -165,3 +169,4 @@ Citing MethylDackel
 ===================
 
 There are no immediate plans for a MethylDackel publication. If you use MethylDackel (or PileOMeth, as it was formerly known) in your research, please simply site the URL for this repository on github.
+

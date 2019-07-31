@@ -3,9 +3,11 @@
 #include <zlib.h>
 #include "htslib/sam.h"
 #include "htslib/faidx.h"
+#include "libBigWig/bigWig.h"
 
 //These are needed to handle multiple threads
 pthread_mutex_t positionMutex;
+pthread_mutex_t bwMutex;
 pthread_mutex_t outputMutex;
 uint32_t globalTid;
 uint32_t globalPos;
@@ -89,6 +91,19 @@ typedef struct {
     FILE **output_fp;
     char *reg;
     char *BAMName;
+    char *BWName;
+    char *outBBMName;
+    char *BBMName;
+    FILE *BBM_ptr;
+    char** chromNames;
+    uint32_t chromCount;
+    uint32_t* chromLengths;
+    char filterMappability;
+    char outputBB;
+    float mappabilityCutoff;
+    int minMappableBases;
+    bigWigFile_t *BW_ptr;
+    char** bw_data;
     htsFile *fp;
     hts_idx_t *bai;
     char *bedName;
@@ -97,6 +112,7 @@ typedef struct {
     int bounds[16];
     int absoluteBounds[16];
     int nThreads;
+    char noBAM;
     unsigned long chunkSize;
 } Config;
 
