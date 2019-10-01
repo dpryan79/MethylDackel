@@ -1,12 +1,13 @@
 steps:
 - bash: |
     source activate foo
+    export LC_RPATH=$CONDA_PREFIX/lib
     make install CC=$CC CFLAGS="-O3 -Wall -I$CONDA_PREFIX/include" LIBS="-L$CONDA_PREFIX/lib" prefix=$CONDA_PREFIX/bin
   displayName: Installing methylDackel
 - bash: |
     source activate foo
     export LD_LIBRARY_PATH=$CONDA_PREFIX/lib
-    export DYLD_LIBRARY_PATH=$CONDA_PREFIX/lib
-    ls -l $CONDA_PREFIX/lib
+    export LC_RPATH=$CONDA_PREFIX/lib
+    install_name_tool -add_rpath @$CONDA_PREFIX/lib MethylDackel
     make test CC=$CC CFLAGS="-O3 -Wall -I$CONDA_PREFIX/include" LIBS="-L $CONDA_PREFIX/lib"
   displayName: Test methylDackel
