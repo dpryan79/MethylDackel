@@ -6,6 +6,7 @@ steps:
 - bash: |
     source activate foo
     export LD_LIBRARY_PATH=$CONDA_PREFIX/lib
+    export DYLD_LIBRARY_PATH=$CONDA_PREFIX/lib
     ls -l $CONDA_PREFIX/lib
     make test CC=$CC CFLAGS="-O3 -Wall -I$CONDA_PREFIX/include" LIBS="-L$CONDA_PREFIX/lib"
   displayName: Test methylDackel
