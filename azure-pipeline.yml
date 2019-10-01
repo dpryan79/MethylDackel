@@ -44,10 +44,7 @@ jobs:
   - bash: echo "##vso[task.prependpath]$CONDA/bin"
     displayName: Add conda to PATH
   - script: |
-      ls -l /Users/vsts/.conda/
-      if [[ -f /Users/vsts/.conda/pkgs/urls.txt ]] ; then
-          sudo chown -f 501:20 /Users/vsts/.conda/pkgs/urls.txt
-      fi
+      sudo chown -f 501:20 /Users/vsts
       conda create -n foo -q --yes -c conda-forge -c bioconda htslib python clang clang_osx-64 clangxx cctools compiler-rt ld64
     displayName: Installing dependencies
   - template: .azure-pipelines/test-template.yml
