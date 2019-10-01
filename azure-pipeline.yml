@@ -35,6 +35,7 @@ jobs:
   - checkout: self
     submodules: true
   - script: |
+      ls -l /Users/vsts/.conda/
       if [[ -f /Users/vsts/.conda/pkgs/urls.txt ]] ; then
           sudo chown -f 501:20 /Users/vsts/.conda/pkgs/urls.txt
       fi
