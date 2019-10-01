@@ -19,7 +19,7 @@ version.h:
 	$(CC) -c $(CFLAGS) $(LIBS) -IlibBigWig $< -o $@
 
 libbw: 
-	$(MAKE) -C libBigWig all
+	$(MAKE) -C libBigWig lib-static CC="$(CC)" LDFLAGS="$(LIBS)" CFLAGS="$(CFLAGS)"
 
 libMethylDackel.a: version.h $(OBJS)
 	-@rm -f $@
