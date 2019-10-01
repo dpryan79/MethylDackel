@@ -34,7 +34,10 @@ jobs:
   steps:
   - checkout: self
     submodules: true
-  - bash: sudo chown -f 501:20 /Users/vsts/.conda/pkgs/urls.txt
+  - script: |
+      if [[ -f /Users/vsts/.conda/pkgs/urls.txt ]] ; then
+          sudo chown -f 501:20 /Users/vsts/.conda/pkgs/urls.txt
+      fi
     displayName: chown
   - script: |
       echo "Removing homebrew from Azure to avoid conflicts."
