@@ -9,5 +9,6 @@ steps:
     export LD_LIBRARY_PATH=$CONDA_PREFIX/lib
     export LC_RPATH=$CONDA_PREFIX/lib
     install_name_tool -add_rpath @$CONDA_PREFIX/lib MethylDackel
+    otool -l MethylDackel
     make test CC=$CC CFLAGS="-O3 -Wall -I$CONDA_PREFIX/include" LIBS="-L $CONDA_PREFIX/lib"
   displayName: Test methylDackel
