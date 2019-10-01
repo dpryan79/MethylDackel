@@ -23,6 +23,11 @@ If the linker has issues finding the htslib headers and library, then specify th
 
     make install CFLAGS="-O3 -Wall -I/some/path/include " LIBS="-L/some/path/lib" prefix=/some/installation/path
 
+License
+=======
+
+This software is licensed under the terms of the MIT license (see the LICENSE file). Please feel free to redistribute this according to those terms.
+
 Methylation Context
 ===================
 
