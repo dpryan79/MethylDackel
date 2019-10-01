@@ -31,7 +31,7 @@ MethylDackel: libbw version.h libMethylDackel.a $(OBJS)
 	$(CC) $(CFLAGS) $(LIBS) -o MethylDackel $(OBJS) main.c libMethylDackel.a libBigWig/libBigWig.a -lm -lz -lpthread -lhts -lcurl
 
 test: MethylDackel 
-	otool -L libMethylDackel
+	otool -L MethylDackel
 	python tests/test.py
 
 clean:
