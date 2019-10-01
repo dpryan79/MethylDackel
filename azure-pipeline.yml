@@ -13,6 +13,8 @@ jobs:
     maxParallel: 1
 
   steps:
+  - checkout: self
+    submodules: true
   - bash: echo "##vso[task.prependpath]/usr/share/miniconda/bin"
     displayName: Add conda to PATH
   - bash: conda create -n foo -q --yes -c conda-forge -c bioconda htslib python gcc_impl_linux-64 binutils_impl_linux-64 binutils_linux-64 gcc_linux-64 libgcc-ng
