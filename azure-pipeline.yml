@@ -47,5 +47,6 @@ jobs:
       sudo chown -f 501:20 /Users/vsts
       conda create -n foo -q --yes -c conda-forge -c bioconda htslib python clang clang_osx-64 clangxx cctools compiler-rt ld64
       rm /Users/vsts/.conda/envs/foo/lib/libhts.2.dylib
+      find / -name libhts2.dylib -ls
     displayName: Installing dependencies
   - template: .azure-pipelines/test-template.yml
