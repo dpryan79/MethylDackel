@@ -688,7 +688,7 @@ void extract_usage() {
 
 int extract_main(int argc, char *argv[]) {
     char *opref = NULL, *oname, *p;
-    int c, i, keepStrand = 0;
+    int c, i, j, keepStrand = 0;
     Config config;
     bam_hdr_t *hdr = NULL;
 
@@ -1043,7 +1043,7 @@ int extract_main(int argc, char *argv[]) {
             fwrite(&config.BW_ptr->cl->nKeys, sizeof(uint32_t), 1, f); //write chrom count
             fprintf(stderr, "writing .bbm file to %s\n", config.outBBMName);
         }
-        for(int i = 0; i<config.BW_ptr->cl->nKeys; i++) //loop over chroms
+        for(i = 0; i<config.BW_ptr->cl->nKeys; i++) //loop over chroms
         {
             config.chromNames[i] = strdup(config.BW_ptr->cl->chrom[i]); //store chrom name
             config.chromLengths[i] = config.BW_ptr->cl->len[i]; //store chrom length
@@ -1067,7 +1067,7 @@ int extract_main(int argc, char *argv[]) {
             }
             config.bw_data[i] = malloc(arrlen*sizeof(char)); //init inner array
             bwOverlappingIntervals_t *vals = bwGetValues(config.BW_ptr, config.BW_ptr->cl->chrom[i], 0, config.BW_ptr->cl->len[i], 1); //get data from bigWig
-            for(int j = 0; j<config.BW_ptr->cl->len[i]; j++) //loop over data
+            for(j = 0; j<config.BW_ptr->cl->len[i]; j++) //loop over data
             {
                 int index; //index in array
                 char offset; //offset in byte at index
@@ -1162,7 +1162,7 @@ int extract_main(int argc, char *argv[]) {
             fclose(f); //close the BBM file
             if(config.noBAM)
             {
-                for(int i = 0; i<config.chromCount; i++)
+                for(i = 0; i<config.chromCount; i++)
                 {
                     free(config.bw_data[i]);
                     free(config.chromNames[i]);
@@ -1187,7 +1187,7 @@ int extract_main(int argc, char *argv[]) {
         readlen = fread(&bbm_version, sizeof(char), 1, config.BBM_ptr); //get BBM version
         if(bbm_version != 1)
         {
-            fprintf(stderr, "fatal: file is wrong BBM version or malformed\n", config.BBMName);
+            fprintf(stderr, "fatal: %s has wrong BBM version or is malformed\n", config.BBMName);
             return -10;
         }
         readlen = fread(&config.chromCount, sizeof(config.chromCount), 1, config.BBM_ptr); //get chrom count
@@ -1204,7 +1204,7 @@ int extract_main(int argc, char *argv[]) {
             uint16_t nameLen;
             readlen = fread(&nameLen, sizeof(uint16_t), 1, config.BBM_ptr); //read in length of name
             config.chromNames[chromID] = malloc((nameLen+1)*sizeof(char)); //one more than length to make space for null terminator
-            for(int i = 0; i<nameLen; i++)
+            for(i = 0; i<nameLen; i++)
             {
                 readlen = fread(&(config.chromNames[chromID][i]), sizeof(char), 1, config.BBM_ptr); //read in character of name
             }
@@ -1255,7 +1255,7 @@ int extract_main(int argc, char *argv[]) {
                         readlen = fread(&val, sizeof(val), 1, config.BBM_ptr); //read value
                     }
                     aboveCutoff = (char)(val >= config.mappabilityCutoff*100.0); //check if above cutoff
-                    for(int i = 0; i<runlen; i++) //loop runlen times to store a run of the value
+                    for(i = 0; i<runlen; i++) //loop runlen times to store a run of the value
                     {
                         int tempindex;
                         char tempoffset;
@@ -1445,7 +1445,7 @@ int extract_main(int argc, char *argv[]) {
     free(config.output_fp);
     if(config.filterMappability)
     {
-        for(int i = 0; i<config.chromCount; i++)
+        for(i = 0; i<config.chromCount; i++)
         {
             free(config.bw_data[i]);
             free(config.chromNames[i]);
