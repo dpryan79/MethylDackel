@@ -5,6 +5,8 @@ Version 0.4.0:
    * Removed the `--maxDepth` option, it's not longer required.
    * Fixed issue #58, the `--keepDupes` flag now changes `--ignoreFlags`.
    * Fixed issue #59, the confidence intervals should no longer extend outside of [0, 1].
+   * libBigWig is now an external dependency as it's needed for handling the "binary bismap format"
+   * Added support for blacklisting reads according to a "binary bismap file". See [here](https://github.com/dpryan79/MethylDackel/blob/master/BBM_Specification.md) for details. Code for this was contributed by @valiec and @bwlang at New England Biolabs.
 
 Version 0.3.0:
 
