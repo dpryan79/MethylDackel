@@ -1,10 +1,10 @@
 steps:
 - bash: |
     source activate foo
-    make install CC=$CC CFLAGS="-O3 -Wall -I$CONDA_PREFIX/include" LIBS="-L$CONDA_PREFIX/lib" prefix=$CONDA_PREFIX/bin
+    make install CC=$CC CFLAGS="-O3 -Wall -I$CONDA_PREFIX/include" LIBS="-L$CONDA_PREFIX/lib" LIBBIGWIG="$CONDA_PREFIX/lib/libBigWig.a" prefix=$CONDA_PREFIX/bin
   displayName: Installing methylDackel
 - bash: |
     source activate foo
     export LD_LIBRARY_PATH=$CONDA_PREFIX/lib
-    make test CC=$CC CFLAGS="-O3 -Wall -I$CONDA_PREFIX/include" LIBS="-L$CONDA_PREFIX/lib"
+    make test CC=$CC CFLAGS="-O3 -Wall -I$CONDA_PREFIX/include" LIBS="-L$CONDA_PREFIX/lib" LIBBIGWIG="$CONDA_PREFIX/lib/libBigWig.a"
   displayName: Test methylDackel

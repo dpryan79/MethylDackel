@@ -3,7 +3,7 @@
 #include <zlib.h>
 #include "htslib/sam.h"
 #include "htslib/faidx.h"
-#include "libBigWig/bigWig.h"
+#include "bigWig.h"
 
 //These are needed to handle multiple threads
 pthread_mutex_t positionMutex;
