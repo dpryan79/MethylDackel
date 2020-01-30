@@ -18,7 +18,7 @@ int RUNOFFSET = 99; //used to calculate the run length value to store in a BBM f
 
 void print_version(void);
 
-extern inline double logit(double p) {
+static inline double logit(double p) {
     return(log(p) - log(1 - p)); 
 }
 
@@ -453,7 +453,7 @@ void *extractCalls(void *foo) {
             if(nmethyl+nunmethyl==0 && config->cytosine_report == 0) continue;
             if(!config->merge || type==2) { //Also, cytosine report
                 if(config->cytosine_report) {
-                    writeBlank(os, config, hdr->target_name[tid], pos, localPos2, &lastPos, seq, seqlen);
+                    writeBlank(os, config, hdr->target_name[localTid], pos, localPos2, &lastPos, seq, seqlen);
 
                     //Set the C-context
                     if(type == 0) {
@@ -498,7 +498,7 @@ void *extractCalls(void *foo) {
                 lastCHG->tid = -1;
             }
         } else if(config->cytosine_report) {
-            writeBlank(os, config, hdr->target_name[tid], localEnd, localPos2, &lastPos, seq, seqlen);
+            writeBlank(os, config, hdr->target_name[localTid], localEnd, localPos2, &lastPos, seq, seqlen);
         }
         hts_itr_destroy(data->iter);
         free(seq);
