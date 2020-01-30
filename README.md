@@ -173,5 +173,5 @@ Fragments longer than 10kb are currently not handled correctly.
 Citing MethylDackel
 ===================
 
-There are no immediate plans for a MethylDackel publication. If you use MethylDackel (or PileOMeth, as it was formerly known) in your research, please simply site the URL for this repository on github.
+There are no immediate plans for a MethylDackel publication. If you use MethylDackel (or PileOMeth, as it was formerly known) in your research, please simply cite the URL for this repository on github.
 
