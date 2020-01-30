@@ -157,6 +157,8 @@ Ignored alignments
 
 By default, any alignment marked as being secondary (bit 256), having failed QC (bit 512), being a PCR/optical duplicate (bit 1024), or being supplemental (bit 2048) is ignored. This is a reasonable default and should only be changed by expert users. For those needing to change this behaviour, please see the `-F` or `--ignoreFlags` options to both `MethylDackel mbias` and `MethylDackel extract`.
 
+Note that PCR (but not optical!) duplicates should be included for enrichment-based library preparations, like RRBS. In such cases it is vital to use the `--keepDupes` option!
+
 Per-read metrics
 ================
 
