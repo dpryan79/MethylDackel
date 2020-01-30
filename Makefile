@@ -19,16 +19,12 @@ version.h:
 .c.o:
 	$(CC) -c $(CFLAGS) $(LIBS) -IlibBigWig $< -o $@
 
-#libbw: 
-#	$(MAKE) -C libBigWig all
-
 libMethylDackel.a: version.h $(OBJS)
 	-@rm -f $@
 	$(AR) -rcs $@ $(OBJS)
 
 lib: libMethylDackel.a
 
-#MethylDackel: libbw version.h libMethylDackel.a $(OBJS)
 MethylDackel: libMethylDackel.a version.h $(OBJS)
 	$(CC) $(CFLAGS) $(LIBS) -o MethylDackel $(OBJS) main.c libMethylDackel.a $(LIBBIGWIG) -lm -lz -lpthread -lhts -lcurl
 
@@ -37,10 +33,6 @@ test: MethylDackel
 
 clean:
 	rm -f *.o MethylDackel libMethylDackel.a
-
-clean-all: clean
-	make --directory=libBigWig clean
-	rm -f *.o MethylDackel
 
 install: MethylDackel
 	install MethylDackel $(prefix)

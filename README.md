@@ -7,7 +7,7 @@
 Prerequisites
 =============
 
-A C compiler, such as gcc, and htslib (versions 1.4 through 1.9 are known to be compatible).
+A C compiler, such as gcc, htslib (versions 1.4 through 1.9 are known to be compatible) and libBigWig are required. For libBigWig, the static library is used.
 
 Compilation
 ===========
@@ -16,12 +16,12 @@ Compilation and installation can be performed via:
 
     git clone https://github.com/dpryan79/MethylDackel.git
     cd MethylDackel
-    make
+    make LIBBIGWIG="/some/path/to/libBigWig.a"
     make install prefix=/some/installation/path
 
 If the linker has issues finding the htslib headers and library, then specify them using `CFLAGS` and `LIBS`:
 
-    make install CFLAGS="-O3 -Wall -I/some/path/include " LIBS="-L/some/path/lib" prefix=/some/installation/path
+    make install CFLAGS="-O3 -Wall -I/some/path/include " LIBS="-L/some/path/lib" prefix=/some/installation/path LIBBIGWIG="/some/path/to/libBigWig.a"
 
 License
 =======
