@@ -19,17 +19,17 @@ version.h:
 .c.o:
 	$(CC) -c $(CFLAGS) $(LIBS) -IlibBigWig $< -o $@
 
-libbw: 
-	$(MAKE) -C libBigWig all
+#libbw: 
+#	$(MAKE) -C libBigWig all
 
 libMethylDackel.a: version.h $(OBJS)
 	-@rm -f $@
 	$(AR) -rcs $@ $(OBJS)
 
-#lib: libMethylDackel.a
+lib: libMethylDackel.a
 
 #MethylDackel: libbw version.h libMethylDackel.a $(OBJS)
-MethylDackel: libbw version.h $(OBJS)
+MethylDackel: libMethylDackel.a version.h $(OBJS)
 	$(CC) $(CFLAGS) $(LIBS) -o MethylDackel $(OBJS) main.c libMethylDackel.a $(LIBBIGWIG) -lm -lz -lpthread -lhts -lcurl
 
 test: MethylDackel 
