@@ -1020,7 +1020,7 @@ int extract_main(int argc, char *argv[]) {
         config.chromCount = config.BW_ptr->cl->nKeys; //same chromosome count
         config.chromNames = malloc(config.chromCount*sizeof(char*));
         config.chromLengths = malloc(config.chromCount*sizeof(uint32_t));
-        FILE* f; //this file pointer is only used when writing a BBM file, declared here to make sure it is in scope where it is needed
+        FILE* f = NULL; //this file pointer is only used when writing a BBM file, declared here to make sure it is in scope where it is needed
         uint16_t runlen; //length of a run of the same value, declared here for the same reasons as the above file pointer
         uint16_t chromNameLen; //length of the name of a chromosome, declared here for the same reasons as the above file pointer
         unsigned char lastval; //the previous value read
