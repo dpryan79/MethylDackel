@@ -1,6 +1,7 @@
 prefix ?= /usr/local/bin #This can be changed
 CC ?= gcc
 LIBS ?=  # e.g., -L$PREFIX/lib, or where ever htslib is
+LIBBIGWIG ?=
 CFLAGS ?= -Wall -g -O3 -pthread
 
 .PHONY: all clean install version.h
@@ -25,10 +26,11 @@ libMethylDackel.a: version.h $(OBJS)
 	-@rm -f $@
 	$(AR) -rcs $@ $(OBJS)
 
-lib: libMethylDackel.a
+#lib: libMethylDackel.a
 
-MethylDackel: libbw version.h libMethylDackel.a $(OBJS)
-	$(CC) $(CFLAGS) $(LIBS) -o MethylDackel $(OBJS) main.c libMethylDackel.a libBigWig/libBigWig.a -lm -lz -lpthread -lhts -lcurl
+#MethylDackel: libbw version.h libMethylDackel.a $(OBJS)
+MethylDackel: libbw version.h $(OBJS)
+	$(CC) $(CFLAGS) $(LIBS) -o MethylDackel $(OBJS) main.c libMethylDackel.a $(LIBBIGWIG) -lm -lz -lpthread -lhts -lcurl
 
 test: MethylDackel 
 	python tests/test.py
