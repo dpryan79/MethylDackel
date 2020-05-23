@@ -47,6 +47,7 @@ void print_version() {
 }
 
 inline int isCpG(char *seq, int pos, int seqlen) {
+    if(pos >= seqlen) return 0;
     if(*(seq+pos) == 'C' || *(seq+pos) == 'c') {
         if(pos+1 == seqlen) return 0;
         if(*(seq+pos+1) == 'G' || *(seq+pos+1) == 'g') return 1;
@@ -60,6 +61,7 @@ inline int isCpG(char *seq, int pos, int seqlen) {
 }
 
 inline int isCHG(char *seq, int pos, int seqlen) {
+    if(pos >= seqlen) return 0;
     if(*(seq+pos) == 'C' || *(seq+pos) == 'c') {
         if(pos+2 >= seqlen) return 0;
         if(*(seq+pos+2) == 'G' || *(seq+pos+2) == 'g') return 1;
@@ -73,6 +75,7 @@ inline int isCHG(char *seq, int pos, int seqlen) {
 }
 
 inline int isCHH(char *seq, int pos, int seqlen) {
+    if(pos >= seqlen) return 0;
     if(*(seq+pos) == 'C' || *(seq+pos) == 'c') return 1;
     else if(*(seq+pos) == 'G' || *(seq+pos) == 'g') return -1;
     return 0;

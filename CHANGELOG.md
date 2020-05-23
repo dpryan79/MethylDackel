@@ -1,3 +1,7 @@
+Version 0.5.1:
+
+   * Fixed an issue in `MethylDackel mbias` due to an uninitialized value (issue #93).
+
 Version 0.5.0:
 
    * Fixed an issue with the `--cytosine_report` option where the reported chromosome name could be wrong IF the input BAM files were very sparse and multiple threads were used. (issue #88)
