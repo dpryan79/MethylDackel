@@ -19,7 +19,7 @@ int RUNOFFSET = 99; //used to calculate the run length value to store in a BBM f
 void print_version(void);
 
 static inline double logit(double p) {
-    return(log(p) - log(1 - p)); 
+    return(log(p) - log(1 - p));
 }
 
 //N.B., a tid of -1 means that the lastCall was written
@@ -35,7 +35,7 @@ const char *TriNucleotideContexts[25] = {"CAA", "CAC", "CAG", "CAT", "CAN", \
                                          "CTA", "CTC", "CTG", "CTT", "CTN", \
                                          "CNA", "CNC", "CNG", "CNT", "CNN"};
 
-void writeCall(kstring_t *ks, Config *config, char *chrom, int32_t pos, int32_t width, uint32_t nmethyl, uint32_t nunmethyl, char base, char *context, const char *tnc) { 
+void writeCall(kstring_t *ks, Config *config, char *chrom, int32_t pos, int32_t width, uint32_t nmethyl, uint32_t nunmethyl, char base, char *context, const char *tnc) {
     char str[10000]; // I don't really like hardcoding it, but given the probability that it ever won't suffice...
     char strand = (base=='C' || base=='c') ? 'F' : 'R';
     if(nmethyl+nunmethyl < config->minDepth && !config->cytosine_report) return;
@@ -186,6 +186,8 @@ void writeBlank(kstring_t **ks, Config *config, char *chrom, int32_t pos, uint32
     for(;*lastPos < pos; (*lastPos)++) {
         if((direction = isCpG(seq, *lastPos-localPos2, seqlen)) != 0) {
             if(!config->keepCpG) continue;
+            // if it's NoMe data, check if it's a valid NoMe-CpG
+            if((config->NoMeCpG) && (direction = isNoMeCpG(seq, *lastPos-localPos2, seqlen)) == 0) continue;
             triNucContext = getTriNucContext(seq, *lastPos - localPos2, seqlen, direction);
             context[0] = 'G'; context[1] = 0;
         } else if((direction = isCHG(seq, *lastPos-localPos2, seqlen)) != 0) {
@@ -196,8 +198,14 @@ void writeBlank(kstring_t **ks, Config *config, char *chrom, int32_t pos, uint32
             if(!config->keepCHH) continue;
             triNucContext = getTriNucContext(seq, *lastPos - localPos2, seqlen, direction);
             context[0] = 'H'; context[1] = 'H';
-        } else {
+        } else if ((direction = isGCH(seq, *lastPos-localPos2, seqlen)) != 0) {
+          // in case of NoMe, catch GCH too
+            if(!config->keepGCH) continue;
+            triNucContext = getTriNucContext(seq, *lastPos - localPos2, seqlen, direction);
+            context[0] = 'C'; context[1] = 'H';
             continue;
+        } else {
+          continue;
         }
         writeCall(ks[0], config, chrom, *lastPos, 1, 0, 0, (direction>0)?'C':'G', context, TriNucleotideContexts[triNucContext]);
     }
@@ -398,6 +406,8 @@ void *extractCalls(void *foo) {
 
             if((direction = isCpG(seq, pos-localPos2, seqlen))) {
                 if(!config->keepCpG) continue;
+                // in case of NoMe, check if it's a valid NoMe-CpG
+                if((config->NoMeCpG) && (direction = isNoMeCpG(seq, pos-localPos2, seqlen)) == 0) continue;
                 type = 0;
             } else if((direction = isCHG(seq, pos-localPos2, seqlen))) {
                 if(!config->keepCHG) continue;
@@ -405,6 +415,10 @@ void *extractCalls(void *foo) {
             } else if((direction = isCHH(seq, pos-localPos2, seqlen))) {
                 if(!config->keepCHH) continue;
                 type = 2;
+            } else if ((direction = isGCH(seq, pos-localPos2, seqlen))){
+                // extract Nome GpC
+                if(!config->keepGCH) continue;
+                type = 3;
             } else {
                 continue;
             }
@@ -460,8 +474,12 @@ void *extractCalls(void *foo) {
                         context[0] = 'G'; context[1] = 0;
                     } else if(type == 1) {
                         context[0] = 'H'; context[1] = 'G';
-                    } else {
+                    } else if(type == 2) {
                         context[0] = 'H'; context[1] = 'H';
+                    } else if(type == 3) {
+                      context[0] = 'C'; context[1] = 'H';
+                    } else {
+                      continue;
                     }
 
                     //Set the trinucleotide context
@@ -624,6 +642,9 @@ void extract_usage() {
 " --noCpG          Do not output CpG context methylation metrics\n"
 " --CHG            Output CHG context methylation metrics\n"
 " --CHH            Output CHH context methylation metrics\n"
+" --GCH            Output GCH context methylation metrics (NoMe-Seq)\n"
+" --NoMeCpG        Output CpG methylation considering sample is NoMe-Seq \n"
+"                  (skip CpGs with upstream G/C to avoid conflict with GC-methylation)\n"
 " --fraction       Extract fractional methylation (only) at each position. This\n"
 "                  produces a file with a .meth.bedGraph extension.\n"
 " --counts         Extract base counts (only) at each position. This produces a\n"
@@ -705,7 +726,8 @@ int extract_main(int argc, char *argv[]) {
     config.filterMappability = 0;
     config.mappabilityCutoff = 0.01;
     config.minMappableBases = 15;
-    config.keepCpG = 1; config.keepCHG = 0; config.keepCHH = 0;
+    config.keepCpG = 1; config.keepCHG = 0; config.keepCHH = 0; config.keepGCH = 0;
+    config.NoMeCpG = 0;
     config.minMapq = 10; config.minPhred = 5; config.keepDupes = 0;
     config.keepSingleton = 0, config.keepDiscordant = 0;
     config.minDepth = 1;
@@ -760,6 +782,8 @@ int extract_main(int argc, char *argv[]) {
         {"chunkSize",    1, NULL,  19},
         {"keepStrand",   0, NULL,  20},
         {"cytosine_report", 0, NULL, 21},
+        {"GCH",          0, NULL,   22},
+        {"NoMeCpG",      0, NULL,   23},
         {"ignoreFlags",  1, NULL, 'F'},
         {"requireFlags", 1, NULL, 'R'},
         {"help",         0, NULL, 'h'},
@@ -865,6 +889,12 @@ int extract_main(int argc, char *argv[]) {
             break;
         case 21:
             config.cytosine_report = 1;
+            break;
+        case 22:
+            config.keepGCH = 1;
+            break;
+        case 23:
+            config.NoMeCpG = 1;
             break;
         case 'M':
             config.BWName = optarg;
@@ -977,7 +1007,7 @@ int extract_main(int argc, char *argv[]) {
     }
 
     //Is there still a metric to output?
-    if(!(config.keepCpG + config.keepCHG + config.keepCHH)) {
+    if(!(config.keepCpG + config.keepCHG + config.keepCHH + config.keepGCH + config.NoMeCpG)) {
         fprintf(stderr, "You haven't specified any metrics to output!\nEither don't use the --noCpG option or specify --CHG and/or --CHH.\n");
         return -1;
     }
@@ -1007,13 +1037,13 @@ int extract_main(int argc, char *argv[]) {
             return -8;
         }
     }
-    
-    
+
+
     if(config.BWName && (config.BW_ptr = bwOpen(config.BWName, NULL, "r")) == NULL) {
         fprintf(stderr, "Couldn't open %s for reading!\n", config.BWName);
         return -4;
     }
-    
+
     if(config.BWName) //has a bigWig file
     {
         config.filterMappability = 1; //set flag to do filtering
@@ -1058,7 +1088,7 @@ int extract_main(int argc, char *argv[]) {
                 uint32_t chromLen = (uint32_t)(config.BW_ptr->cl->len[i]); //get length of actual chromosome
                 fwrite(&chromLen, sizeof(uint32_t), 1, f); //write chromosome length to file
             }
-            
+
             int arrlen; //variable to store the length of the array used for the data (this is not the same as the chromosome length, as each value is one bit and this is an array of characters, i.e. bytes)
             arrlen = config.BW_ptr->cl->len[i]/8; //array length is chromosome length over 8 (number of bits to number of bytes)
             if(config.BW_ptr->cl->len[i]%8 > 0) //if there is a remainder that didn't divide evenly
@@ -1093,7 +1123,7 @@ int extract_main(int argc, char *argv[]) {
                     if(val == lastval && runlen < 65535) //in a run and haven't maxed out the run length
                     {
                         runlen++;
-                        
+
                     }
                     else
                     {
@@ -1155,7 +1185,7 @@ int extract_main(int argc, char *argv[]) {
                 }
             }
             bwDestroyOverlappingIntervals(vals); //free memory from bigWig read
-            
+
         }
         if(config.outBBMName) //are we writing a BBM?
         {
@@ -1174,10 +1204,10 @@ int extract_main(int argc, char *argv[]) {
                 return 0;
             }
         }
-        
+
     }
-    
-    
+
+
     if(config.BBM_ptr) //reading a BBM
     {
         config.filterMappability = 1; //set flag to filter mappability
@@ -1215,7 +1245,7 @@ int extract_main(int argc, char *argv[]) {
             {
                 return error(); //malformed file, fail
             }
-            
+
             readlen = fread(&(config.chromLengths[chromID]), sizeof(uint32_t), 1, config.BBM_ptr); //get chromosome length
             uint32_t pos = 0;
             int arrlen; //variable to store the length of the array used for the data (this is not the same as the chromosome length, as each value is one bit and this is an array of characters, i.e. bytes)
@@ -1227,7 +1257,7 @@ int extract_main(int argc, char *argv[]) {
             config.bw_data[chromID] = malloc(arrlen*sizeof(char)); //init inner array
             while(pos<(config.chromLengths[chromID])) //loop over chrom
             {
-                
+
                 int index; //index in array
                 char offset; //offset in byte at index
                 char aboveCutoff;
@@ -1238,7 +1268,7 @@ int extract_main(int argc, char *argv[]) {
                     config.bw_data[chromID][index] = 0; //init new byte
                 }
 
-                
+
                 unsigned char val; //data value from file
                 uint16_t runlen; //length of a run of the same value
                 readlen = fread(&val, sizeof(val), 1, config.BBM_ptr); //read value
@@ -1278,7 +1308,7 @@ int extract_main(int argc, char *argv[]) {
             }
             chromID++; //next chromosome
         }
-        
+
         fclose(config.BBM_ptr); //done with the file
 
     }
@@ -1295,7 +1325,7 @@ int extract_main(int argc, char *argv[]) {
         if(p != NULL) *p = '\0';
         fprintf(stderr, "writing to prefix:'%s'\n", opref);
     }
-    if(config.fraction) { 
+    if(config.fraction) {
         oname = malloc(sizeof(char) * (strlen(opref)+19));
     } else if(config.counts) {
         oname = malloc(sizeof(char) * (strlen(opref)+21));
@@ -1309,12 +1339,12 @@ int extract_main(int argc, char *argv[]) {
         config.output_fp[0] = fopen(oname, "w");
         config.output_fp[1] = config.output_fp[0];
         config.output_fp[2] = config.output_fp[0];
-    } else { 
+    } else {
         oname = malloc(sizeof(char) * (strlen(opref)+14));
     }
     assert(oname);
     if(config.keepCpG && !config.cytosine_report) {
-        if(config.fraction) { 
+        if(config.fraction) {
             sprintf(oname, "%s_CpG.meth.bedGraph", opref);
         } else if(config.counts) {
             sprintf(oname, "%s_CpG.counts.bedGraph", opref);
@@ -1322,7 +1352,7 @@ int extract_main(int argc, char *argv[]) {
             sprintf(oname, "%s_CpG.logit.bedGraph", opref);
         } else if(config.methylKit) {
             sprintf(oname, "%s_CpG.methylKit", opref);
-        } else { 
+        } else {
             sprintf(oname, "%s_CpG.bedGraph", opref);
         }
         config.output_fp[0] = fopen(oname, "w");
@@ -1337,7 +1367,7 @@ int extract_main(int argc, char *argv[]) {
         }
     }
     if(config.keepCHG && !config.cytosine_report) {
-        if(config.fraction) { 
+        if(config.fraction) {
             sprintf(oname, "%s_CHG.meth.bedGraph", opref);
         } else if(config.counts) {
             sprintf(oname, "%s_CHG.counts.bedGraph", opref);
@@ -1345,7 +1375,7 @@ int extract_main(int argc, char *argv[]) {
             sprintf(oname, "%s_CHG.logit.bedGraph", opref);
         } else if(config.methylKit) {
             sprintf(oname, "%s_CHG.methylKit", opref);
-        } else { 
+        } else {
             sprintf(oname, "%s_CHG.bedGraph", opref);
         }
         config.output_fp[1] = fopen(oname, "w");
@@ -1360,7 +1390,7 @@ int extract_main(int argc, char *argv[]) {
         }
     }
     if(config.keepCHH && !config.cytosine_report) {
-        if(config.fraction) { 
+        if(config.fraction) {
             sprintf(oname, "%s_CHH.meth.bedGraph", opref);
         } else if(config.counts) {
             sprintf(oname, "%s_CHH.counts.bedGraph", opref);
@@ -1368,7 +1398,7 @@ int extract_main(int argc, char *argv[]) {
             sprintf(oname, "%s_CHH.logit.bedGraph", opref);
         } else if(config.methylKit) {
             sprintf(oname, "%s_CHH.methylKit", opref);
-        } else { 
+        } else {
             sprintf(oname, "%s_CHH.bedGraph", opref);
         }
         config.output_fp[2] = fopen(oname, "w");
@@ -1380,6 +1410,30 @@ int extract_main(int argc, char *argv[]) {
             fprintf(config.output_fp[2], "chrBase\tchr\tbase\tstrand\tcoverage\tfreqC\tfreqT\n");
         } else {
             printHeader(config.output_fp[2], "CHH", opref, config);
+        }
+    }
+
+    if(config.keepGCH && !config.cytosine_report) {
+        if(config.fraction) {
+            sprintf(oname, "%s_GCH.meth.bedGraph", opref);
+        } else if(config.counts) {
+            sprintf(oname, "%s_GCH.counts.bedGraph", opref);
+        } else if(config.logit) {
+            sprintf(oname, "%s_GCH.logit.bedGraph", opref);
+        } else if(config.methylKit) {
+            sprintf(oname, "%s_GCH.methylKit", opref);
+        } else {
+            sprintf(oname, "%s_GCH.bedGraph", opref);
+        }
+        config.output_fp[2] = fopen(oname, "w");
+        if(config.output_fp[2] == NULL) {
+            fprintf(stderr, "Couldn't open the output GCH metrics file for writing! Insufficient permissions?\n");
+            return -3;
+        }
+        if(config.methylKit) {
+            fprintf(config.output_fp[2], "chrBase\tchr\tbase\tstrand\tcoverage\tfreqC\tfreqT\n");
+        } else {
+            printHeader(config.output_fp[2], "GCH", opref, config);
         }
     }
     //parse the region, if needed

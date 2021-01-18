@@ -51,6 +51,7 @@ typedef struct {
  @field	keepCpG	1: Output CpG metrics
  @field keepCHG	1: Output CHG metrics
  @field	keepCHH	1: Output CHH metrics
+ @field	keepGCH	1: Output GCH metrics
  @field	minMapq	Minimum MAPQ value to include a read (-q)
  @field	minPhred	Minimum Phred score to include a base (-p)
  @field	keepDupes	1: Include marked duplicates when calculating metrics
@@ -81,7 +82,7 @@ typedef struct {
  @field chunkSize	The number of bases processed by each thread at a time (can be adjusted a bit to ensure CpGs/CHGs aren't split between processors)
 */
 typedef struct {
-    int keepCpG, keepCHG, keepCHH;
+    int keepCpG, keepCHG, keepCHH, keepGCH, NoMeCpG;
     int minMapq, minPhred, keepDupes, minDepth;
     int keepDiscordant, keepSingleton, ignoreFlags, requireFlags;
     int merge, methylKit, minOppositeDepth;
@@ -135,7 +136,7 @@ typedef struct {
  @abstract Determine the strand from which a read arose
  @param	b	Pointer to an alignment
  @returns	1, original top; 2, original bottom; 3, complementary to the original top; 4, complementary to the original bottom
- @discussion There are two methods used to determine the strand of origin. The 
+ @discussion There are two methods used to determine the strand of origin. The
  first method uses XG auxiliary tags as output by Bison and Bismark. For details
  on how strand is determined from this, see the source code for this function or
  the documentation for either Bison or bismark. This method can handle non-
@@ -194,6 +195,8 @@ void makeTXT(strandMeth **meths);
 int isCpG(char *seq, int pos, int seqlen);
 int isCHG(char *seq, int pos, int seqlen);
 int isCHH(char *seq, int pos, int seqlen);
+int isGCH(char *seq, int pos, int seqlen);
+int isNoMeCpG(char *seq, int pos, int seqlen);
 
 /*! @function
  @abstract Determine what strand an alignment originated from
