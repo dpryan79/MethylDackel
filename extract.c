@@ -191,7 +191,13 @@ void writeBlank(kstring_t **ks, Config *config, char *chrom, int32_t pos, uint32
     char context[3] = "HG";
     if(pos == -1) return;
     for(;*lastPos < pos; (*lastPos)++) {
-        if((direction = isCpG(seq, *lastPos-localPos2, seqlen)) != 0) {
+      if ((direction = isGCH(seq, *lastPos-localPos2, seqlen)) != 0) {
+        // in case of NoMe, catch GCH too
+          if(!config->keepGCH) continue;
+          triNucContext = getTriNucContext(seq, *lastPos - localPos2, seqlen, direction);
+          context[0] = 'C'; context[1] = 'H';
+          //fprintf(stderr, "Found GCH! triNucContext = %s \n", TriNucleotideContextsGpC[triNucContext]);
+        } else if((direction = isCpG(seq, *lastPos-localPos2, seqlen)) != 0) {
             if(!config->keepCpG) continue;
             // if it's NoMe data, check if it's a valid NoMe-CpG
             if((config->NoMeCpG) && (direction = isNoMeCpG(seq, *lastPos-localPos2, seqlen)) == 0) continue;
@@ -205,17 +211,14 @@ void writeBlank(kstring_t **ks, Config *config, char *chrom, int32_t pos, uint32
             if(!config->keepCHH) continue;
             triNucContext = getTriNucContext(seq, *lastPos - localPos2, seqlen, direction);
             context[0] = 'H'; context[1] = 'H';
-        } else if ((direction = isGCH(seq, *lastPos-localPos2, seqlen)) != 0) {
-          // in case of NoMe, catch GCH too
-            if(!config->keepGCH) continue;
-            triNucContext = getTriNucContext(seq, *lastPos - localPos2, seqlen, direction);
-            context[0] = 'C'; context[1] = 'H';
-            fprintf(stderr, "Found GCH! triNucContext = %s \n", TriNucleotideContextsGpC[triNucContext]);
-            continue;
         } else {
           continue;
         }
-        writeCall(ks[0], config, chrom, *lastPos, 1, 0, 0, (direction>0)?'C':'G', context, TriNucleotideContexts[triNucContext]);
+        if(config->keepGCH) {
+            writeCall(ks[0], config, chrom, *lastPos, 1, 0, 0, (direction>0)?'G':'C', context, TriNucleotideContextsGpC[triNucContext]);
+        } else {
+            writeCall(ks[0], config, chrom, *lastPos, 1, 0, 0, (direction>0)?'C':'G', context, TriNucleotideContexts[triNucContext]);
+        }
     }
 }
 
@@ -485,13 +488,14 @@ void *extractCalls(void *foo) {
                     } else if(type == 2) {
                         context[0] = 'H'; context[1] = 'H';
                     } else if(type == 3) {
+                      fprintf(stderr, "type = %d\n", type);
                       context[0] = 'C'; context[1] = 'H';
                     } else {
                       continue;
                     }
 
                     //Set the trinucleotide context
-                    tnc = getTriNucContext(seq, pos - localPos2, seqlen, direction);
+                      tnc = getTriNucContext(seq, pos - localPos2, seqlen, direction);
 
                     writeCall(os[0], config, hdr->target_name[tid], pos, 1, nmethyl, nunmethyl, base, context, TriNucleotideContexts[tnc]);
                 } else {
