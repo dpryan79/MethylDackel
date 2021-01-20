@@ -35,6 +35,13 @@ const char *TriNucleotideContexts[25] = {"CAA", "CAC", "CAG", "CAT", "CAN", \
                                          "CTA", "CTC", "CTG", "CTT", "CTN", \
                                          "CNA", "CNC", "CNG", "CNT", "CNN"};
 
+const char *TriNucleotideContextsGpC[25] = {"GAA", "GAC", "GAG", "GAT", "GAN", \
+                                            "GCA", "GCC", "GCG", "GCT", "GCN", \
+                                            "GGA", "GGC", "GGG", "GGT", "GGN", \
+                                            "GTA", "GTC", "GTG", "GTT", "GTN", \
+                                            "GNA", "GNC", "GNG", "GNT", "GNN"};
+
+// writeCall(ks[0], config, chrom, *lastPos, 1, 0, 0, (direction>0)?'C':'G', context, TriNucleotideContexts[triNucContext]);
 void writeCall(kstring_t *ks, Config *config, char *chrom, int32_t pos, int32_t width, uint32_t nmethyl, uint32_t nunmethyl, char base, char *context, const char *tnc) {
     char str[10000]; // I don't really like hardcoding it, but given the probability that it ever won't suffice...
     char strand = (base=='C' || base=='c') ? 'F' : 'R';
@@ -203,6 +210,7 @@ void writeBlank(kstring_t **ks, Config *config, char *chrom, int32_t pos, uint32
             if(!config->keepGCH) continue;
             triNucContext = getTriNucContext(seq, *lastPos - localPos2, seqlen, direction);
             context[0] = 'C'; context[1] = 'H';
+            fprintf(stderr, "Found GCH! triNucContext = %s \n", TriNucleotideContextsGpC[triNucContext]);
             continue;
         } else {
           continue;
