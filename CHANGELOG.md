@@ -1,3 +1,7 @@
+Version 0.5.2:
+
+   * Temporary work around for issue #99. Long-term pileup.c needs to be reworked.
+
 Version 0.5.1:
 
    * Fixed an issue in `MethylDackel mbias` due to an uninitialized value (issue #93).

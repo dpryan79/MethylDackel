@@ -53,6 +53,9 @@ struct __bam_plp_t {
 
 struct __bam_mplp_t {
     int n;
+#if HTS_VERSION >= 101000
+    int32_t min_tid, *tid;
+#endif
     uint64_t min, *pos;
     bam_plp_t *iter;
     int *n_plp;
