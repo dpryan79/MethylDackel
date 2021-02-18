@@ -22,6 +22,8 @@ rm('test1_CpG.bedGraph')
 rm('test2_CpG.bedGraph')
 check_call('../MethylDackel extract cg100.fa cg_aln.bam -q 2 -o test2', shell=True)
 assert op.exists('test2_CpG.bedGraph')
+for line in open('test2_CpG.bedGraph'):
+    print(line)
 lines = sum(1 for _ in open('test2_CpG.bedGraph'))
 assert lines > 1
 rm('test2_CpG.bedGraph')
