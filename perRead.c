@@ -17,14 +17,14 @@ void addRead(kstring_t *os, bam1_t *b, bam_hdr_t *hdr, uint32_t nmethyl, uint32_
     char str[10000]; // I don't really like hardcoding it, but given the probability that it ever won't suffice...
 
     if(nmethyl + nunmethyl > 0) {
-        snprintf(str, 10000, "%s\t%s\t%i\t%f\t%"PRIu32"\n",
+        snprintf(str, 10000, "%s\t%s\t%"PRId64"\t%f\t%"PRIu32"\n",
             bam_get_qname(b),
             hdr->target_name[b->core.tid],
             b->core.pos,
             100. * ((double) nmethyl)/(nmethyl+nunmethyl),
             nmethyl + nunmethyl);
     } else {
-        snprintf(str, 10000, "%s\t%s\t%i\t0.0\t%"PRIu32"\n",
+        snprintf(str, 10000, "%s\t%s\t%"PRId64"\t0.0\t%"PRIu32"\n",
             bam_get_qname(b),
             hdr->target_name[b->core.tid],
             b->core.pos,

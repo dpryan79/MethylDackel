@@ -8,14 +8,18 @@ jobs:
     vmImage: 'ubuntu-16.04'
   strategy:
     matrix:
-      Python37:
-        python.version: '3.7'
+      htslib109:
+        htslib_version: '1.9'
+      htslib110:
+        htslib_version: '1.10'
+      htslib111:
+        htslib_version: '1.11'
     maxParallel: 1
 
   steps:
   - bash: echo "##vso[task.prependpath]/usr/share/miniconda/bin"
     displayName: Add conda to PATH
-  - bash: conda create -n foo -q --yes -c conda-forge -c bioconda htslib=1.9 python gcc_impl_linux-64 binutils_impl_linux-64 binutils_linux-64 gcc_linux-64 libgcc-ng libbigwig
+  - bash: conda create -n foo -q --yes -c conda-forge -c bioconda htslib=$htslib_version python gcc_impl_linux-64 binutils_impl_linux-64 binutils_linux-64 gcc_linux-64 libgcc-ng libbigwig
     displayName: Installing dependencies
   - template: .azure-pipelines/test-template.yml
 

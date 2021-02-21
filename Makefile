@@ -10,7 +10,8 @@ CFLAGS ?= -Wall -g -O3 -pthread
 
 all: MethylDackel
 
-OBJS = common.o bed.o svg.o pileup.o extract.o MBias.o mergeContext.o perRead.o
+#OBJS = common.o bed.o svg.o pileup.o extract.o MBias.o mergeContext.o perRead.o
+OBJS = common.o bed.o svg.o overlaps.o extract.o MBias.o mergeContext.o perRead.o
 VERSION = 0.5.2
 
 version.h:
