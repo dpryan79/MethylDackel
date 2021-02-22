@@ -388,6 +388,7 @@ void *extractCalls(void *foo) {
         iter = bam_mplp_init(1, filter_func, (void **) &data);
         bam_mplp_set_maxcnt(iter, INT_MAX);
         bam_mplp_constructor(iter, custom_overlap_constructor);
+        bam_mplp_destructor(iter, custom_overlap_destructor);
         initOlapHash();
 
         while((ret = bam_mplp64_auto(iter, &tid, &pos, &n_plp, plp)) > 0) {

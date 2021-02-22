@@ -225,6 +225,7 @@ void parseBounds(char *s2, int *vals, int mult);
 //Used internally to not split CpGs/CHGs between threads
 void adjustBounds(Config *config, bam_hdr_t *hdr, faidx_t *fai, uint32_t *localTid, uint32_t *localPos, uint32_t *localEnd);
 
+// Read-pair overlap handling functions
 int custom_overlap_constructor(void *data, const bam1_t *b, bam_pileup_cd *cd);
 int custom_overlap_destructor(void *data, const bam1_t *b, bam_pileup_cd *cd);
 void initOlapHash();

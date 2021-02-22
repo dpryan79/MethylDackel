@@ -120,15 +120,23 @@ int custom_overlap_constructor(void *data, const bam1_t *b, bam_pileup_cd *cd) {
     int ret;
     khiter_t k = kh_get(olap_hash, ohash, bam_get_qname(b));
     bam1_t *a;
+    // Skip unpaired reads
+    if(!(b->core.flag & BAM_FPAIRED) || ((b->core.flag & 12) > 0)) return 0;
     if (k==kh_end(ohash)) {
         k = kh_put(olap_hash, ohash, bam_get_qname(b), &ret);
         kh_value(ohash, k) = b;
-        return 0;
     } else {
         a = kh_value(ohash, k);
+        if(a == b) return 0;  // For some reason, the same read is occasionally processed multiple times
         cust_tweak_overlap_quality(a, b);
         kh_del(olap_hash, ohash, k);
     }
     return 0;
     
+}
+
+int custom_overlap_destructor(void *data, const bam1_t *b, bam_pileup_cd *cd) {
+    khiter_t k = kh_get(olap_hash, ohash, bam_get_qname(b));
+    if (k!=kh_end(ohash)) kh_del(olap_hash, ohash, k);
+    return 0;
 }
