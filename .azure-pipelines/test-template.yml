@@ -8,5 +8,6 @@ steps:
     source activate MethylDackel
     export LD_LIBRARY_PATH=$CONDA_PREFIX/lib
     ls -l $CONDA_PREFIX/lib/libhts*
+    otool -L $CONDA_PREFIX/lib/libhts.1.11.dylib
     make test CC=$CC CFLAGS="-O3 -Wall -I$CONDA_PREFIX/include" LIBS="-L$CONDA_PREFIX/lib" LIBBIGWIG="$CONDA_PREFIX/lib/libBigWig.a"
   displayName: Test methylDackel
