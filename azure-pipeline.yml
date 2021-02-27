@@ -39,7 +39,7 @@ jobs:
     displayName: Remove homebrew
   #- bash: echo "##vso[task.prependpath]$CONDA/bin"
   #  displayName: Add conda to PATH
-  - bash: sudo chown -r 501:20 /usr/local/miniconda/pkgs
+  - bash: sudo chown -R 501:20 /usr/local/miniconda/pkgs
     displayName: Fix permissions
   - bash: conda create -n MethylDackel -q --yes -c conda-forge -c bioconda htslib=$(HTSLIB_VERSION) python clang clang_osx-64 clangxx cctools compiler-rt ld64 libbigwig
     displayName: Installing dependencies
