@@ -7,12 +7,8 @@ steps:
 - bash: |
     source activate MethylDackel
     export LD_LIBRARY_PATH=$CONDA_PREFIX/lib
-    export LC_RPATH=$LD_LIBRARY_PATH
-    #ls -l
+    #export LC_RPATH=$LD_LIBRARY_PATH
     install_name_tool -add_rpath @$CONDA_PREFIX/lib MethylDackel
-    #otool -L MethylDackel
-    #otool -L $CONDA_PREFIX/lib/libhts.1.11.dylib
     ./MethylDackel --version
-    #DYLD_PRINT_LIBRARIES=1 ./MethylDackel extract tests/ct100.fa tests/ct_aln.bam -q 2 -o test1
     python tests/test.py
   displayName: Test methylDackel
