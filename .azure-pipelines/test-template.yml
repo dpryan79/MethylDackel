@@ -6,7 +6,7 @@ steps:
   displayName: Installing methylDackel
 - bash: |
     source activate MethylDackel
-    #export LD_LIBRARY_PATH=$CONDA_PREFIX/lib
+    export LD_LIBRARY_PATH=$CONDA_PREFIX/lib
     export LC_RPATH=$LD_LIBRARY_PATH
     #ls -l
     install_name_tool -add_rpath @$CONDA_PREFIX/lib MethylDackel
