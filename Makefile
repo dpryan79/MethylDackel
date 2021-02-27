@@ -29,8 +29,8 @@ lib: libMethylDackel.a
 MethylDackel: libMethylDackel.a version.h $(OBJS)
 	$(CC) $(CFLAGS) $(LIBS) -o MethylDackel $(OBJS) main.c libMethylDackel.a $(LIBBIGWIG) -lm -lz -lpthread -lhts -lcurl
 
-test: MethylDackel 
-	python test.py
+test:
+	python tests/test.py
 
 clean:
 	rm -f *.o MethylDackel libMethylDackel.a
