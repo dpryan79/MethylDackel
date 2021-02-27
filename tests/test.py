@@ -94,3 +94,4 @@ assert op.exists('test9_CpG.bedGraph')
 lines = sum(1 for _ in open('test9_CpG.bedGraph'))
 assert lines == 48
 rm('test9_CpG.bedGraph')
+print("Finished correctly")
