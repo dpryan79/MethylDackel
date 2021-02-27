@@ -5,6 +5,11 @@
 #include "htslib/faidx.h"
 #include "bigWig.h"
 
+#if HTS_VERSION < 101100
+#error "The minimum supported version of htslib is 1.11!"
+#endif
+
+
 //These are needed to handle multiple threads
 pthread_mutex_t positionMutex;
 pthread_mutex_t bwMutex;
@@ -121,6 +126,7 @@ typedef struct {
  @field	config:	The Config* structure containing the settings
  @field hdr:	The input header
  @field iter:	The alignment iterator that should be traversed.
+ @field ohash:  A pointer to the hash table needed for overlap detection
  @field bedIdx: The last index into the BED file
 */
 typedef struct {
@@ -128,6 +134,7 @@ typedef struct {
     htsFile *fp;
     bam_hdr_t *hdr;
     hts_itr_t *iter;
+    void *ohash;
     int32_t bedIdx;
 } mplp_data;
 
@@ -228,5 +235,5 @@ void adjustBounds(Config *config, bam_hdr_t *hdr, faidx_t *fai, uint32_t *localT
 // Read-pair overlap handling functions
 int custom_overlap_constructor(void *data, const bam1_t *b, bam_pileup_cd *cd);
 int custom_overlap_destructor(void *data, const bam1_t *b, bam_pileup_cd *cd);
-void initOlapHash();
-void destroyOlapHash();
+void *initOlapHash();
+void destroyOlapHash(void *ohash);

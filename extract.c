@@ -385,11 +385,11 @@ void *extractCalls(void *foo) {
         }
 
         //Start the pileup
+        data->ohash = initOlapHash();
         iter = bam_mplp_init(1, filter_func, (void **) &data);
         bam_mplp_set_maxcnt(iter, INT_MAX);
         bam_mplp_constructor(iter, custom_overlap_constructor);
         bam_mplp_destructor(iter, custom_overlap_destructor);
-        initOlapHash();
 
         while((ret = bam_mplp64_auto(iter, &tid, &pos, &n_plp, plp)) > 0) {
             if(pos < localPos || pos >= localEnd) continue; // out of the region requested
@@ -528,7 +528,7 @@ void *extractCalls(void *foo) {
             pthread_mutex_unlock(&outputMutex);
             break;
         }
-        destroyOlapHash();
+        destroyOlapHash(data->ohash);
     }
 
     free(os_CpG->s); free(os_CpG);
@@ -571,7 +571,7 @@ void extract_usage() {
 " -q INT           Minimum MAPQ threshold to include an alignment (default 10)\n"
 " -p INT           Minimum Phred threshold to include a base (default 5). This\n"
 "                  must be >0.\n"
-" -D INT           Maximum per-base depth (default 2000)\n"
+" -D INT           Ignored, kept only for backward compatibility.\n"
 " -d INT           Minimum per-base depth for reporting output. If you use\n"
 "                  --mergeContext, this then applies to the merged CpG/CHG.\n"
 "                  (default 1)\n"

@@ -18,7 +18,7 @@ version.h:
 	echo '#define VERSION "$(VERSION)"' > $@
 
 .c.o:
-	$(CC) -c $(CFLAGS) $(LIBS) -IlibBigWig $< -o $@
+	$(CC) -c $(CFLAGS) -g $(LIBS) -IlibBigWig $< -o $@
 
 libMethylDackel.a: version.h $(OBJS)
 	-@rm -f $@

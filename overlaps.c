@@ -4,21 +4,23 @@
 #include <assert.h>
 #include "htslib/khash.h"
 #include "htslib/sam.h"
+#include "MethylDackel.h"
 
 int getStrand(bam1_t *b);
 
 // Dictionary of overlapping reads
-//KHASH_MAP_INIT_STR(olap_hash, lbnode_t *)
 KHASH_MAP_INIT_STR(olap_hash, bam1_t *)
 typedef khash_t(olap_hash) olap_hash_t;
 khash_t(olap_hash) *ohash = NULL;
 
-void initOlapHash() {
-    ohash = kh_init(olap_hash);
+
+void * initOlapHash() {
+    return (void*) kh_init(olap_hash);
 }
 
-void destroyOlapHash() {
-    kh_destroy(olap_hash, ohash);
+void destroyOlapHash(void *ohash) {
+    khash_t(olap_hash) * oh = ( khash_t(olap_hash) *) ohash;
+    kh_destroy(olap_hash, oh);
 }
 
 //This is from bison
@@ -118,6 +120,8 @@ quit :
 
 int custom_overlap_constructor(void *data, const bam1_t *b, bam_pileup_cd *cd) {
     int ret;
+    mplp_data *foo = (mplp_data*) data;
+    khash_t(olap_hash) * ohash = ( khash_t(olap_hash) *)foo->ohash;
     khiter_t k = kh_get(olap_hash, ohash, bam_get_qname(b));
     bam1_t *a;
     // Skip unpaired reads
@@ -127,7 +131,6 @@ int custom_overlap_constructor(void *data, const bam1_t *b, bam_pileup_cd *cd) {
         kh_value(ohash, k) = b;
     } else {
         a = kh_value(ohash, k);
-        if(a == b) return 0;  // For some reason, the same read is occasionally processed multiple times
         cust_tweak_overlap_quality(a, b);
         kh_del(olap_hash, ohash, k);
     }
@@ -136,6 +139,8 @@ int custom_overlap_constructor(void *data, const bam1_t *b, bam_pileup_cd *cd) {
 }
 
 int custom_overlap_destructor(void *data, const bam1_t *b, bam_pileup_cd *cd) {
+    mplp_data *foo = (mplp_data*) data;
+    khash_t(olap_hash) * ohash = ( khash_t(olap_hash) *)foo->ohash;
     khiter_t k = kh_get(olap_hash, ohash, bam_get_qname(b));
     if (k!=kh_end(ohash)) kh_del(olap_hash, ohash, k);
     return 0;
