@@ -7,6 +7,7 @@ steps:
 - bash: |
     source activate MethylDackel
     export LD_LIBRARY_PATH=$CONDA_PREFIX/lib
+    export LC_RPATH=$LD_LIBRARY_PATH
     ls -l $CONDA_PREFIX/lib/libhts*
     otool -L MethylDackel
     otool -L $CONDA_PREFIX/lib/libhts.1.11.dylib
