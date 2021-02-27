@@ -13,6 +13,7 @@ steps:
     otool -L MethylDackel
     otool -L $CONDA_PREFIX/lib/libhts.1.11.dylib
     DYLD_PRINT_LIBRARIES=1 ./MethylDackel --version
-    DYLD_PRINT_LIBRARIES=1 ./MethylDackel extract ct100.fa ct_aln.bam -q 2 -o test1
+    DYLD_PRINT_LIBRARIES=1 ./MethylDackel extract tests/ct100.fa tests/ct_aln.bam -q 2 -o test1
+    echo $?
     python tests/test.py
   displayName: Test methylDackel
