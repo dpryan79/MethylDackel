@@ -13,8 +13,8 @@ jobs:
     maxParallel: 1
 
   steps:
-  - bash: echo "##vso[task.prependpath]/usr/share/miniconda/bin"
-    displayName: Add conda to PATH
+  #- bash: echo "##vso[task.prependpath]/usr/share/miniconda/bin"
+  #  displayName: Add conda to PATH
   - bash: conda create -n MethylDackel -q --yes -c conda-forge -c bioconda htslib=$(HTSLIB_VERSION) python gcc_impl_linux-64 binutils_impl_linux-64 binutils_linux-64 gcc_linux-64 libgcc-ng libbigwig
     displayName: Installing dependencies
   - template: .azure-pipelines/test-template.yml
