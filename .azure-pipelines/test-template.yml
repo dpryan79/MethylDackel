@@ -7,6 +7,5 @@ steps:
 - bash: |
     source activate MethylDackel
     export LD_LIBRARY_PATH=$CONDA_PREFIX/lib
-    #install_name_tool -add_rpath @$CONDA_PREFIX/lib MethylDackel
     python tests/test.py
   displayName: Test methylDackel
