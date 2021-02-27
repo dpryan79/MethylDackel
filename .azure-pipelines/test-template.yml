@@ -11,5 +11,6 @@ steps:
     ls -l
     otool -L MethylDackel
     otool -L $CONDA_PREFIX/lib/libhts.1.11.dylib
-    make test CC=$CC CFLAGS="-O3 -Wall -I$CONDA_PREFIX/include" LIBS="-L$CONDA_PREFIX/lib" LIBBIGWIG="$CONDA_PREFIX/lib/libBigWig.a"
+    install_name_tools -add_rpath @$CONDA_PREFIX/lib
+    python test/tests.py
   displayName: Test methylDackel
