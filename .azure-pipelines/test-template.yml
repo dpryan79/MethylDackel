@@ -1,6 +1,7 @@
 steps:
 - bash: |
     source activate foo
+    export CONDA_BUILD_SYSROOT=''
     make install CC=$CC CFLAGS="-O3 -Wall -I$CONDA_PREFIX/include" LIBS="-L$CONDA_PREFIX/lib" LIBBIGWIG="$CONDA_PREFIX/lib/libBigWig.a" prefix=$CONDA_PREFIX/bin
   displayName: Installing methylDackel
 - bash: |
