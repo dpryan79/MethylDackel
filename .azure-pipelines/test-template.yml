@@ -11,6 +11,6 @@ steps:
     ls -l
     otool -L MethylDackel
     otool -L $CONDA_PREFIX/lib/libhts.1.11.dylib
-    install_name_tools -add_rpath @$CONDA_PREFIX/lib
-    python test/tests.py
+    install_name_tool -add_rpath @$CONDA_PREFIX/lib MethylDackel
+    python tests/test.py
   displayName: Test methylDackel
