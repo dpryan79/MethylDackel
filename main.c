@@ -3,6 +3,16 @@
 #include "htslib/hts.h"
 #include "version.h" //This has the VERSION define
 
+pthread_mutex_t positionMutex;
+pthread_mutex_t bwMutex;
+pthread_mutex_t outputMutex;
+uint32_t globalTid = 0;
+uint32_t globalPos = 0;
+uint32_t globalEnd = 0;
+uint32_t bin = 0;
+uint32_t outputBin = 0;
+uint64_t globalnVariantPositions = 0;
+
 int mbias_main(int argc, char *argv[]);
 int extract_main(int argc, char *argv[]);
 int mergeContext_main(int argc, char *argv[]);
