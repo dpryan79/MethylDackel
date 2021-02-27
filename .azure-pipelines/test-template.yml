@@ -12,5 +12,6 @@ steps:
     otool -L MethylDackel
     otool -L $CONDA_PREFIX/lib/libhts.1.11.dylib
     install_name_tool -add_rpath @$CONDA_PREFIX/lib MethylDackel
+    DYLD_PRINT_LIBRARIES=1 ./MethylDackel --version
     python tests/test.py
   displayName: Test methylDackel
