@@ -11,15 +11,15 @@
 
 
 //These are needed to handle multiple threads
-pthread_mutex_t positionMutex;
-pthread_mutex_t bwMutex;
-pthread_mutex_t outputMutex;
-uint32_t globalTid;
-uint32_t globalPos;
-uint32_t globalEnd;
-uint32_t bin;
-uint32_t outputBin;
-uint64_t globalnVariantPositions;
+extern pthread_mutex_t positionMutex;
+extern pthread_mutex_t bwMutex;
+extern pthread_mutex_t outputMutex;
+extern uint32_t globalTid;
+extern uint32_t globalPos;
+extern uint32_t globalEnd;
+extern uint32_t bin;
+extern uint32_t outputBin;
+extern uint64_t globalnVariantPositions;
 
 /*! @typedef
  @abstract Structure to hold one region defined in a BED file
