@@ -7,7 +7,7 @@
 Prerequisites
 =============
 
-A C compiler, such as gcc, htslib (versions 1.4 through 1.9 are known to be compatible) and libBigWig are required. For libBigWig, the static library is used.
+A C compiler, such as gcc, htslib (at least versions 1.11, earlier versions are not compatible) and libBigWig are required. For libBigWig, the static library is used.
 
 Compilation
 ===========

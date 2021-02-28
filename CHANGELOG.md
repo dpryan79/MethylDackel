@@ -1,3 +1,7 @@
+Version 0.5.2:
+
+   * Rewrote how read-pair overlap handling is performed. It now uses the constructor/destructor mechanism from htslib instead of using internal htslib structures and functions. This allows supporting newer htslib versions. Currently 1.11 is the only tested and working version, due to changes in the pileup constructor interface in it. (issue #99)
+
 Version 0.5.1:
 
    * Fixed an issue in `MethylDackel mbias` due to an uninitialized value (issue #93).

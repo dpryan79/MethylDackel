@@ -10,8 +10,8 @@ CFLAGS ?= -Wall -g -O3 -pthread
 
 all: MethylDackel
 
-OBJS = common.o bed.o svg.o pileup.o extract.o MBias.o mergeContext.o perRead.o
-VERSION = 0.5.1
+OBJS = common.o bed.o svg.o overlaps.o extract.o MBias.o mergeContext.o perRead.o
+VERSION = 0.5.2
 
 version.h:
 	echo '#define VERSION "$(VERSION)"' > $@
@@ -28,7 +28,7 @@ lib: libMethylDackel.a
 MethylDackel: libMethylDackel.a version.h $(OBJS)
 	$(CC) $(CFLAGS) $(LIBS) -o MethylDackel $(OBJS) main.c libMethylDackel.a $(LIBBIGWIG) -lm -lz -lpthread -lhts -lcurl
 
-test: MethylDackel 
+test: MethylDackel
 	python tests/test.py
 
 clean:

@@ -28,7 +28,6 @@ struct lastCall{
     uint32_t nmethyl, nunmethyl;
 };
 
-const char *quux[2] = {"foo", "bar"};
 const char *TriNucleotideContexts[25] = {"CAA", "CAC", "CAG", "CAT", "CAN", \
                                          "CCA", "CCC", "CCG", "CCT", "CCN", \
                                          "CGA", "CGC", "CGG", "CGT", "CGN", \
@@ -247,7 +246,8 @@ void *extractCalls(void *foo) {
     Config *config = (Config*) foo;
     bam_hdr_t *hdr;
     bam_mplp_t iter;
-    int ret, tid, pos, i, seqlen, type, rv, o = 0;
+    int ret, tid, i, seqlen, type, rv, o = 0;
+    hts_pos_t pos;
     int32_t bedIdx = 0;
     int n_plp; //This will need to be modified for multiple input files
     int strand, direction;
@@ -314,7 +314,7 @@ void *extractCalls(void *foo) {
     data->fp = fp;
     data->bedIdx = bedIdx;
 
-    plp = calloc(1, sizeof(bam_pileup1_t *)); //This will have to be modified for multiple input files
+    plp = calloc(1, sizeof(bam_pileup1_t *));
     if(plp == NULL) {
         fprintf(stderr, "Couldn't allocate space for the plp structure in extractCalls()!\n");
         return NULL;
@@ -385,10 +385,13 @@ void *extractCalls(void *foo) {
         }
 
         //Start the pileup
+        data->ohash = initOlapHash();
         iter = bam_mplp_init(1, filter_func, (void **) &data);
-        bam_mplp_init_overlaps(iter);
         bam_mplp_set_maxcnt(iter, INT_MAX);
-        while((ret = cust_mplp_auto(iter, &tid, &pos, &n_plp, plp)) > 0) {
+        bam_mplp_constructor(iter, custom_overlap_constructor);
+        bam_mplp_destructor(iter, custom_overlap_destructor);
+
+        while((ret = bam_mplp64_auto(iter, &tid, &pos, &n_plp, plp)) > 0) {
             if(pos < localPos || pos >= localEnd) continue; // out of the region requested
 
             if(config->bed) { //Handle -l
@@ -525,6 +528,7 @@ void *extractCalls(void *foo) {
             pthread_mutex_unlock(&outputMutex);
             break;
         }
+        destroyOlapHash(data->ohash);
     }
 
     free(os_CpG->s); free(os_CpG);
@@ -567,7 +571,7 @@ void extract_usage() {
 " -q INT           Minimum MAPQ threshold to include an alignment (default 10)\n"
 " -p INT           Minimum Phred threshold to include a base (default 5). This\n"
 "                  must be >0.\n"
-" -D INT           Maximum per-base depth (default 2000)\n"
+" -D INT           Ignored, kept only for backward compatibility.\n"
 " -d INT           Minimum per-base depth for reporting output. If you use\n"
 "                  --mergeContext, this then applies to the merged CpG/CHG.\n"
 "                  (default 1)\n"

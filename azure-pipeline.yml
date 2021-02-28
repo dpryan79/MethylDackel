@@ -8,37 +8,39 @@ jobs:
     vmImage: 'ubuntu-16.04'
   strategy:
     matrix:
-      Python37:
-        python.version: '3.7'
+      htslib111:
+        htslib_version: '1.11'
     maxParallel: 1
 
   steps:
   - bash: echo "##vso[task.prependpath]/usr/share/miniconda/bin"
     displayName: Add conda to PATH
-  - bash: conda create -n foo -q --yes -c conda-forge -c bioconda htslib python gcc_impl_linux-64 binutils_impl_linux-64 binutils_linux-64 gcc_linux-64 libgcc-ng libbigwig
+  - bash: conda create -n MethylDackel -q --yes -c conda-forge -c bioconda htslib=$(HTSLIB_VERSION) python gcc_impl_linux-64 binutils_impl_linux-64 binutils_linux-64 gcc_linux-64 libgcc-ng libbigwig
     displayName: Installing dependencies
   - template: .azure-pipelines/test-template.yml
 
 #This tries to link against 32-bit libraries for some reason
-#- job: 'OSX'
-#  pool:
-#    vmImage: 'macOS-10.13'
-#  strategy:
-#    matrix:
-#      Python37:
-#        python.version: '3.7'
-#    maxParallel: 1
-#
-#  steps:
-#  - script: |
-#      echo "Removing homebrew from Azure to avoid conflicts."
-#      curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/uninstall > ~/uninstall_homebrew
-#      chmod +x ~/uninstall_homebrew
-#      ~/uninstall_homebrew -fq
-#      rm ~/uninstall_homebrew
-#    displayName: Remove homebrew
-#  - bash: echo "##vso[task.prependpath]$CONDA/bin"
-#    displayName: Add conda to PATH
-#  - bash: conda create -n foo -q --yes -c conda-forge -c bioconda htslib python clang clang_osx-64 clangxx cctools compiler-rt ld64
-#    displayName: Installing dependencies
-#  - template: .azure-pipelines/test-template.yml
+- job: 'OSX'
+  pool:
+    vmImage: 'macOS-latest'
+  strategy:
+    matrix:
+      htslib111:
+        htslib_version: '1.11'
+    maxParallel: 1
+
+  steps:
+  - script: |
+      echo "Removing homebrew from Azure to avoid conflicts."
+      curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/uninstall > ~/uninstall_homebrew
+      chmod +x ~/uninstall_homebrew
+      ~/uninstall_homebrew -fq
+      rm ~/uninstall_homebrew
+    displayName: Remove homebrew
+  - bash: echo "##vso[task.prependpath]$CONDA/bin"
+    displayName: Add conda to PATH
+  - bash: sudo chown -R 501:20 /usr/local/miniconda/pkgs
+    displayName: Fix permissions
+  - bash: conda create -n MethylDackel -q --yes -c conda-forge -c bioconda htslib=$(HTSLIB_VERSION) python clang clang_osx-64 clangxx cctools compiler-rt ld64 libbigwig
+    displayName: Installing dependencies
+  - template: .azure-pipelines/test-template.yml
