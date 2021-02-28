@@ -1,5 +1,6 @@
 #include <string.h>
 #include <stdio.h>
+#include <pthread.h>
 #include "htslib/hts.h"
 #include "version.h" //This has the VERSION define
 
