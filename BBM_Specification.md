@@ -4,7 +4,7 @@ BBM is a binary format for storing a single data track for a genome. Its main re
 
 ## Format Overview:
 
-([bracketed] items will be explained below, <angle bracketed> items are simply markers of the beginning and end of the file, and items in {curly braces} contain other items and are explained in their own sections)
+(`[bracketed]` items will be explained below, `<angle bracketed>` items are simply markers of the beginning and end of the file, and items in `{curly braces}` contain other items and are explained in their own sections)
 
 ```<beginning of file>[version][chromCount]{chrom record}{chrom record}{chrom record}{chrom record}...<end of file>```
 
