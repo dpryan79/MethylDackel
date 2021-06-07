@@ -15,6 +15,8 @@
 #include "MethylDackel.h"
 
 int RUNOFFSET = 99; //used to calculate the run length value to store in a BBM file, as value-to-store = actual-run-length + RUNOFFSET. Placed up here as it's a constant.
+unsigned char BBM_VERSION = 1; //the version of the BBM file format read/written here 
+
 
 void print_version(void);
 
@@ -1044,7 +1046,7 @@ int extract_main(int argc, char *argv[]) {
                 fprintf(stderr, "Couldn't open %s for writing! Insufficient permissions?\n", config.outBBMName);
                 return -7;
             }
-            unsigned char bbm_version = 1;
+            unsigned char bbm_version = BBM_VERSION;
             fwrite(&bbm_version, sizeof(char), 1, f); //write version
         }
         config.bw_data = malloc(config.BW_ptr->cl->nKeys*sizeof(char*)); //init outer array
@@ -1196,9 +1198,9 @@ int extract_main(int argc, char *argv[]) {
         char readlen; //used to store the length of data read from the file. Could be used in the future to detect unexpected EOF throughout reading the file, but it is currently only used to check for blank files and incorrect chrom name null terminators
         unsigned char bbm_version;
         readlen = fread(&bbm_version, sizeof(char), 1, config.BBM_ptr); //get BBM version
-        if(bbm_version != 1)
+        if(bbm_version != BBM_VERSION)
         {
-            fprintf(stderr, "fatal: file is wrong BBM version or malformed\n", config.BBMName);
+            fprintf(stderr, "fatal: file %s is wrong BBM version or malformed\n", config.BBMName);
             return -10;
         }
         readlen = fread(&config.chromCount, sizeof(config.chromCount), 1, config.BBM_ptr); //get chrom count
