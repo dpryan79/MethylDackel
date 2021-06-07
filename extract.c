@@ -925,6 +925,14 @@ int extract_main(int argc, char *argv[]) {
         if(p != NULL) *p = '\0';
         config.outBBMName = strcat(tmp, ".bbm");
     }
+
+    if(config.outputBB && !config.BWName)
+    {
+        fprintf(stderr, "You must specify a bigWig file when attempting to create a BBM file!\n");
+        extract_usage();
+        return -1;
+    }
+
     if(argc == 1) {
         extract_usage();
         return 0;
@@ -932,7 +940,7 @@ int extract_main(int argc, char *argv[]) {
     if(argc-optind < 2) {
         if(config.outputBB)
         {
-             config.noBAM = 1; //just write BBM, don't extract
+            config.noBAM = 1; //just write BBM, don't extract
         }
         else
         {
@@ -983,8 +991,11 @@ int extract_main(int argc, char *argv[]) {
     }
 
     //Open the files
-    config.FastaName = argv[optind];
-    config.BAMName = argv[optind+1];
+    if(!config.noBAM)
+    {
+        config.FastaName = argv[optind];
+        config.BAMName = argv[optind+1];
+    }
     if(!config.noBAM)
     {
         if((config.fp = hts_open(argv[optind+1], "rb")) == NULL) {

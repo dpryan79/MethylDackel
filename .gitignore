@@ -6,3 +6,5 @@ htslib/*
 libMethylDackel.a
 MethylDackel
 version.h
+MethylDackel.dSYM/*
+.DS_Store
