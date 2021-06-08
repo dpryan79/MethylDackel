@@ -14,8 +14,8 @@
 #include <pthread.h>
 #include "MethylDackel.h"
 
-int RUNOFFSET = 99; //used to calculate the run length value to store in a BBM file, as value-to-store = actual-run-length + RUNOFFSET. Placed up here as it's a constant.
-unsigned char BBM_VERSION = 1; //the version of the BBM file format read/written here 
+#define RUNOFFSET 99 //used to calculate the run length value to store in a BBM file, as value-to-store = actual-run-length + RUNOFFSET. Placed up here as it's a constant.
+#define BBM_VERSION 1 //the version of the BBM file format read/written here 
 
 
 void print_version(void);
@@ -923,8 +923,24 @@ int extract_main(int argc, char *argv[]) {
     if(config.outputBB && (!config.outBBMName && config.BWName))
     {
         char* tmp = strdup(config.BWName);
+        int fullLen = strlen(config.BWName); //full length
         char* p = strrchr(tmp, '.');
         if(p != NULL) *p = '\0';
+        int nameLen = strlen(tmp); //length of string not including extension
+        if(nameLen+4 > fullLen) //if new name will be bigger than old name
+        {
+            char* tmp2 = realloc(tmp, nameLen+5); //expand str
+
+            if(tmp2 == NULL) //if realloc failed, manually copy over
+            {
+                char* tmp2 = malloc(nameLen+5);
+                strcpy(tmp2, tmp);
+                free(tmp);
+            }
+
+            tmp = tmp2; //assign tmp1 to point to new str
+
+        }
         config.outBBMName = strcat(tmp, ".bbm");
     }
 
@@ -1184,6 +1200,7 @@ int extract_main(int argc, char *argv[]) {
                 free(config.chromNames);
                 free(config.bw_data);
                 bwClose(config.BW_ptr);
+                free(config.outBBMName);
                 return 0;
             }
         }
