@@ -58,7 +58,7 @@ void *extractMBias(void *foo) {
     Config *config = (Config*) foo;
     bam_hdr_t *hdr;
     bam_mplp_t iter;
-    int ret, tid, pos, i, seqlen, rv, o = 0;
+    int ret, tid, pos = 0, i, seqlen, rv, o = 0;
     int32_t bedIdx = 0;
     int strand;
     int n_plp; //This will need to be modified for multiple input files
@@ -301,6 +301,7 @@ int mbias_main(int argc, char *argv[]) {
     config.keepCpG = 1; config.keepCHG = 0; config.keepCHH = 0;
     config.minMapq = 10; config.minPhred = 5; config.keepDupes = 0;
     config.keepSingleton = 0, config.keepDiscordant = 0;
+    config.filterMappability = 0;
     
     config.fp = NULL;
     config.bai = NULL;

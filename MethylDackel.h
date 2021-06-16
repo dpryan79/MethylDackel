@@ -3,18 +3,23 @@
 #include <zlib.h>
 #include "htslib/sam.h"
 #include "htslib/faidx.h"
-#include "libBigWig/bigWig.h"
+#include "bigWig.h"
+
+#if HTS_VERSION < 101100
+#error "The minimum supported version of htslib is 1.11!"
+#endif
+
 
 //These are needed to handle multiple threads
-pthread_mutex_t positionMutex;
-pthread_mutex_t bwMutex;
-pthread_mutex_t outputMutex;
-uint32_t globalTid;
-uint32_t globalPos;
-uint32_t globalEnd;
-uint32_t bin;
-uint32_t outputBin;
-uint64_t globalnVariantPositions;
+extern pthread_mutex_t positionMutex;
+extern pthread_mutex_t bwMutex;
+extern pthread_mutex_t outputMutex;
+extern uint32_t globalTid;
+extern uint32_t globalPos;
+extern uint32_t globalEnd;
+extern uint32_t bin;
+extern uint32_t outputBin;
+extern uint64_t globalnVariantPositions;
 
 /*! @typedef
  @abstract Structure to hold one region defined in a BED file
@@ -121,6 +126,7 @@ typedef struct {
  @field	config:	The Config* structure containing the settings
  @field hdr:	The input header
  @field iter:	The alignment iterator that should be traversed.
+ @field ohash:  A pointer to the hash table needed for overlap detection
  @field bedIdx: The last index into the BED file
 */
 typedef struct {
@@ -128,6 +134,7 @@ typedef struct {
     htsFile *fp;
     bam_hdr_t *hdr;
     hts_itr_t *iter;
+    void *ohash;
     int32_t bedIdx;
 } mplp_data;
 
@@ -224,3 +231,9 @@ void parseBounds(char *s2, int *vals, int mult);
 
 //Used internally to not split CpGs/CHGs between threads
 void adjustBounds(Config *config, bam_hdr_t *hdr, faidx_t *fai, uint32_t *localTid, uint32_t *localPos, uint32_t *localEnd);
+
+// Read-pair overlap handling functions
+int custom_overlap_constructor(void *data, const bam1_t *b, bam_pileup_cd *cd);
+int custom_overlap_destructor(void *data, const bam1_t *b, bam_pileup_cd *cd);
+void *initOlapHash();
+void destroyOlapHash(void *ohash);

@@ -20,7 +20,7 @@
 
 void print_version(void);
 
-extern inline double logit(double p) {
+static inline double logit(double p) {
     return(log(p) - log(1 - p)); 
 }
 
@@ -30,7 +30,6 @@ struct lastCall{
     uint32_t nmethyl, nunmethyl;
 };
 
-const char *quux[2] = {"foo", "bar"};
 const char *TriNucleotideContexts[25] = {"CAA", "CAC", "CAG", "CAT", "CAN", \
                                          "CCA", "CCC", "CCG", "CCT", "CCN", \
                                          "CGA", "CGC", "CGG", "CGT", "CGN", \
@@ -249,7 +248,8 @@ void *extractCalls(void *foo) {
     Config *config = (Config*) foo;
     bam_hdr_t *hdr;
     bam_mplp_t iter;
-    int ret, tid, pos, i, seqlen, type, rv, o = 0;
+    int ret, tid, i, seqlen, type, rv, o = 0;
+    hts_pos_t pos;
     int32_t bedIdx = 0;
     int n_plp; //This will need to be modified for multiple input files
     int strand, direction;
@@ -316,7 +316,7 @@ void *extractCalls(void *foo) {
     data->fp = fp;
     data->bedIdx = bedIdx;
 
-    plp = calloc(1, sizeof(bam_pileup1_t *)); //This will have to be modified for multiple input files
+    plp = calloc(1, sizeof(bam_pileup1_t *));
     if(plp == NULL) {
         fprintf(stderr, "Couldn't allocate space for the plp structure in extractCalls()!\n");
         return NULL;
@@ -387,10 +387,13 @@ void *extractCalls(void *foo) {
         }
 
         //Start the pileup
+        data->ohash = initOlapHash();
         iter = bam_mplp_init(1, filter_func, (void **) &data);
-        bam_mplp_init_overlaps(iter);
         bam_mplp_set_maxcnt(iter, INT_MAX);
-        while((ret = cust_mplp_auto(iter, &tid, &pos, &n_plp, plp)) > 0) {
+        bam_mplp_constructor(iter, custom_overlap_constructor);
+        bam_mplp_destructor(iter, custom_overlap_destructor);
+
+        while((ret = bam_mplp64_auto(iter, &tid, &pos, &n_plp, plp)) > 0) {
             if(pos < localPos || pos >= localEnd) continue; // out of the region requested
 
             if(config->bed) { //Handle -l
@@ -455,7 +458,7 @@ void *extractCalls(void *foo) {
             if(nmethyl+nunmethyl==0 && config->cytosine_report == 0) continue;
             if(!config->merge || type==2) { //Also, cytosine report
                 if(config->cytosine_report) {
-                    writeBlank(os, config, hdr->target_name[tid], pos, localPos2, &lastPos, seq, seqlen);
+                    writeBlank(os, config, hdr->target_name[localTid], pos, localPos2, &lastPos, seq, seqlen);
 
                     //Set the C-context
                     if(type == 0) {
@@ -500,7 +503,7 @@ void *extractCalls(void *foo) {
                 lastCHG->tid = -1;
             }
         } else if(config->cytosine_report) {
-            writeBlank(os, config, hdr->target_name[tid], localEnd, localPos2, &lastPos, seq, seqlen);
+            writeBlank(os, config, hdr->target_name[localTid], localEnd, localPos2, &lastPos, seq, seqlen);
         }
         hts_itr_destroy(data->iter);
         free(seq);
@@ -527,6 +530,7 @@ void *extractCalls(void *foo) {
             pthread_mutex_unlock(&outputMutex);
             break;
         }
+        destroyOlapHash(data->ohash);
     }
 
     free(os_CpG->s); free(os_CpG);
@@ -569,7 +573,7 @@ void extract_usage() {
 " -q INT           Minimum MAPQ threshold to include an alignment (default 10)\n"
 " -p INT           Minimum Phred threshold to include a base (default 5). This\n"
 "                  must be >0.\n"
-" -D INT           Maximum per-base depth (default 2000)\n"
+" -D INT           Ignored, kept only for backward compatibility.\n"
 " -d INT           Minimum per-base depth for reporting output. If you use\n"
 "                  --mergeContext, this then applies to the merged CpG/CHG.\n"
 "                  (default 1)\n"
@@ -690,7 +694,7 @@ void extract_usage() {
 
 int extract_main(int argc, char *argv[]) {
     char *opref = NULL, *oname, *p;
-    int c, i, keepStrand = 0;
+    int c, i, j, keepStrand = 0;
     Config config;
     bam_hdr_t *hdr = NULL;
 
@@ -1049,7 +1053,7 @@ int extract_main(int argc, char *argv[]) {
         config.chromCount = config.BW_ptr->cl->nKeys; //same chromosome count
         config.chromNames = malloc(config.chromCount*sizeof(char*));
         config.chromLengths = malloc(config.chromCount*sizeof(uint32_t));
-        FILE* f; //this file pointer is only used when writing a BBM file, declared here to make sure it is in scope where it is needed
+        FILE* f = NULL; //this file pointer is only used when writing a BBM file, declared here to make sure it is in scope where it is needed
         uint16_t runlen; //length of a run of the same value, declared here for the same reasons as the above file pointer
         uint16_t chromNameLen; //length of the name of a chromosome, declared here for the same reasons as the above file pointer
         unsigned char lastval; //the previous value read
@@ -1072,7 +1076,7 @@ int extract_main(int argc, char *argv[]) {
             fwrite(&config.BW_ptr->cl->nKeys, sizeof(uint32_t), 1, f); //write chrom count
             fprintf(stderr, "writing .bbm file to %s\n", config.outBBMName);
         }
-        for(int i = 0; i<config.BW_ptr->cl->nKeys; i++) //loop over chroms
+        for(i = 0; i<config.BW_ptr->cl->nKeys; i++) //loop over chroms
         {
             config.chromNames[i] = strdup(config.BW_ptr->cl->chrom[i]); //store chrom name
             config.chromLengths[i] = config.BW_ptr->cl->len[i]; //store chrom length
@@ -1096,7 +1100,7 @@ int extract_main(int argc, char *argv[]) {
             }
             config.bw_data[i] = malloc(arrlen*sizeof(char)); //init inner array
             bwOverlappingIntervals_t *vals = bwGetValues(config.BW_ptr, config.BW_ptr->cl->chrom[i], 0, config.BW_ptr->cl->len[i], 1); //get data from bigWig
-            for(int j = 0; j<config.BW_ptr->cl->len[i]; j++) //loop over data
+            for(j = 0; j<config.BW_ptr->cl->len[i]; j++) //loop over data
             {
                 int index; //index in array
                 char offset; //offset in byte at index
@@ -1191,7 +1195,7 @@ int extract_main(int argc, char *argv[]) {
             fclose(f); //close the BBM file
             if(config.noBAM)
             {
-                for(int i = 0; i<config.chromCount; i++)
+                for(i = 0; i<config.chromCount; i++)
                 {
                     free(config.bw_data[i]);
                     free(config.chromNames[i]);
@@ -1217,7 +1221,7 @@ int extract_main(int argc, char *argv[]) {
         readlen = fread(&bbm_version, sizeof(char), 1, config.BBM_ptr); //get BBM version
         if(bbm_version != BBM_VERSION)
         {
-            fprintf(stderr, "fatal: file %s is wrong BBM version or malformed\n", config.BBMName);
+            fprintf(stderr, "fatal: %s has wrong BBM version or is malformed\n", config.BBMName);
             return -10;
         }
         readlen = fread(&config.chromCount, sizeof(config.chromCount), 1, config.BBM_ptr); //get chrom count
@@ -1234,7 +1238,7 @@ int extract_main(int argc, char *argv[]) {
             uint16_t nameLen;
             readlen = fread(&nameLen, sizeof(uint16_t), 1, config.BBM_ptr); //read in length of name
             config.chromNames[chromID] = malloc((nameLen+1)*sizeof(char)); //one more than length to make space for null terminator
-            for(int i = 0; i<nameLen; i++)
+            for(i = 0; i<nameLen; i++)
             {
                 readlen = fread(&(config.chromNames[chromID][i]), sizeof(char), 1, config.BBM_ptr); //read in character of name
             }
@@ -1285,7 +1289,7 @@ int extract_main(int argc, char *argv[]) {
                         readlen = fread(&val, sizeof(val), 1, config.BBM_ptr); //read value
                     }
                     aboveCutoff = (char)(val >= config.mappabilityCutoff*100.0); //check if above cutoff
-                    for(int i = 0; i<runlen; i++) //loop runlen times to store a run of the value
+                    for(i = 0; i<runlen; i++) //loop runlen times to store a run of the value
                     {
                         int tempindex;
                         char tempoffset;
@@ -1475,7 +1479,7 @@ int extract_main(int argc, char *argv[]) {
     free(config.output_fp);
     if(config.filterMappability)
     {
-        for(int i = 0; i<config.chromCount; i++)
+        for(i = 0; i<config.chromCount; i++)
         {
             free(config.bw_data[i]);
             free(config.chromNames[i]);

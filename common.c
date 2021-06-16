@@ -47,6 +47,7 @@ void print_version() {
 }
 
 inline int isCpG(char *seq, int pos, int seqlen) {
+    if(pos >= seqlen) return 0;
     if(*(seq+pos) == 'C' || *(seq+pos) == 'c') {
         if(pos+1 == seqlen) return 0;
         if(*(seq+pos+1) == 'G' || *(seq+pos+1) == 'g') return 1;
@@ -60,6 +61,7 @@ inline int isCpG(char *seq, int pos, int seqlen) {
 }
 
 inline int isCHG(char *seq, int pos, int seqlen) {
+    if(pos >= seqlen) return 0;
     if(*(seq+pos) == 'C' || *(seq+pos) == 'c') {
         if(pos+2 >= seqlen) return 0;
         if(*(seq+pos+2) == 'G' || *(seq+pos+2) == 'g') return 1;
@@ -73,6 +75,7 @@ inline int isCHG(char *seq, int pos, int seqlen) {
 }
 
 inline int isCHH(char *seq, int pos, int seqlen) {
+    if(pos >= seqlen) return 0;
     if(*(seq+pos) == 'C' || *(seq+pos) == 'c') return 1;
     else if(*(seq+pos) == 'G' || *(seq+pos) == 'g') return -1;
     return 0;
@@ -208,7 +211,8 @@ unsigned char* getMappabilityValue(Config* config, char* chrom_n, uint32_t start
 {
     char chromFound = 0;
     uint32_t chrom = -1;
-    for(int i = 0; i<config->chromCount; i++) //loop over chromosomes
+    int i;
+    for(i = 0; i<config->chromCount; i++) //loop over chromosomes
     {
         if(!strcmp(config->chromNames[i], chrom_n)) //found the chromosome
         {
@@ -232,7 +236,7 @@ unsigned char* getMappabilityValue(Config* config, char* chrom_n, uint32_t start
     }
     //debug
 
-    for(int i = 0; i<end-start; i++)
+    for(i = 0; i<end-start; i++)
     {
         unsigned char byte;
         if(chromFound) //was a chrom ID found for chrom_n, or is chrom still -1 (or here 4,294,967,295) i.e. chrom not found
