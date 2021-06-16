@@ -1,10 +1,11 @@
 steps:
 - bash: |
-    source activate foo
-    make install CC=$CC CFLAGS="-O3 -Wall -I$CONDA_PREFIX/include" LIBS="-L$CONDA_PREFIX/lib" prefix=$CONDA_PREFIX/bin
+    source activate MethylDackel
+    export CONDA_BUILD_SYSROOT=''
+    make install CC=$CC CFLAGS="-O3 -Wall -I$CONDA_PREFIX/include" LIBS="-L$CONDA_PREFIX/lib" LIBBIGWIG="$CONDA_PREFIX/lib/libBigWig.a" prefix=$CONDA_PREFIX/bin
   displayName: Installing methylDackel
 - bash: |
-    source activate foo
+    source activate MethylDackel
     export LD_LIBRARY_PATH=$CONDA_PREFIX/lib
-    make test CC=$CC CFLAGS="-O3 -Wall -I$CONDA_PREFIX/include" LIBS="-L$CONDA_PREFIX/lib"
+    python tests/test.py
   displayName: Test methylDackel

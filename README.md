@@ -7,7 +7,7 @@
 Prerequisites
 =============
 
-A C compiler, such as gcc, and htslib (versions 1.4 through 1.9 are known to be compatible).
+A C compiler, such as gcc, htslib (at least versions 1.11, earlier versions are not compatible) and libBigWig are required. For libBigWig, the static library is used.
 
 Compilation
 ===========
@@ -16,12 +16,12 @@ Compilation and installation can be performed via:
 
     git clone https://github.com/dpryan79/MethylDackel.git
     cd MethylDackel
-    make
+    make LIBBIGWIG="/some/path/to/libBigWig.a"
     make install prefix=/some/installation/path
 
 If the linker has issues finding the htslib headers and library, then specify them using `CFLAGS` and `LIBS`:
 
-    make install CFLAGS="-O3 -Wall -I/some/path/include " LIBS="-L/some/path/lib" prefix=/some/installation/path
+    make install CFLAGS="-O3 -Wall -I/some/path/include " LIBS="-L/some/path/lib" prefix=/some/installation/path LIBBIGWIG="/some/path/to/libBigWig.a"
 
 License
 =======
@@ -157,6 +157,8 @@ Ignored alignments
 
 By default, any alignment marked as being secondary (bit 256), having failed QC (bit 512), being a PCR/optical duplicate (bit 1024), or being supplemental (bit 2048) is ignored. This is a reasonable default and should only be changed by expert users. For those needing to change this behaviour, please see the `-F` or `--ignoreFlags` options to both `MethylDackel mbias` and `MethylDackel extract`.
 
+Note that PCR (but not optical!) duplicates should be included for enrichment-based library preparations, like RRBS. In such cases it is vital to use the `--keepDupes` option!
+
 Per-read metrics
 ================
 
@@ -173,5 +175,5 @@ Fragments longer than 10kb are currently not handled correctly.
 Citing MethylDackel
 ===================
 
-There are no immediate plans for a MethylDackel publication. If you use MethylDackel (or PileOMeth, as it was formerly known) in your research, please simply site the URL for this repository on github.
+There are no immediate plans for a MethylDackel publication. If you use MethylDackel (or PileOMeth, as it was formerly known) in your research, please simply cite the URL for this repository on github.
 

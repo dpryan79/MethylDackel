@@ -1,3 +1,17 @@
+Version 0.5.2:
+
+   * Rewrote how read-pair overlap handling is performed. It now uses the constructor/destructor mechanism from htslib instead of using internal htslib structures and functions. This allows supporting newer htslib versions. Currently 1.11 is the only tested and working version, due to changes in the pileup constructor interface in it. (issue #99)
+
+Version 0.5.1:
+
+   * Fixed an issue in `MethylDackel mbias` due to an uninitialized value (issue #93).
+
+Version 0.5.0:
+
+   * Fixed an issue with the `--cytosine_report` option where the reported chromosome name could be wrong IF the input BAM files were very sparse and multiple threads were used. (issue #88)
+   * libBigWig is now an external dependency as it's needed for handling the "binary bismap format"
+   * Added support for blacklisting reads according to a "binary bismap file". See [here](https://github.com/dpryan79/MethylDackel/blob/master/BBM_Specification.md) for details. Code for this was contributed by @valiec and @bwlang at New England Biolabs.
+
 Version 0.4.0:
 
    * Switched to an external htslib. It is currently compatible with htslib versions 1.4 through 1.9 (the latest one at the time of release).

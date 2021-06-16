@@ -20,7 +20,7 @@ struct lastCall{
     uint32_t nmethyl, nunmethyl;
 };
 
-extern inline void printRecord(FILE *of, char *chr, int32_t start, int32_t end, uint32_t nmethyl, uint32_t nunmethyl) {
+static inline void printRecord(FILE *of, char *chr, int32_t start, int32_t end, uint32_t nmethyl, uint32_t nunmethyl) {
     fprintf(of, "%s\t%"PRId32"\t%"PRId32"\t%i\t%"PRIu32"\t%"PRIu32"\n", chr, \
         start, end, (int) (100.0 * ((double) nmethyl)/(nmethyl+nunmethyl)), \
         nmethyl, nunmethyl);
