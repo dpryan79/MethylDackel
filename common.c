@@ -228,13 +228,15 @@ unsigned char* getMappabilityValue(Config* config, char* chrom_n, uint32_t start
     //int startoffset = start%8; //debug
 
     //debug
-    int arrlen; //variable to store the length of the array used for the data (this is not the same as the chromosome length, as each value is one bit and this is an array of characters, i.e. bytes)
-    arrlen = config->chromLengths[chrom]/8; //array length is chromosome length over 8 (number of bits to number of bytes)
-    if(config->chromLengths[chrom]%8 > 0) //if there is a remainder that didn't divide evenly
+    int arrlen = 0; //variable to store the length of the array used for the data (this is not the same as the chromosome length, as each value is one bit and this is an array of characters, i.e. bytes)
+    if(chromFound)
     {
-        arrlen++; //add an extra byte to store it
+        arrlen = config->chromLengths[chrom]/8; //array length is chromosome length over 8 (number of bits to number of bytes)
+        if(config->chromLengths[chrom]%8 > 0) //if there is a remainder that didn't divide evenly
+        {
+            arrlen++; //add an extra byte to store it
+        }
     }
-    //debug
 
     for(i = 0; i<end-start; i++)
     {
