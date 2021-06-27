@@ -188,7 +188,7 @@ void *perReadMetrics(void *foo) {
             if(b->core.pos < localPos) continue;
             if(b->core.pos >= localEnd) break;
             nmethyl = 0, nunmethyl = 0;
-            if(config->requireFlags && (config->requireFlags & b->core.flag) == 0) continue;
+            if(config->requireFlags && (config->requireFlags & b->core.flag) != config->requireFlags) continue;
             if(config->ignoreFlags && (config->ignoreFlags & b->core.flag) != 0) continue;
             if(b->core.qual < config->minMapq) continue;
             processRead(config, b, seq, localPos2, seqlen, &nmethyl, &nunmethyl);
