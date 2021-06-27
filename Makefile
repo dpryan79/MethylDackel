@@ -11,7 +11,7 @@ CFLAGS ?= -Wall -g -O3 -pthread
 all: MethylDackel
 
 OBJS = common.o bed.o svg.o overlaps.o extract.o MBias.o mergeContext.o perRead.o
-VERSION = 0.5.2
+VERSION = 0.5.3
 
 version.h:
 	echo '#define VERSION "$(VERSION)"' > $@

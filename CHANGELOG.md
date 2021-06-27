@@ -1,3 +1,7 @@
+Version 0.5.3:
+
+   * Fixed an issue with the `perRead` subcommand, wherein the requireFlags option didn't fully work (a read would pass if it had at least one of the required flags set, rather than all of them). (issue #117)
+
 Version 0.5.2:
 
    * Rewrote how read-pair overlap handling is performed. It now uses the constructor/destructor mechanism from htslib instead of using internal htslib structures and functions. This allows supporting newer htslib versions. Currently 1.11 is the only tested and working version, due to changes in the pileup constructor interface in it. (issue #99)
