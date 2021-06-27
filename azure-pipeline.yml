@@ -41,6 +41,6 @@ jobs:
     displayName: Add conda to PATH
   - bash: sudo chown -R 501:20 /usr/local/miniconda/pkgs
     displayName: Fix permissions
-  - bash: conda create -n MethylDackel -q --yes -c conda-forge -c bioconda htslib=$(HTSLIB_VERSION) python clang clang_osx-64 clangxx cctools compiler-rt ld64 libbigwig
+  - bash: conda create -n MethylDackel -q --yes -c conda-forge -c bioconda htslib=$(HTSLIB_VERSION) python clang=11.1.0 clang-11 clang_osx-64=11.1.0 clangxx=11.1.0 cctools_osx-64 compiler-rt ld64_osx libcxx make libbigwig
     displayName: Installing dependencies
   - template: .azure-pipelines/test-template.yml

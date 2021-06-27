@@ -2,9 +2,6 @@ steps:
 - bash: |
     source activate MethylDackel
     export CONDA_BUILD_SYSROOT=''
-    echo $CONDA_PREFIX
-    find $CONDA_PREFIX -name inttypes.h -print
-    env
     make install CC=$CC CFLAGS="-O3 -Wall -I$CONDA_PREFIX/include" LIBS="-L$CONDA_PREFIX/lib" LIBBIGWIG="$CONDA_PREFIX/lib/libBigWig.a" prefix=$CONDA_PREFIX/bin
   displayName: Installing methylDackel
 - bash: |
