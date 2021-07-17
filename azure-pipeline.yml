@@ -10,6 +10,10 @@ jobs:
     matrix:
       htslib111:
         htslib_version: '1.11'
+      htslib112:
+        htslib_version: '1.12'
+      htslib113:
+        htslib_version: '1.13'
     maxParallel: 1
 
   steps:
@@ -27,6 +31,10 @@ jobs:
     matrix:
       htslib111:
         htslib_version: '1.11'
+      htslib112:
+        htslib_version: '1.12'
+      htslib113:
+        htslib_version: '1.13'
     maxParallel: 1
 
   steps:
