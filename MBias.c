@@ -151,6 +151,9 @@ void *extractMBias(void *foo) {
             fprintf(stderr, "Note that the output will be truncated!\n");
             return NULL;
         }
+        data->seq = seq;
+        data->lseq = seqlen;
+        data->offset = localPos;
 
         //Start the pileup
         iter = bam_mplp_init(1, filter_func, (void **) &data);
@@ -263,6 +266,11 @@ void mbias_usage() {
 "                  present, or else the alignment is ignored. This is equivalent\n"
 "                  to the -f option in samtools. The default is 0, which\n"
 "                  includes all alignments.\n"
+" --minConversionEfficiency  The minimum non-CpG conversion efficiency observed\n"
+"                  in a read to include it in the output. The default is 0.0 and\n"
+"                  the maximum is 1.0 (100%% conversion). You are strongly\n"
+"                  encouraged to NOT use this option without an EXTREMELY\n"
+"                  compelling reason!\n"
 " --txt            Output tab separated metrics to the screen. These can be\n"
 "                  imported into R or another program for manual plotting and\n"
 "                  analysis. Note that coordinates are 1-based.\n"
@@ -312,6 +320,7 @@ int mbias_main(int argc, char *argv[]) {
     config.requireFlags = 0;
     config.nThreads = 1;
     config.chunkSize = 1000000;
+    config.minConversionEfficiency = 0.0;
     for(i=0; i<16; i++) config.bounds[i] = 0;
     for(i=0; i<16; i++) config.absoluteBounds[i] = 0;
 
@@ -330,6 +339,7 @@ int mbias_main(int argc, char *argv[]) {
         {"nCTOB",        1, NULL,  12},
         {"chunkSize",    1, NULL,  13},
         {"keepStrand",   0, NULL,  14},
+        {"minConversionEfficiency", 1, NULL, 15},
         {"ignoreFlags",  1, NULL, 'F'},
         {"requireFlags", 1, NULL, 'R'},
         {"help",         0, NULL, 'h'},
@@ -399,6 +409,9 @@ int mbias_main(int argc, char *argv[]) {
             break;
         case 14:
             keepStrand = 1;
+            break;
+        case 15:
+            config.minConversionEfficiency = atof(optarg);
             break;
         case 'F' :
             config.ignoreFlags = atoi(optarg);

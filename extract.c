@@ -381,8 +381,11 @@ void *extractCalls(void *foo) {
             fprintf(stderr, "faidx_fetch_seq returned %i while trying to fetch the sequence for tid %s:%"PRIu32"-%"PRIu32"!\n",\
                 seqlen, hdr->target_name[localTid], localPos2, localEnd);
             fprintf(stderr, "Note that the output will be truncated!\n");
-            return NULL;
+            continue;
         }
+        data->seq = seq;
+        data->offset = localPos2;
+        data->lseq = seqlen;
 
         //Start the pileup
         data->ohash = initOlapHash();
@@ -644,6 +647,11 @@ void extract_usage() {
 "                  -q apply here as well. Note further that if you use\n"
 "                  --mergeContext that a merged site will be excluded if either\n"
 "                  of its individual Cs would be excluded.\n"
+" --minConversionEfficiency  The minimum non-CpG conversion efficiency observed\n"
+"                  in a read to include it in the output. The default is 0.0 and\n"
+"                  the maximum is 1.0 (100%% conversion). You are strongly\n"
+"                  encouraged to NOT use this option without an EXTREMELY\n"
+"                  compelling reason!\n"
 " --maxVariantFrac The maximum fraction of A/T/C base calls on the strand\n"
 "                  opposite of a C to allow before a position is declared a\n"
 "                  variant (thereby being excluded from output). The default is\n"
@@ -734,6 +742,7 @@ int extract_main(int argc, char *argv[]) {
     config.chunkSize = 1000000;
     config.cytosine_report = 0;
     config.noBAM = 0;
+    config.minConversionEfficiency = 0.0;
     for(i=0; i<16; i++) config.bounds[i] = 0;
     for(i=0; i<16; i++) config.absoluteBounds[i] = 0;
 
@@ -764,6 +773,7 @@ int extract_main(int argc, char *argv[]) {
         {"chunkSize",    1, NULL,  19},
         {"keepStrand",   0, NULL,  20},
         {"cytosine_report", 0, NULL, 21},
+        {"minConversionEfficiency", 1, NULL, 22},
         {"ignoreFlags",  1, NULL, 'F'},
         {"requireFlags", 1, NULL, 'R'},
         {"help",         0, NULL, 'h'},
@@ -869,6 +879,9 @@ int extract_main(int argc, char *argv[]) {
             break;
         case 21:
             config.cytosine_report = 1;
+            break;
+        case 22:
+            config.minConversionEfficiency = atof(optarg);
             break;
         case 'M':
             config.BWName = optarg;

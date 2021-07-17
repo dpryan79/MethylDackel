@@ -75,6 +75,7 @@ typedef struct {
  @field output_fp	Output file pointers (to CpG, CHG, and CHH, respectively)
  @field	reg	A region specified by -r
  @field BAMName	The BAM file name
+ @field minConversionEfficiency	The minimum acceptable conversion efficiency in non-CpG positions for read inclusion
  @field fp	Input file pointer (must be a BAM or CRAM file)
  @field	bai	The index for fp
  @field bedName	The BED file name
@@ -96,6 +97,7 @@ typedef struct {
     FILE **output_fp;
     char *reg;
     char *BAMName;
+    float minConversionEfficiency;
     char *BWName;
     char *outBBMName;
     char *BBMName;
@@ -128,6 +130,9 @@ typedef struct {
  @field iter:	The alignment iterator that should be traversed.
  @field ohash:  A pointer to the hash table needed for overlap detection
  @field bedIdx: The last index into the BED file
+ @field lseq:   The length of seq.
+ @field seq:    The sequence for the current region
+ @field offset: The beginning position of seq on the relevant contig
 */
 typedef struct {
     Config *config;
@@ -136,6 +141,9 @@ typedef struct {
     hts_itr_t *iter;
     void *ohash;
     int32_t bedIdx;
+    int lseq;
+    char *seq;
+    uint32_t offset;
 } mplp_data;
 
 /*! @function

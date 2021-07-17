@@ -312,6 +312,75 @@ char check_mappability(void *data, bam1_t *b) {
     return num_mappable_reads;
 }
 
+// This is the same as updateMetrics, 1 on methylation, -1 on unmethylation
+int getMethylState(bam1_t *b, int seqPos, Config *config) {
+    uint8_t base = bam_seqi(bam_get_seq(b), seqPos);
+    int strand = getStrand(b); //1=OT, 2=OB, 3=CTOT, 4=CTOB
+
+    if(strand==0) {
+        fprintf(stderr, "Can't determine the strand of a read!\n");
+        assert(strand != 0);
+    }
+    //Is the phred score even high enough?
+    if(bam_get_qual(b)[seqPos] < config->minPhred) return 0;
+
+    if(base == 2 && (strand==1 || strand==3)) return 1; //C on an OT/CTOT alignment
+    else if(base == 8 && (strand==1 || strand==3)) return -1; //T on an OT/CTOT alignment
+    else if(base == 4 && (strand==2 || strand==4)) return 1; //G on an OB/CTOB alignment
+    else if(base == 1 && (strand==2 || strand==4)) return -1; //A on an OB/CTOB alignment
+    return 0;
+}
+
+float computeEfficiency(unsigned int nMethyl, unsigned int nUMethyl) {
+    if(nMethyl + nUMethyl == 0) return 1.0;
+    return nUMethyl / ((float)(nMethyl + nUMethyl));
+}
+
+float computeConversionEfficiency(bam1_t *b, mplp_data *ldata) {
+    unsigned int nMethyl = 0, nUMethyl = 0;
+    uint32_t i, j, seqEnd = ldata->offset + ldata->lseq;  // 1-base after the end of the sequence
+    uint32_t *cigar = bam_get_cigar(b), op, opLen;
+    int direction, type, state;
+    int pos = b->core.pos, seqPos = 0;  //position in the genome and position in the read
+
+    for(i=0; i<b->core.n_cigar; i++) {
+        op = bam_cigar_op(cigar[i]);
+        opLen = bam_cigar_oplen(cigar[i]);
+
+        switch(op) {
+        case 0:
+        case 7:
+        case 8:
+            // do something
+            for(j=0; j<opLen; j++, seqPos++) {
+                if(pos+j >= seqEnd) return computeEfficiency(nMethyl, nUMethyl);
+                if(isCpG(ldata->seq, pos+j-ldata->offset, ldata->lseq)) {
+                    continue;
+                } else if((direction = isCHG(ldata->seq, pos+j-ldata->offset, ldata->lseq))) {
+                    state = getMethylState(b, seqPos, ldata->config);
+                    if(state > 0) nMethyl++;
+                    else if(state < 0) nUMethyl++;
+                } else if((direction = isCHH(ldata->seq, pos+j-ldata->offset, ldata->lseq))) {
+                    state = getMethylState(b, seqPos, ldata->config);
+                    if(state > 0) nMethyl++;
+                    else if(state < 0) nUMethyl++;
+                }
+            }
+            break;
+        case 1:  // I, consume read
+        case 4:  // S, consume read
+            seqPos += opLen;
+            break;
+        case 2:  // D, consume seq
+        case 3:  // N, consume seq
+            pos += opLen;
+            break;
+        }
+    }
+
+    return computeEfficiency(nMethyl, nUMethyl);
+}
+
 //This will need to be restructured to handle multiple input files
 int filter_func(void *data, bam1_t *b) {
     int rv, NH, overlap;
@@ -343,6 +412,11 @@ int filter_func(void *data, bam1_t *b) {
                 rv = -1;
                 break;
             }
+        }
+
+        // This is (A) moderately expensive to compute and (B) not completely correct at chunk boundaries.
+        if(ldata->config->minConversionEfficiency > 0.0) {
+            if(computeConversionEfficiency(b, ldata) < ldata->config->minConversionEfficiency) continue;
         }
 
         /***********************************************************************
