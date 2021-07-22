@@ -1,6 +1,7 @@
 Version 0.6.0:
 
    * Added the `minConversionEfficiency` option, which allows filtering out incompletely converted alignments on the fly. Note that doing this is generally NOT recommended. (issue #61)
+   * Fixed various segfaults and other issues related to mappability filtering (courtesy of @Valiec)
 
 Version 0.5.3:
 
