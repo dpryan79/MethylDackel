@@ -1,3 +1,7 @@
+Version 0.6.0:
+
+   * Added the `minConversionEfficiency` option, which allows filtering out incompletely converted alignments on the fly. Note that doing this is generally NOT recommended. (issue #61)
+
 Version 0.5.3:
 
    * Fixed an issue with the `perRead` subcommand, wherein the requireFlags option didn't fully work (a read would pass if it had at least one of the required flags set, rather than all of them). (issue #117)
