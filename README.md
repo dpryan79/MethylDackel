@@ -109,6 +109,11 @@ Excluding low-coverage regions
 
 If your downstream analysis requires an absolute minimum coverage (here, defined as the number of methylation calls kept after filtering for MAPQ, phred score, etc.), you can use the `--minDepth` option to achieve this. By default, `MethylDackel extract` will output all methylation metrics as long as the coverage is at least 1. If you use `--minDepth 10`, then only sites covered at least 10x will be output. This works in conjunction with the `--mergeContext` option, above. So if you request per-CpG context output (i.e., with `--mergeContext`) and `--minDepth 10` then only CpGs with a minimum coverage of 10 will be output.
 
+Excluding partially converted reads
+===================================
+
+Some users wish to filter out reads that have evidence of incomplete bisulfite conversion. This can be determined by looking for CHH and CHG-context Cytosines in each read and determining their methylation state. Such filtering should generally be avoided, since there are regions in most genomes with at least some CHH and CHG-context Cytosine methylation, which would cause excess filtering in those regions. However, if you absolutely need to filter out only partially-converted alignments, you can do so with the `--minConversionEfficiency` option. The default is 0, meaning that CHH and CHG-context Cytosine conversion status is ignored. The maximum value is 1.0, meaning that 100% of the CHH and CHG-context Cytosines in an alignment must be converted to T. Note that an alignment with no CHH or CHG-context Cytosines will be given a conversion efficiency of 1.0.
+
 Logit, fraction, and counts only output
 =======================================
 
