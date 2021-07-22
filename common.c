@@ -224,12 +224,34 @@ unsigned char* getMappabilityValue(Config* config, char* chrom_n, uint32_t start
     unsigned char* data = malloc((end-start)*sizeof(unsigned char)); //allocate array for data
     int index = start/8;
     int offset = start%8;
+    //int startindex = start/8; //debug
+    //int startoffset = start%8; //debug
+
+    //debug
+    int arrlen = 0; //variable to store the length of the array used for the data (this is not the same as the chromosome length, as each value is one bit and this is an array of characters, i.e. bytes)
+    if(chromFound)
+    {
+        arrlen = config->chromLengths[chrom]/8; //array length is chromosome length over 8 (number of bits to number of bytes)
+        if(config->chromLengths[chrom]%8 > 0) //if there is a remainder that didn't divide evenly
+        {
+            arrlen++; //add an extra byte to store it
+        }
+    }
+
     for(i = 0; i<end-start; i++)
     {
         unsigned char byte;
         if(chromFound) //was a chrom ID found for chrom_n, or is chrom still -1 (or here 4,294,967,295) i.e. chrom not found
         {
-            byte = config->bw_data[chrom][index];
+            if(index>=arrlen)
+            {
+                byte = 0;
+                //printf("warning: accessing at index %d offset %d, arrlen is %d!\ni is %d, end-start is %d, end pos should be %d!\nstartindex is %d, startoffset is %d, start is %d, end is %d\nchrom len is %d\n", index, offset, arrlen, i, end-start, (start/8)+((end-start)/8), startindex, startoffset, start, end, config->chromLengths[chrom]);
+            }
+            else
+            {
+                byte = config->bw_data[chrom][index];
+            }
         }
         else
         {
@@ -278,9 +300,9 @@ char check_mappability(void *data, bam1_t *b) {
         read1_start = b->core.mpos;
         read1_end = b->core.mpos + b->core.l_qseq; //assuming both reads same length to avoid issues finding read2_end
     }
-    vals = getMappabilityValue(ldata->config, ldata->hdr->target_name[b->core.tid], read1_start, read1_end+1);
+    vals = getMappabilityValue(ldata->config, ldata->hdr->target_name[b->core.tid], read1_start, read1_end);
     
-    for (i=0; i<=read1_end-read1_start; i++)
+    for (i=0; i<read1_end-read1_start; i++)
     {
         if(vals[i] > 0) //is base above threshold?
         {
@@ -293,10 +315,10 @@ char check_mappability(void *data, bam1_t *b) {
         }
     }
     free(vals);
-    vals = getMappabilityValue(ldata->config, ldata->hdr->target_name[b->core.tid], read2_start, read2_end+1);
+    vals = getMappabilityValue(ldata->config, ldata->hdr->target_name[b->core.tid], read2_start, read2_end);
     
     num_mappable_bases = 0;
-    for (i=0; i<=read2_end-read2_start; i++)
+    for (i=0; i<read2_end-read2_start; i++)
     {
         if(vals[i] > 0) //is base above threshold?
         {

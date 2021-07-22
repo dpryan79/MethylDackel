@@ -14,7 +14,9 @@
 #include <pthread.h>
 #include "MethylDackel.h"
 
-int RUNOFFSET = 99; //used to calculate the run length value to store in a BBM file, as value-to-store = actual-run-length + RUNOFFSET. Placed up here as it's a constant.
+#define RUNOFFSET 99 //used to calculate the run length value to store in a BBM file, as value-to-store = actual-run-length + RUNOFFSET. Placed up here as it's a constant.
+#define BBM_VERSION 1 //the version of the BBM file format read/written here 
+
 
 void print_version(void);
 
@@ -590,11 +592,11 @@ void extract_usage() {
 " -b, --minMappableBases INT    If a bigWig file is provided, this sets the\n"
 "                  number of mappable bases needed for a read to be considered\n"
 "                  mappable (default 15).\n"
-" -O, --outputBBFile    If this is specified, a Binary Bismap (.bbm) file will\n"
+" -O, --outputBBMFile    If this is specified, a Binary Bismap (.bbm) file will\n"
 "                  be written with the same base name as the provided bigWig file,\n"
 "                  but with the .bbm extension. Neither this option nor -N have any\n"
 "                  effect if a bigWig is not specified with -M.\n"
-" -N, --outputBBFileName FILE    If this is specified, a Binary Bismap (.bbm) file will\n"
+" -N, --outputBBMFileName FILE    If this is specified, a Binary Bismap (.bbm) file will\n"
 "                  be written at the provided filename. Neither this option nor -O\n"
 "                  have any effect if a bigWig is not specified with -M.\n"
 " -B, --mappabilityBB FILE    A .bbm file containing mappability data for\n"
@@ -925,10 +927,34 @@ int extract_main(int argc, char *argv[]) {
     if(config.outputBB && (!config.outBBMName && config.BWName))
     {
         char* tmp = strdup(config.BWName);
+        int fullLen = strlen(config.BWName); //full length
         char* p = strrchr(tmp, '.');
         if(p != NULL) *p = '\0';
+        int nameLen = strlen(tmp); //length of string not including extension
+        if(nameLen+4 > fullLen) //if new name will be bigger than old name
+        {
+            char* tmp2 = realloc(tmp, nameLen+5); //expand str
+
+            if(tmp2 == NULL) //if realloc failed, manually copy over
+            {
+                char* tmp2 = malloc(nameLen+5);
+                strcpy(tmp2, tmp);
+                free(tmp);
+            }
+
+            tmp = tmp2; //assign tmp1 to point to new str
+
+        }
         config.outBBMName = strcat(tmp, ".bbm");
     }
+
+    if(config.outputBB && !config.BWName)
+    {
+        fprintf(stderr, "You must specify a bigWig file when attempting to create a BBM file!\n");
+        extract_usage();
+        return -1;
+    }
+
     if(argc == 1) {
         extract_usage();
         return 0;
@@ -936,7 +962,7 @@ int extract_main(int argc, char *argv[]) {
     if(argc-optind < 2) {
         if(config.outputBB)
         {
-             config.noBAM = 1; //just write BBM, don't extract
+            config.noBAM = 1; //just write BBM, don't extract
         }
         else
         {
@@ -987,8 +1013,11 @@ int extract_main(int argc, char *argv[]) {
     }
 
     //Open the files
-    config.FastaName = argv[optind];
-    config.BAMName = argv[optind+1];
+    if(!config.noBAM)
+    {
+        config.FastaName = argv[optind];
+        config.BAMName = argv[optind+1];
+    }
     if(!config.noBAM)
     {
         if((config.fp = hts_open(argv[optind+1], "rb")) == NULL) {
@@ -1037,7 +1066,7 @@ int extract_main(int argc, char *argv[]) {
                 fprintf(stderr, "Couldn't open %s for writing! Insufficient permissions?\n", config.outBBMName);
                 return -7;
             }
-            unsigned char bbm_version = 1;
+            unsigned char bbm_version = BBM_VERSION;
             fwrite(&bbm_version, sizeof(char), 1, f); //write version
         }
         config.bw_data = malloc(config.BW_ptr->cl->nKeys*sizeof(char*)); //init outer array
@@ -1175,6 +1204,7 @@ int extract_main(int argc, char *argv[]) {
                 free(config.chromNames);
                 free(config.bw_data);
                 bwClose(config.BW_ptr);
+                free(config.outBBMName);
                 return 0;
             }
         }
@@ -1189,7 +1219,7 @@ int extract_main(int argc, char *argv[]) {
         char readlen; //used to store the length of data read from the file. Could be used in the future to detect unexpected EOF throughout reading the file, but it is currently only used to check for blank files and incorrect chrom name null terminators
         unsigned char bbm_version;
         readlen = fread(&bbm_version, sizeof(char), 1, config.BBM_ptr); //get BBM version
-        if(bbm_version != 1)
+        if(bbm_version != BBM_VERSION)
         {
             fprintf(stderr, "fatal: %s has wrong BBM version or is malformed\n", config.BBMName);
             return -10;
