@@ -94,4 +94,37 @@ assert op.exists('test9_CpG.bedGraph')
 lines = sum(1 for _ in open('test9_CpG.bedGraph'))
 assert lines == 48
 rm('test9_CpG.bedGraph')
+
+# Check conversion efficiency. 2 read pairs, one mostly converted
+# By default, 1 read is MAPQ filtered, another is kept
+rm('test10_CpG.bedGraph')
+check_call([MPath, 'extract', '-o', 'test10', 'chgchh.fa', 'chgchh_aln.bam'])
+assert op.exists('test10_CpG.bedGraph')
+lines = sum(1 for _ in open('test10_CpG.bedGraph'))
+assert lines == 2
+rm('test10_CpG.bedGraph')
+
+# Ensure 2 reads/positions are covered by changing MAPQ
+rm('test11_CpG.bedGraph')
+check_call([MPath, 'extract', '-o', 'test11', '-q', '5', 'chgchh.fa', 'chgchh_aln.bam'])
+assert op.exists('test11_CpG.bedGraph')
+lines = sum(1 for _ in open('test11_CpG.bedGraph'))
+assert lines == 3
+rm('test11_CpG.bedGraph')
+
+# Only 1 read has a conversion efficiency >=0.9
+rm('test12_CpG.bedGraph')
+check_call([MPath, 'extract', '-o', 'test12', '-q', '5', '--minConversionEfficiency', '0.9', 'chgchh.fa', 'chgchh_aln.bam'])
+assert op.exists('test12_CpG.bedGraph')
+lines = sum(1 for _ in open('test12_CpG.bedGraph'))
+assert lines == 2
+rm('test12_CpG.bedGraph')
+
+# No perfectly converted reads
+rm('test13_CpG.bedGraph')
+check_call([MPath, 'extract', '-o', 'test13', '-q', '5', '--minConversionEfficiency', '1.0', 'chgchh.fa', 'chgchh_aln.bam'])
+assert op.exists('test13_CpG.bedGraph')
+lines = sum(1 for _ in open('test13_CpG.bedGraph'))
+assert lines == 1
+rm('test13_CpG.bedGraph')
 print("Finished correctly")
