@@ -266,6 +266,9 @@ void mbias_usage() {
 "                  present, or else the alignment is ignored. This is equivalent\n"
 "                  to the -f option in samtools. The default is 0, which\n"
 "                  includes all alignments.\n"
+" --ignoreNH       Ignore NH auxiliary tags. By default, if an NH tag is present\n"
+"                  and its value is >1 then an entry is ignored as a\n"
+"                  multimapper.\n"
 " --minConversionEfficiency  The minimum non-CpG conversion efficiency observed\n"
 "                  in a read to include it in the output. The default is 0.0 and\n"
 "                  the maximum is 1.0 (100%% conversion). You are strongly\n"
@@ -309,7 +312,7 @@ int mbias_main(int argc, char *argv[]) {
     config.keepCpG = 1; config.keepCHG = 0; config.keepCHH = 0;
     config.minMapq = 10; config.minPhred = 5; config.keepDupes = 0;
     config.keepSingleton = 0, config.keepDiscordant = 0;
-    config.filterMappability = 0;
+    config.filterMappability = 0, config.ignoreNH = 0;
     
     config.fp = NULL;
     config.bai = NULL;
@@ -340,6 +343,7 @@ int mbias_main(int argc, char *argv[]) {
         {"chunkSize",    1, NULL,  13},
         {"keepStrand",   0, NULL,  14},
         {"minConversionEfficiency", 1, NULL, 15},
+        {"ignoreNH",     0, NULL,  16},
         {"ignoreFlags",  1, NULL, 'F'},
         {"requireFlags", 1, NULL, 'R'},
         {"help",         0, NULL, 'h'},
@@ -412,6 +416,9 @@ int mbias_main(int argc, char *argv[]) {
             break;
         case 15:
             config.minConversionEfficiency = atof(optarg);
+            break;
+        case 16:
+            config.ignoreNH = 1;
             break;
         case 'F' :
             config.ignoreFlags = atoi(optarg);

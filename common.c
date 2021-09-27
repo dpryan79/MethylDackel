@@ -418,10 +418,12 @@ int filter_func(void *data, bam1_t *b) {
         if(b->core.flag & ldata->config->ignoreFlags) continue; //By default: secondary alignments, QC failed, PCR duplicates, and supplemental alignments
         if(ldata->config->requireFlags && (b->core.flag & ldata->config->requireFlags) != ldata->config->requireFlags) continue;
         if(!ldata->config->keepDupes && b->core.flag & BAM_FDUP) continue;
-        p = bam_aux_get(b, "NH");
-        if(p != NULL) {
-            NH = bam_aux2i(p);
-            if(NH>1) continue; //Ignore obvious multimappers
+        if(!ldata->config->ignoreNH) {
+            p = bam_aux_get(b, "NH");
+            if(p != NULL) {
+                NH = bam_aux2i(p);
+                if(NH>1) continue; //Ignore obvious multimappers
+            }
         }
         if((ldata->config->filterMappability) && check_mappability(ldata, b) == 0) continue; //Low mappability
         if(!ldata->config->keepSingleton && (b->core.flag & 0x9) == 0x9) continue; //Singleton
