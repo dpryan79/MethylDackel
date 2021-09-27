@@ -127,4 +127,21 @@ assert op.exists('test13_CpG.bedGraph')
 lines = sum(1 for _ in open('test13_CpG.bedGraph'))
 assert lines == 1
 rm('test13_CpG.bedGraph')
+
+# Test ignoreNH
+rm('test14_CpG.bedGraph')
+check_call([MPath, 'extract', '-o', 'test14', '-q', '1', 'cg100.fa', 'NH.bam'])
+assert op.exists('test14_CpG.bedGraph')
+lines = sum(1 for _ in open('test14_CpG.bedGraph'))
+assert lines == 1
+rm('test14_CpG.bedGraph')
+
+# Test ignoreNH
+rm('test15_CpG.bedGraph')
+check_call([MPath, 'extract', '-o', 'test15', '--ignoreNH', '-q', '1', 'cg100.fa', 'NH.bam'])
+assert op.exists('test15_CpG.bedGraph')
+lines = sum(1 for _ in open('test15_CpG.bedGraph'))
+assert lines == 49
+rm('test15_CpG.bedGraph')
 print("Finished correctly")
+

@@ -259,6 +259,9 @@ void perRead_usage() {
 "            present, or else the alignment is ignored. This is equivalent to the\n"
 "            -f option in samtools. The default is 0, which includes all\n"
 "            alignments.\n"
+" --ignoreNH Ignore NH auxiliary tags. By default, if an NH tag is present\n"
+"            and its value is >1 then an entry is ignored as a\n"
+"            multimapper.\n"
 " -@ INT     The number of threads to use, the default 1\n"
 " --chunkSize INT  The size of the genome processed by a single thread at a time.\n"
 "            The default is 1000000 bases. This value MUST be at least 1.\n"
@@ -280,6 +283,7 @@ int perRead_main(int argc, char *argv[]) {
     config.keepCpG = 1; config.keepCHG = 0; config.keepCHH = 0;
     config.minMapq = 10; config.minPhred = 5; config.keepDupes = 0;
     config.keepSingleton = 0, config.keepDiscordant = 0;
+    config.ignoreNH = 0;
     config.fp = NULL;
     config.bai = NULL;
     config.reg = NULL;
@@ -343,6 +347,9 @@ int perRead_main(int argc, char *argv[]) {
             break;
         case 20:
             keepStrand = 1;
+            break;
+        case 21:
+            config.ignoreNH = 1;
             break;
         default :
             fprintf(stderr, "Invalid option '%c'\n", c);
