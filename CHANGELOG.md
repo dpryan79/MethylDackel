@@ -1,3 +1,7 @@
+Version 0.6.1:
+
+   * Added the `--ignoreNH` option, which allows inclusion of multimappers normally excluded with the NH flag.
+
 Version 0.6.0:
 
    * Added the `minConversionEfficiency` option, which allows filtering out incompletely converted alignments on the fly. Note that doing this is generally NOT recommended. (issue #61)
