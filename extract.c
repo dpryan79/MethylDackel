@@ -639,6 +639,9 @@ void extract_usage() {
 "                  file with a .counts.bedGraph extension.\n"
 " --logit          Extract logit(M/(M+U)) (only) at each position. This produces\n"
 "                  a file with a .logit.bedGraph extension.\n"
+" --ignoreNH       Ignore NH auxiliary tags. By default, if an NH tag is present\n"
+"                  and its value is >1 then an entry is ignored as a\n"
+"                  multimapper.\n"
 " --minOppositeDepth   If you would like to exclude sites that likely contain\n"
 "                  SNPs, then specifying a value greater than 0 here will\n"
 "                  indicate the minimum depth required on the strand opposite of\n"
@@ -722,6 +725,7 @@ int extract_main(int argc, char *argv[]) {
     config.keepCpG = 1; config.keepCHG = 0; config.keepCHH = 0;
     config.minMapq = 10; config.minPhred = 5; config.keepDupes = 0;
     config.keepSingleton = 0, config.keepDiscordant = 0;
+    config.ignoreNH = 0;
     config.minDepth = 1;
     config.methylKit = 0;
     config.merge = 0;
@@ -776,6 +780,7 @@ int extract_main(int argc, char *argv[]) {
         {"keepStrand",   0, NULL,  20},
         {"cytosine_report", 0, NULL, 21},
         {"minConversionEfficiency", 1, NULL, 22},
+        {"ignoreNH",     0, NULL, 23},
         {"ignoreFlags",  1, NULL, 'F'},
         {"requireFlags", 1, NULL, 'R'},
         {"help",         0, NULL, 'h'},
@@ -884,6 +889,9 @@ int extract_main(int argc, char *argv[]) {
             break;
         case 22:
             config.minConversionEfficiency = atof(optarg);
+            break;
+        case 23:
+            config.ignoreNH = 1;
             break;
         case 'M':
             config.BWName = optarg;

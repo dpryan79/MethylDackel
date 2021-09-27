@@ -67,6 +67,7 @@ typedef struct {
  @field merge   1: Merge Cs in either a CpG or CHG context into single entries
  @field methylKit       Output in a format compatible with methylKit
  @field minOppositeDepth	Minimum depth covering the opposite strand needed to look for variants
+ @field ignoreNH	If set, don't exclude alignments with NH auxiliary tags with values >1 (i.e., marked multimappers).
  @field maxVariantFrac	If the fraction of non-Gs on the opposite strand is greater than this then a position is excluded.
  @field fraction	1: Output should be the methylation fraction only, 0: otherwise
  @field counts	1: Output just the coverage
@@ -91,6 +92,7 @@ typedef struct {
     int minMapq, minPhred, keepDupes, minDepth;
     int keepDiscordant, keepSingleton, ignoreFlags, requireFlags;
     int merge, methylKit, minOppositeDepth;
+    int ignoreNH;
     double maxVariantFrac;
     int fraction, counts, logit;
     int cytosine_report;
