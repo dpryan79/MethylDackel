@@ -129,7 +129,6 @@ assert lines == 1
 rm('test13_CpG.bedGraph')
 
 # Test ignoreNH
-49 for --ignoreNH
 rm('test14_CpG.bedGraph')
 check_call([MPath, 'extract', '-o', 'test14', '-q', '1', 'cg100.fa', 'NH.bam'])
 assert op.exists('test14_CpG.bedGraph')
