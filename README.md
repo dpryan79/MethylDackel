@@ -164,7 +164,7 @@ By default, any alignment marked as being secondary (bit 256), having failed QC 
 
 Note that PCR (but not optical!) duplicates should be included for enrichment-based library preparations, like RRBS. In such cases it is vital to use the `--keepDupes` option!
 
-Reads that do not map to a unique location in the genome may contain methylation information about multiple loci and can add noise to methylation calls. Using `--mappability <bigwig>` eliminates reads that cannot be uniquely placed (note: MapQ alone is insufficient to identify such reads). Specify a bigWig file containing low-mappabilty regions (e.g. [bismap](https://hgdownload.soe.ucsc.edu/gbdb/hg38/hoffmanMappability/k100.Bismap.MultiTrackMappability.bw]) to use this feature. `--minMappableBases` and `--mappabilityThreshold` can be used to fine-tune filtering. For faster execution, bigWig files can be compacted to bbm files using `--outputBBMFile` and used via `--mappabilityBB`.
+Reads that do not map to a unique location in the genome may contain methylation information about multiple loci and can add noise to methylation calls. Using `--mappability <bigwig>` eliminates reads that cannot be uniquely placed (note: MapQ alone is insufficient to identify such reads). Specify a bigWig file containing low-mappabilty regions (e.g. [bismap](https://hgdownload.soe.ucsc.edu/gbdb/hg38/hoffmanMappability/k100.Bismap.MultiTrackMappability.bw)) to use this feature. `--minMappableBases` and `--mappabilityThreshold` can be used to fine-tune filtering. For faster execution, bigWig files can be compacted to bbm files using `--outputBBMFile` and used via `--mappabilityBB`.
 
 Per-read metrics
 ================
