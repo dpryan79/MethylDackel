@@ -16,22 +16,69 @@ void print_version(void);
 void addRead(kstring_t *os, bam1_t *b, bam_hdr_t *hdr, uint32_t nmethyl, uint32_t nunmethyl) {
     char str[10000]; // I don't really like hardcoding it, but given the probability that it ever won't suffice...
 
-    if(nmethyl + nunmethyl > 0) {
-        snprintf(str, 10000, "%s\t%s\t%"PRId64"\t%f\t%"PRIu32"\n",
-            bam_get_qname(b),
-            hdr->target_name[b->core.tid],
-            b->core.pos,
-            100. * ((double) nmethyl)/(nmethyl+nunmethyl),
-            nmethyl + nunmethyl);
-    } else {
-        snprintf(str, 10000, "%s\t%s\t%"PRId64"\t0.0\t%"PRIu32"\n",
-            bam_get_qname(b),
-            hdr->target_name[b->core.tid],
-            b->core.pos,
-            nmethyl + nunmethyl);
-    }
-
+    // parsing mate cigar string
+    char *c_string = bam_aux2Z(bam_aux_get(b, "MC"));
+    char *end;
+    uint32_t *mate_cigar = NULL;
+    size_t m = 0;
+    int n_cigar_mate;
+    n_cigar_mate = sam_parse_cigar(c_string, &end, &mate_cigar, &m);
+    int uncovered = abs(b->core.isize) - bam_cigar2rlen(b->core.n_cigar, bam_get_cigar(b)) - bam_cigar2rlen(n_cigar_mate, mate_cigar);
+    
+    snprintf(str, 10000, "%s\t%s\t%"PRId64"\t%"PRIu32"\t%"PRIu32"\t%"PRId32"\t%"PRId64"\t%"PRIu16"\t%"PRId64"\t%"PRId64"\t%s\n",
+        bam_get_qname(b),
+        hdr->target_name[b->core.tid],
+        b->core.pos,
+        nmethyl,
+        nunmethyl,
+        (uncovered > 0) ? uncovered : 0,
+        b->core.isize,
+        b->core.flag,
+        bam_cigar2rlen(b->core.n_cigar, bam_get_cigar(b)),
+        bam_cigar2rlen(n_cigar_mate, mate_cigar),
+        c_string
+    );
+    free(mate_cigar);
     kputs(str, os);
+}
+
+int calcFragmentBound(int readPosWanted, int n_cigar, uint32_t *CIGAR, int mapPos) {
+    int readPos = 0;
+    int cigarPos = 0;
+    int cigarOPType;
+    int qlen = bam_cigar2qlen(n_cigar, CIGAR);
+    
+    if(readPosWanted > 0) {
+        while (readPos < qlen && cigarPos < n_cigar) {
+            cigarOPType = bam_cigar_type(CIGAR[cigarPos]);
+            if(cigarOPType & 2) {
+                if(cigarOPType & 1) { // consumes both query and ref
+                    if((readPos + bam_cigar_oplen(CIGAR[cigarPos])) >= readPosWanted) {
+                        mapPos = mapPos + readPosWanted - readPos; // move mapPos to the location where readPosWanted is
+                        break;
+                    } else {
+                        readPos += bam_cigar_oplen(CIGAR[cigarPos]);
+                        mapPos += bam_cigar_oplen(CIGAR[cigarPos++]);
+                        continue;
+                    }
+                } else { // consumes only ref but not query
+                    mapPos += bam_cigar_oplen(CIGAR[cigarPos++]);
+                    continue;
+                }
+            } else if(cigarOPType & 1) { // consumes only query but not ref
+                readPos += bam_cigar_oplen(CIGAR[cigarPos++]);
+                if(readPos >= readPosWanted) {
+                    break; // mapPos does not have to be moved
+                } else {
+                    continue;
+                }
+            } else { // consumes neither query or ref
+                cigarPos++;
+                continue;
+            }
+        }
+    }
+    return(mapPos);
 }
 
 void processRead(Config *config, bam1_t *b, char *seq, uint32_t sequenceStart, int seqLen, uint32_t *nmethyl, uint32_t *nunmethyl) {
@@ -47,7 +94,47 @@ void processRead(Config *config, bam1_t *b, char *seq, uint32_t sequenceStart, i
     int direction;
     int base;
 
-    while(readPosition < b->core.l_qseq && cigarOPNumber < b->core.n_cigar) {
+    // parsing mate cigar string
+    char *c_string = bam_aux2Z(bam_aux_get(b, "MC"));
+    char *end;
+    uint32_t *mate_cigar = NULL;
+    size_t m = 0;
+    int n_cigar_mate;
+    n_cigar_mate = sam_parse_cigar(c_string, &end, &mate_cigar, &m);
+    uint32_t matePosition = b->core.mpos + bam_cigar2rlen(n_cigar_mate, mate_cigar);
+    int mateQlen = bam_cigar2qlen(n_cigar_mate, mate_cigar);
+
+    // 5' and 3' trimming, assumes paired end sequencing
+    int lb, rb;
+    
+    // Left and right bounds based on desired 5' and 3' trimming
+    // Original version based on ref position, which is more straightforward
+    // Can be further simplified but it's hard enough to read already
+    if(b->core.flag & 0x3) { // Read properly paired
+      if(b->core.flag & 0x40) { // Read 1 (ie contains 5')
+          if(b->core.flag & 0x20) { // OT
+              lb = calcFragmentBound(config->fivePrime, b->core.n_cigar, bam_get_cigar(b), b->core.pos);
+              rb = calcFragmentBound(mateQlen - config->threePrime, n_cigar_mate, mate_cigar, b->core.mpos);
+          } else { // OB
+              lb = calcFragmentBound(config->threePrime, n_cigar_mate, mate_cigar, b->core.mpos);
+              rb = calcFragmentBound(b->core.l_qseq - config->fivePrime, b->core.n_cigar, bam_get_cigar(b), b->core.pos);
+          }
+      } else { // Read 2 (ie contains 3')
+          if(b->core.flag & 0x20) { // OT
+              lb = calcFragmentBound(config->threePrime, b->core.n_cigar, bam_get_cigar(b), b->core.pos);
+              rb = calcFragmentBound(mateQlen - config->fivePrime, n_cigar_mate, mate_cigar, b->core.mpos);
+          } else { // OB
+              lb = calcFragmentBound(config->fivePrime, n_cigar_mate, mate_cigar, b->core.mpos);
+              rb = calcFragmentBound(b->core.l_qseq - config->threePrime, b->core.n_cigar, bam_get_cigar(b), b->core.pos);
+          }
+      }
+    } else {
+        fprintf(stderr, "Read with qname [[ %s ]] not properly paired and is skipped\n", bam_get_qname(b));
+        lb = -1;
+        rb = -1;
+    }
+
+    while(readPosition < b->core.l_qseq && cigarOPNumber < b->core.n_cigar && mappedPosition <= rb) {
         if(cigarOPOffset >= bam_cigar_oplen(CIGAR[cigarOPNumber])) {
             cigarOPOffset = 0;
             cigarOPNumber++;
@@ -55,11 +142,29 @@ void processRead(Config *config, bam1_t *b, char *seq, uint32_t sequenceStart, i
         cigarOPType = bam_cigar_type(CIGAR[cigarOPNumber]);
         if(cigarOPType & 2) { //not ISHPB
             if(cigarOPType & 1) { //M=X
+                // If read is on the reverse strand (ie rightward to its mate), skip overlap with mate
+                // Ignorant to phread score; there's a better way of doing this but too cumbersome 
+                if(bam_is_rev(b) && (mappedPosition <= matePosition)) {
+                    mappedPosition++;
+                    readPosition++;
+                    cigarOPOffset++;
+                    continue;
+                }
+                
+                // Skip the left bound; right bound is skipped using the while loop conditions
+                if(mappedPosition < lb) {
+                    mappedPosition++;
+                    readPosition++;
+                    cigarOPOffset++;
+                    continue;
+                }
+                
                 // Skip poor base calls
                 if(readQual[readPosition] < config->minPhred) {
                     mappedPosition++;
                     readPosition++;
                     cigarOPOffset++;
+                    continue;
                 }
 
                 direction = isCpG(seq, mappedPosition - sequenceStart, seqLen);
@@ -91,6 +196,7 @@ void processRead(Config *config, bam1_t *b, char *seq, uint32_t sequenceStart, i
             continue;
         }
     }
+    free(mate_cigar);
 }
 
 void *perReadMetrics(void *foo) {
@@ -231,8 +337,13 @@ void perRead_usage() {
 " - read name\n"
 " - chromosome\n"
 " - position\n"
-" - CpG methylation (%%)\n"
-" - number of informative bases\n"
+" - number of unmodified cytosine (ie 5mC for bisulfite)\n"
+" - number of modified cytosine\n"
+" - alignment overlap\n"
+" - insert size\n"
+" - sam flag (for strand & read information)\n"
+" - self rlen\n"
+" - mate rlen\n"
 "\n"
 "Arguments:\n"
 "  ref.fa    Reference genome in fasta format. This must be indexed with\n"
@@ -240,7 +351,7 @@ void perRead_usage() {
 "  input     An input BAM or CRAM file. This MUST be sorted and should be indexed.\n"
 "\nOptions:\n"
 " -q INT     Minimum MAPQ threshold to include an alignment (default 10)\n"
-" -p INT     Minimum Phred threshold to include a base (default 5). This must "
+" -p INT     Minimum Phred threshold to include a base (default 5). This must\n"
 "            be >0.\n"
 " -r STR     Region string in which to extract methylation\n"
 " -l FILE    A BED file listing regions for inclusion.\n"
@@ -293,6 +404,8 @@ int perRead_main(int argc, char *argv[]) {
     config.requireFlags = 0;
     config.nThreads = 1;
     config.chunkSize = 1000000;
+    config.fivePrime = 0;
+    config.threePrime = 0;
 
     static struct option lopts[] = {
         {"help",    0, NULL, 'h'},
@@ -301,6 +414,8 @@ int perRead_main(int argc, char *argv[]) {
         {"keepStrand",   0, NULL,  20},
         {"ignoreFlags",  1, NULL, 'F'},
         {"requireFlags", 1, NULL, 'R'},
+        {"fivePrime",  1, NULL, 22},
+        {"threePrime", 1, NULL, 23},
         {0,         0, NULL,   0}
     };
     while((c = getopt_long(argc, argv, "hvq:p:o:@:r:l:F:R:", lopts, NULL)) >= 0) {
@@ -351,6 +466,12 @@ int perRead_main(int argc, char *argv[]) {
         case 21:
             config.ignoreNH = 1;
             break;
+        case 22:
+            config.fivePrime = atoi(optarg);
+            break;
+        case 23:
+            config.threePrime = atoi(optarg);
+            break;
         default :
             fprintf(stderr, "Invalid option '%c'\n", c);
             perRead_usage();
@@ -375,6 +496,14 @@ int perRead_main(int argc, char *argv[]) {
     }
     if(config.minMapq < 0) {
         fprintf(stderr, "-q %i is invalid. Resetting to 0, which is the lowest possible value.\n", config.minMapq);
+        config.minMapq = 0;
+    }
+    if(config.fivePrime < 0) {
+        fprintf(stderr, "--fivePrime %i is invalid. Resetting to 0, which is the lowest possible value.\n", config.fivePrime);
+        config.minMapq = 0;
+    }
+    if(config.threePrime < 0) {
+        fprintf(stderr, "--threePrime %i is invalid. Resetting to 0, which is the lowest possible value.\n", config.threePrime);
         config.minMapq = 0;
     }
 

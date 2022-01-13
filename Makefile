@@ -1,7 +1,7 @@
 prefix ?= /usr/local/bin #This can be changed
 CC ?= gcc
-LIBS ?=  # e.g., -L$PREFIX/lib, or where ever htslib is
-LIBBIGWIG ?=
+LIBS ?= -L/mnt/lustre/users/pxie/software/devel/dependency/lib # e.g., -L$PREFIX/lib, or where ever htslib is
+LIBBIGWIG ?= /mnt/lustre/users/pxie/software/devel/dependency/lib/libBigWig.a
 CFLAGS ?= -Wall -g -O3 -pthread
 
 .PHONY: all clean install version.h
@@ -17,7 +17,7 @@ version.h:
 	echo '#define VERSION "$(VERSION)"' > $@
 
 .c.o:
-	$(CC) -c $(CFLAGS) $(LIBS) -IlibBigWig $< -o $@
+	$(CC) -c $(CFLAGS) $(LIBS) -I/mnt/lustre/users/pxie/software/devel/dependency/include $< -o $@
 
 libMethylDackel.a: version.h $(OBJS)
 	-@rm -f $@

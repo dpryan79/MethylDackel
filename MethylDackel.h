@@ -123,6 +123,8 @@ typedef struct {
     int nThreads;
     char noBAM;
     unsigned long chunkSize;
+    int fivePrime;
+    int threePrime;
 } Config;
 
 /*! @typedef
