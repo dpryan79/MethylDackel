@@ -125,6 +125,8 @@ typedef struct {
     unsigned long chunkSize;
     int fivePrime;
     int threePrime;
+    int minIsize;
+    int maxIsize;
 } Config;
 
 /*! @typedef
@@ -249,3 +251,5 @@ int custom_overlap_constructor(void *data, const bam1_t *b, bam_pileup_cd *cd);
 int custom_overlap_destructor(void *data, const bam1_t *b, bam_pileup_cd *cd);
 void *initOlapHash();
 void destroyOlapHash(void *ohash);
+
+bam1_t *trimFragmentEnds(bam1_t *b, int fivePrime, int threePrime);

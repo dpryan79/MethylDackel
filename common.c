@@ -133,6 +133,212 @@ int updateMetrics(Config *config, const bam_pileup1_t *plp) {
     return 0;
 }
 
+//Calculate the query moves for a specified reference distance (from the start of a read) 
+int rlen2qlen(int rlen, int n_cigar, uint32_t *CIGAR, bam1_t *b) {
+    int readPos = 0;
+    int mapPos = 0;
+    int cigarPos = 0;
+    int cigarOPType;
+
+    /* remarks
+    In certain cases, the 3' ends of one read may extend beyond the 5' end of the mate (ie cases where insert size is ambiguous)
+    For the purpose of trimming:
+        - when query rlen > read rlen, the full read qlen is returned
+        - when rlen is negative, return 0
+    */
+    if(rlen > bam_cigar2rlen(n_cigar, CIGAR)) {
+        readPos = bam_cigar2qlen(n_cigar, CIGAR);
+        mapPos = rlen;
+    } else if(rlen < 0) {
+        mapPos = rlen;
+        fprintf(stderr, "Warning: rlen is negative; 0 qlen returned. qname is [[ %s ]].\n", bam_get_qname(b));
+    }
+
+    while(mapPos < rlen && cigarPos < n_cigar) {
+        cigarOPType = bam_cigar_type(CIGAR[cigarPos]);
+        if(cigarOPType & 2) {
+            if(cigarOPType & 1) { // consumes both query and ref; move both mapPos and readPos
+                if((mapPos + bam_cigar_oplen(CIGAR[cigarPos])) >= rlen) {
+                    readPos = readPos + rlen - mapPos; // move readPos to the location where mapPos is
+                    break;
+                } else {
+                    mapPos += bam_cigar_oplen(CIGAR[cigarPos]);
+                    readPos += bam_cigar_oplen(CIGAR[cigarPos++]);
+                    continue;
+                } 
+            } else { // consumes only ref but not query
+                mapPos += bam_cigar_oplen(CIGAR[cigarPos++]);
+                if(mapPos >= rlen) {
+                    break; // readPos does not have to be moved
+                } else {
+                    continue;
+                }
+            }
+        } else if(cigarOPType & 1) { // consumes only query but not ref
+            readPos += bam_cigar_oplen(CIGAR[cigarPos++]);
+            continue;
+        } else { // consumes neither query or ref
+            cigarPos++;
+            continue;
+        }
+    }
+    return(readPos);
+}
+
+
+//Calculate the least required query moves for a specified reference distance (from the start of a read) 
+int qlen2rlen(int qlen, int n_cigar, uint32_t *CIGAR, bam1_t *b) {
+    int readPos = 0;
+    int mapPos = 0;
+    int cigarPos = 0;
+    int cigarOPType;
+
+    /* remarks
+    In the case where the desired trimming is greater than the read, return the full read rlen
+    qlen should not be negative, but in that case, 0 is returned with a message to stderr
+    */
+    if(qlen > bam_cigar2qlen(n_cigar, CIGAR)) {
+        mapPos = bam_cigar2rlen(n_cigar, CIGAR);
+        readPos = qlen;
+    } else if(qlen < 0) {
+        readPos = qlen;
+        fprintf(stderr, "Warning: qlen is negative; 0 rlen returned. qname is [[ %s ]].\n", bam_get_qname(b));
+    }
+
+    while(readPos < qlen && cigarPos < n_cigar) {
+        cigarOPType = bam_cigar_type(CIGAR[cigarPos]);
+        if(cigarOPType & 2) {
+            if(cigarOPType & 1) { // consumes both query and ref; move both readPos and mapPos
+                if((readPos + bam_cigar_oplen(CIGAR[cigarPos])) >= qlen) {
+                    mapPos = mapPos + qlen - readPos; // move mapPos to the location where readPos is
+                    break;
+                } else {
+                    readPos += bam_cigar_oplen(CIGAR[cigarPos]);
+                    mapPos += bam_cigar_oplen(CIGAR[cigarPos++]);
+                    continue;
+                } 
+            } else { // consumes only ref but not query
+                mapPos += bam_cigar_oplen(CIGAR[cigarPos++]);
+                continue;
+            }
+        } else if(cigarOPType & 1) { // consumes only query but not ref
+            readPos += bam_cigar_oplen(CIGAR[cigarPos++]);
+            if(readPos >= qlen) {
+                break; // mapPos does not have to be moved
+            } else {
+                continue;
+            }
+        } else { // consumes neither query or ref
+            cigarPos++;
+            continue;
+        }
+    }
+    return(mapPos);
+}
+
+/* pseudocode
+aim: to find out whether the other end needs trimming
+
+approach:
+calculate selfEndPos / mateEndPos;
+do the two reads overlap?
+    y:  calculate the mapPos of trimmed mate;
+        does the trimming cross into current read?
+            y:  trim for readLen required to reach mapPos
+            n:  no need trim
+    n:  is trimLen > mate qlen?
+            y:  tricky case 1, need to assume that the observed isize is the true fragment length, ie need to assume there is no indel in the uncovered area;
+                calculate the hypothesized trim mapPos, and trim accordingly
+            n:  no need trim
+
+the reason to translate trim to mapPos first, then calculate qlen from startpos is that:
+    mapPos is the only anchor between the paired reads (unless they overlap);
+    and CIGAR string always go from left to right, and therefore must start from startpos
+
+tricky case 2:
+what's the interpretation when read is soft trimmed (ie bam_cigar_op(cigar) == BAM_CSOFT_CLIP)?
+    custom barcode? adapter?
+    at this point, I'll stop worrying about them and just use the read-5' ends as the gold standard
+*/
+
+
+bam1_t *trimFragmentEnds(bam1_t *b, int fivePrime, int threePrime) {
+    int i, lb = 0, rb = 0, selfTrim, mateTrim;
+    int mateTrim_mapPos;
+    uint8_t *qual = bam_get_qual(b);
+    uint8_t *seq = bam_get_seq(b);
+
+    // parsing mate cigar string
+    char *m_cstring = bam_aux2Z(bam_aux_get(b, "MC"));
+    char *end;
+    uint32_t *CIGAR = bam_get_cigar(b);
+    uint32_t *m_CIGAR = NULL;
+    size_t m = 0;
+    int m_n_cigar;
+    m_n_cigar = sam_parse_cigar(m_cstring, &end, &m_CIGAR, &m);
+
+    uint32_t mateEndPos = b->core.mpos + bam_cigar2rlen(m_n_cigar, m_CIGAR);
+    uint32_t selfEndPos = bam_endpos(b);
+    int m_qlen = bam_cigar2qlen(m_n_cigar, m_CIGAR);
+
+    // set the params
+    if(b->core.flag & BAM_FPROPER_PAIR) {
+        selfTrim = (b->core.flag & BAM_FREAD1) ? fivePrime : threePrime;
+        mateTrim = (b->core.flag & BAM_FREAD1) ? threePrime : fivePrime;
+        
+        if(b->core.flag & BAM_FMREVERSE) { // OT; selfTrim at left bound, mateTrim at right bound
+            lb = selfTrim;
+            if(selfEndPos > b->core.mpos) { // ie reads overlap
+                if(m_qlen >= mateTrim) {
+                    mateTrim_mapPos = b->core.mpos + qlen2rlen(m_qlen - mateTrim, m_n_cigar, m_CIGAR, b);
+                    rb = (selfEndPos > mateTrim_mapPos) ? b->core.l_qseq - rlen2qlen(mateTrim_mapPos - b->core.pos, b->core.n_cigar, CIGAR, b) : 0;
+                } else rb = b->core.l_qseq - rlen2qlen(b->core.mpos - b->core.pos, b->core.n_cigar, CIGAR, b) + (mateTrim - m_qlen);
+            } else { // ie not overlap
+                if(mateTrim > m_qlen) { // ie tricky case 1
+                    mateTrim_mapPos = b->core.mpos - (mateTrim - m_qlen);
+                    rb = (selfEndPos > mateTrim_mapPos) ? b->core.l_qseq - rlen2qlen(mateTrim_mapPos - b->core.pos, b->core.n_cigar, CIGAR, b) : 0;
+                } else rb = 0;
+            }
+        } else { // OB; selfTrim at right bound, mateTrim at left bound
+            rb = selfTrim;
+            if(mateEndPos > b->core.pos) { // ie reads overlap
+                if(m_qlen >= mateTrim) {
+                    mateTrim_mapPos = b->core.mpos + qlen2rlen(mateTrim, m_n_cigar, m_CIGAR, b);
+                    lb = (mateTrim_mapPos > selfEndPos) ? rlen2qlen(mateTrim_mapPos - b->core.pos, b->core.n_cigar, CIGAR, b) : 0;
+                } else lb = rlen2qlen(mateEndPos - b->core.pos, b->core.n_cigar, CIGAR, b) + (mateTrim - m_qlen);
+            } else { // ie not overlap
+                if(mateTrim > m_qlen) { // ie tricky case 1
+                    mateTrim_mapPos = mateEndPos + (mateTrim - m_qlen);
+                    lb = (mateTrim_mapPos > selfEndPos) ? rlen2qlen(mateTrim_mapPos - b->core.pos, b->core.n_cigar, CIGAR, b) : 0;
+                } else lb = 0;
+            }
+        }
+    } else {
+        fprintf(stderr, "Read with qname [[ %s ]] not properly paired\n", bam_get_qname(b));
+    }
+
+    lb = (lb < b->core.l_qseq) ? lb : b->core.l_qseq;
+    rb = (rb < b->core.l_qseq) ? rb : b->core.l_qseq;
+
+    if(lb) {
+        for(i=0; i<lb; i++) {
+            qual[i] = 0;
+            if(i&1) seq[i>>1] |= 0xf; // 0xf takes 4 bit, corresponds to N
+            else seq[i>>1] |= 0xf0; // 1 byte of seq encode 2 base, and 1 byte of qual encode 1 base qual, thus the shift is needed
+        }
+    }
+
+    if(rb) {
+        for(i=b->core.l_qseq - rb; i<b->core.l_qseq; i++) {
+            qual[i] = 0;
+            if(i&1) seq[i>>1] |= 0xf;
+            else seq[i>>1] |= 0xf0;
+        }
+    }
+    free(m_CIGAR);
+    return b;
+}
+
 //Convert bases outside of the bounds to N and their phred scores to 0
 bam1_t *trimAlignment(bam1_t *b, int bounds[16]) {
     int strand = getStrand(b)-1;
@@ -362,7 +568,7 @@ float computeConversionEfficiency(bam1_t *b, mplp_data *ldata) {
     unsigned int nMethyl = 0, nUMethyl = 0;
     uint32_t i, j, seqEnd = ldata->offset + ldata->lseq;  // 1-base after the end of the sequence
     uint32_t *cigar = bam_get_cigar(b), op, opLen;
-    int direction, type, state;
+    int direction, state;
     int pos = b->core.pos, seqPos = 0;  //position in the genome and position in the read
 
     for(i=0; i<b->core.n_cigar; i++) {
@@ -415,6 +621,8 @@ int filter_func(void *data, bam1_t *b) {
         if(rv<0) return rv;
         if(b->core.tid == -1 || b->core.flag & BAM_FUNMAP) continue; //Unmapped
         if(b->core.qual < ldata->config->minMapq) continue; //-q
+        if(ldata->config->minIsize && abs(b->core.isize) < ldata->config->minIsize) continue; //Minimum insert size
+        if(ldata->config->maxIsize && abs(b->core.isize) > ldata->config->maxIsize) continue; //Maximum insert size
         if(b->core.flag & ldata->config->ignoreFlags) continue; //By default: secondary alignments, QC failed, PCR duplicates, and supplemental alignments
         if(ldata->config->requireFlags && (b->core.flag & ldata->config->requireFlags) != ldata->config->requireFlags) continue;
         if(!ldata->config->keepDupes && b->core.flag & BAM_FDUP) continue;
@@ -457,6 +665,7 @@ int filter_func(void *data, bam1_t *b) {
         ***********************************************************************/
         if(ldata->config->bounds) b = trimAlignment(b, ldata->config->bounds);
         if(ldata->config->absoluteBounds) b = trimAbsoluteAlignment(b, ldata->config->absoluteBounds);
+        if(ldata->config->fivePrime || ldata->config->threePrime) b = trimFragmentEnds(b, ldata->config->fivePrime, ldata->config->threePrime);
         break;
     }
     return rv;

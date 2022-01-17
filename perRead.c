@@ -41,7 +41,7 @@ void addRead(kstring_t *os, bam1_t *b, bam_hdr_t *hdr, uint32_t nmethyl, uint32_
     free(mate_cigar);
     kputs(str, os);
 }
-
+/*
 int calcFragmentBound(int readPosWanted, int n_cigar, uint32_t *CIGAR, int mapPos) {
     int readPos = 0;
     int cigarPos = 0;
@@ -80,7 +80,7 @@ int calcFragmentBound(int readPosWanted, int n_cigar, uint32_t *CIGAR, int mapPo
     }
     return(mapPos);
 }
-
+*/
 void processRead(Config *config, bam1_t *b, char *seq, uint32_t sequenceStart, int seqLen, uint32_t *nmethyl, uint32_t *nunmethyl) {
     uint32_t readPosition = 0;
     uint32_t mappedPosition = b->core.pos;
@@ -102,7 +102,7 @@ void processRead(Config *config, bam1_t *b, char *seq, uint32_t sequenceStart, i
     int n_cigar_mate;
     n_cigar_mate = sam_parse_cigar(c_string, &end, &mate_cigar, &m);
     uint32_t matePosition = b->core.mpos + bam_cigar2rlen(n_cigar_mate, mate_cigar);
-    int mateQlen = bam_cigar2qlen(n_cigar_mate, mate_cigar);
+/*    int mateQlen = bam_cigar2qlen(n_cigar_mate, mate_cigar);
 
     // 5' and 3' trimming, assumes paired end sequencing
     int lb, rb;
@@ -133,8 +133,8 @@ void processRead(Config *config, bam1_t *b, char *seq, uint32_t sequenceStart, i
         lb = -1;
         rb = -1;
     }
-
-    while(readPosition < b->core.l_qseq && cigarOPNumber < b->core.n_cigar && mappedPosition <= rb) {
+*/
+    while(readPosition < b->core.l_qseq && cigarOPNumber < b->core.n_cigar ) { //&& mappedPosition <= rb) {
         if(cigarOPOffset >= bam_cigar_oplen(CIGAR[cigarOPNumber])) {
             cigarOPOffset = 0;
             cigarOPNumber++;
@@ -150,7 +150,7 @@ void processRead(Config *config, bam1_t *b, char *seq, uint32_t sequenceStart, i
                     cigarOPOffset++;
                     continue;
                 }
-                
+/*
                 // Skip the left bound; right bound is skipped using the while loop conditions
                 if(mappedPosition < lb) {
                     mappedPosition++;
@@ -158,7 +158,7 @@ void processRead(Config *config, bam1_t *b, char *seq, uint32_t sequenceStart, i
                     cigarOPOffset++;
                     continue;
                 }
-                
+*/
                 // Skip poor base calls
                 if(readQual[readPosition] < config->minPhred) {
                     mappedPosition++;
@@ -297,6 +297,7 @@ void *perReadMetrics(void *foo) {
             if(config->requireFlags && (config->requireFlags & b->core.flag) != config->requireFlags) continue;
             if(config->ignoreFlags && (config->ignoreFlags & b->core.flag) != 0) continue;
             if(b->core.qual < config->minMapq) continue;
+            if(config->fivePrime || config->threePrime) b = trimFragmentEnds(b, config->fivePrime, config->threePrime);
             processRead(config, b, seq, localPos2, seqlen, &nmethyl, &nunmethyl);
             addRead(os, b, hdr, nmethyl, nunmethyl);
         }
@@ -376,6 +377,10 @@ void perRead_usage() {
 " -@ INT     The number of threads to use, the default 1\n"
 " --chunkSize INT  The size of the genome processed by a single thread at a time.\n"
 "            The default is 1000000 bases. This value MUST be at least 1.\n"
+" --fivePrime INT  Alternative trimming option to --OT / --nOT. Trimming based on\n"
+"                  fragment ends rather than read ends. Experimental, and is not\n"
+"                  accurate in cases where trim length is greater than read length\n"
+" --threePrime INT\n"
 " --version  Print version and quit\n"
 "\n"
 "Note that this program will produce incorrect values for alignments spanning\n"
@@ -500,11 +505,11 @@ int perRead_main(int argc, char *argv[]) {
     }
     if(config.fivePrime < 0) {
         fprintf(stderr, "--fivePrime %i is invalid. Resetting to 0, which is the lowest possible value.\n", config.fivePrime);
-        config.minMapq = 0;
+        config.fivePrime = 0;
     }
     if(config.threePrime < 0) {
         fprintf(stderr, "--threePrime %i is invalid. Resetting to 0, which is the lowest possible value.\n", config.threePrime);
-        config.minMapq = 0;
+        config.threePrime = 0;
     }
 
     if((fai = fai_load(argv[optind])) == NULL) {

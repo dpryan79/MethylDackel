@@ -580,6 +580,9 @@ void extract_usage() {
 " -d INT           Minimum per-base depth for reporting output. If you use\n"
 "                  --mergeContext, this then applies to the merged CpG/CHG.\n"
 "                  (default 1)\n"
+" --minIsize INT   Minimum insert size / fragment length. May be useful for\n"
+"                  applications such as cell-free DNA. Inclusive.\n"
+" --maxIsize INT   Maximum insert size / fragment length. Also inclusive.\n"
 " -r STR           Region string in which to extract methylation\n"
 " -l FILE          A BED file listing regions for inclusion.\n"
 " --keepStrand     If a BED file is specified, then this option will cause the\n"
@@ -699,6 +702,10 @@ void extract_usage() {
 " --nCTOB INT,INT,INT,INT As with --nOT, but for the original bottom,\n"
 "                  complementary to the original top, and complementary to the\n"
 "                  original bottom strands, respectively.\n"
+" --fivePrime INT  Alternative trimming option to --OT / --nOT. Trimming based on\n"
+"                  fragment ends rather than read ends. Experimental, and is not\n"
+"                  accurate in cases where trim length is greater than read length\n"
+" --threePrime INT\n"
 " --version        Print version and then quit.\n"
 "\nNote that --fraction, --counts, and --logit are mutually exclusive!\n");
 }
@@ -751,6 +758,10 @@ int extract_main(int argc, char *argv[]) {
     config.minConversionEfficiency = 0.0;
     for(i=0; i<16; i++) config.bounds[i] = 0;
     for(i=0; i<16; i++) config.absoluteBounds[i] = 0;
+    config.fivePrime = 0;
+    config.threePrime = 0;
+    config.minIsize = 0;
+    config.maxIsize = 0;
 
     static struct option lopts[] = {
         {"opref",        1, NULL, 'o'},
@@ -781,6 +792,10 @@ int extract_main(int argc, char *argv[]) {
         {"cytosine_report", 0, NULL, 21},
         {"minConversionEfficiency", 1, NULL, 22},
         {"ignoreNH",     0, NULL, 23},
+        {"fivePrime",  1, NULL, 24},
+        {"threePrime", 1, NULL, 25},
+        {"minIsize",  1, NULL, 26},
+        {"maxIsize", 1, NULL, 27},
         {"ignoreFlags",  1, NULL, 'F'},
         {"requireFlags", 1, NULL, 'R'},
         {"help",         0, NULL, 'h'},
@@ -892,6 +907,18 @@ int extract_main(int argc, char *argv[]) {
             break;
         case 23:
             config.ignoreNH = 1;
+            break;
+        case 24:
+            config.fivePrime = atoi(optarg);
+            break;
+        case 25:
+            config.threePrime = atoi(optarg);
+        case 26:
+            config.minIsize = atoi(optarg);
+            break;
+        case 27:
+            config.maxIsize = atoi(optarg);
+            break;
             break;
         case 'M':
             config.BWName = optarg;
@@ -1019,6 +1046,22 @@ int extract_main(int argc, char *argv[]) {
         fprintf(stderr, "--mergeContext and --cytosine_report are mutually exclusive.\n");
         extract_usage();
         return 1;
+    }
+    if(config.fivePrime < 0) {
+        fprintf(stderr, "--fivePrime %i is invalid. Resetting to 0, which is the lowest possible value.\n", config.fivePrime);
+        config.fivePrime = 0;
+    }
+    if(config.threePrime < 0) {
+        fprintf(stderr, "--threePrime %i is invalid. Resetting to 0, which is the lowest possible value.\n", config.threePrime);
+        config.threePrime = 0;
+    }
+    if(config.minIsize < 0) {
+        fprintf(stderr, "--minIsize %i is invalid. Resetting to 0, which is the default value.\n", config.minIsize);
+        config.minIsize = 0;
+    }
+    if(config.maxIsize < 0) {
+        fprintf(stderr, "--maxIsize %i is invalid. Resetting to 0, which is the default value.\n", config.maxIsize);
+        config.maxIsize = 0;
     }
 
     //Has more than one output format been requested?
