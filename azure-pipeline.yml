@@ -5,7 +5,7 @@ jobs:
 
 - job: 'Linux'
   pool:
-    vmImage: 'ubuntu-16.04'
+    vmImage: 'ubuntu-latest'
   strategy:
     matrix:
       htslib111:
@@ -14,6 +14,8 @@ jobs:
         htslib_version: '1.12'
       htslib113:
         htslib_version: '1.13'
+      htslib114:
+        htslib_version: '1.14'
     maxParallel: 1
 
   steps:
@@ -35,6 +37,8 @@ jobs:
         htslib_version: '1.12'
       htslib113:
         htslib_version: '1.13'
+      htslib114:
+        htslib_version: '1.14'
     maxParallel: 1
 
   steps:
