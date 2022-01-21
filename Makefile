@@ -4,7 +4,7 @@ LIBS ?=  # e.g., -L$PREFIX/lib, or where ever htslib is
 LIBBIGWIG ?=
 CFLAGS ?= -Wall -g -O3 -pthread
 
-.PHONY: all clean install version.h
+.PHONY: all clean install
 
 .SUFFIXES:.c .o
 
