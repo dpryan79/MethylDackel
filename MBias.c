@@ -58,7 +58,7 @@ void *extractMBias(void *foo) {
     Config *config = (Config*) foo;
     bam_hdr_t *hdr;
     bam_mplp_t iter;
-    int ret, tid, pos = 0, i, seqlen, rv, o = 0;
+    int ret, tid, pos = 0, i, seqlen, rv, o = 0, modified_position;
     int32_t bedIdx = 0;
     int strand;
     int n_plp; //This will need to be modified for multiple input files
@@ -190,26 +190,27 @@ void *extractMBias(void *foo) {
                 }
                 rv = updateMetrics(config, plp[0]+i);
                 if(rv != 0) {
-                    if((plp[0]+i)->qpos >= meths[strand-1]->m)
-                        meths[strand-1] = growStrandMeth(meths[strand-1], (plp[0]+i)->qpos);
+                    modified_position = ((plp[0]+i)->b->core.flag & BAM_FREVERSE) ? (plp[0]+i)->b->core.l_qseq - (plp[0]+i)->qpos : (plp[0]+i)->qpos;
+                    if(modified_position >= meths[strand-1]->m)
+                        meths[strand-1] = growStrandMeth(meths[strand-1], modified_position);
                     if(rv < 0) {
                         if((plp[0]+i)->b->core.flag & BAM_FREAD2) {
-                            assert((meths[strand-1]->unmeth2[(plp[0]+i)->qpos]) < 0xFFFFFFFF);
-                            meths[strand-1]->unmeth2[(plp[0]+i)->qpos]++;
+                            assert((meths[strand-1]->unmeth2[modified_position]) < 0xFFFFFFFF);
+                            meths[strand-1]->unmeth2[modified_position]++;
                         } else {
-                            assert((meths[strand-1]->unmeth1[(plp[0]+i)->qpos]) < 0xFFFFFFFF);
-                            meths[strand-1]->unmeth1[(plp[0]+i)->qpos]++;
+                            assert((meths[strand-1]->unmeth1[modified_position]) < 0xFFFFFFFF);
+                            meths[strand-1]->unmeth1[modified_position]++;
                         }
                     } else {
                         if((plp[0]+i)->b->core.flag & BAM_FREAD2) {
-                            assert((meths[strand-1]->meth2[(plp[0]+i)->qpos]) < 0xFFFFFFFF);
-                            meths[strand-1]->meth2[(plp[0]+i)->qpos]++;
+                            assert((meths[strand-1]->meth2[modified_position]) < 0xFFFFFFFF);
+                            meths[strand-1]->meth2[modified_position]++;
                         } else {
-                            assert((meths[strand-1]->meth1[(plp[0]+i)->qpos]) < 0xFFFFFFFF);
-                            meths[strand-1]->meth1[(plp[0]+i)->qpos]++;
+                            assert((meths[strand-1]->meth1[modified_position]) < 0xFFFFFFFF);
+                            meths[strand-1]->meth1[modified_position]++;
                         }
                     }
-                    if((plp[0]+i)->qpos+1 > meths[strand-1]->l) meths[strand-1]->l = (plp[0]+i)->qpos+1;
+                    if(modified_position+1 > meths[strand-1]->l) meths[strand-1]->l = modified_position+1;
                 }
             }
         }
