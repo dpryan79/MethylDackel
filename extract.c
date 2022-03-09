@@ -36,6 +36,12 @@ const char *TriNucleotideContexts[25] = {"CAA", "CAC", "CAG", "CAT", "CAN", \
                                          "CTA", "CTC", "CTG", "CTT", "CTN", \
                                          "CNA", "CNC", "CNG", "CNT", "CNN"};
 
+const char *CGNucleotideContexts[25] = {"ACGA", "ACGC", "ACGG", "ACGT", "ACGN", \
+                                        "CCGA", "CCGC", "CCGG", "CCGT", "CCGN", \
+                                        "GCGA", "GCGC", "GCGG", "GCGT", "GCGN", \
+                                        "TCGA", "TCGC", "TCGG", "TCGT", "TCGN", \
+                                        "NCGA", "NCGC", "NCGG", "NCGT", "NCGN"};
+
 void writeCall(kstring_t *ks, Config *config, char *chrom, int32_t pos, int32_t width, uint32_t nmethyl, uint32_t nunmethyl, char base, char *context, const char *tnc) { 
     char str[10000]; // I don't really like hardcoding it, but given the probability that it ever won't suffice...
     char strand = (base=='C' || base=='c') ? 'F' : 'R';
@@ -117,11 +123,11 @@ char revcomp(char b) {
     }
 }
 
-int getTriNucContext(char *seq, uint32_t offset, int seqlen, int direction) {
+int getTriNucContext(char *seq, uint32_t offset, int seqlen, int direction, int cgmode) {
     int rv = 0;
     char base;
 
-    //Last base: column
+    // Last base: rv determines column
     if((direction > 0 && offset+2 >= seqlen) || (direction < 0 && offset <= 1)) rv = 4;
     else {
         base = *(seq+offset+2*direction);
@@ -149,10 +155,14 @@ int getTriNucContext(char *seq, uint32_t offset, int seqlen, int direction) {
         }
     }
 
-    //Middle
+    if(cgmode) direction = -direction;
+    
+    // Middle: rv determines row; or first letter, if cgmode
     if((direction > 0 && offset+1 >= seqlen) || (direction < 0 && offset == 0)) rv += 20;
     else {
         base = *(seq+offset+direction);
+        // because direction was switched to reuse the code in CpG context; now switch it back
+        if(cgmode) direction = -direction;
         if(direction < 0) base = revcomp(base);
         switch(base) {
             case 'A':
@@ -187,20 +197,21 @@ void writeBlank(kstring_t **ks, Config *config, char *chrom, int32_t pos, uint32
     for(;*lastPos < pos; (*lastPos)++) {
         if((direction = isCpG(seq, *lastPos-localPos2, seqlen)) != 0) {
             if(!config->keepCpG) continue;
-            triNucContext = getTriNucContext(seq, *lastPos - localPos2, seqlen, direction);
+            triNucContext = getTriNucContext(seq, *lastPos - localPos2, seqlen, direction, direction);
             context[0] = 'G'; context[1] = 0;
         } else if((direction = isCHG(seq, *lastPos-localPos2, seqlen)) != 0) {
             if(!config->keepCHG) continue;
-            triNucContext = getTriNucContext(seq, *lastPos - localPos2, seqlen, direction);
+            triNucContext = getTriNucContext(seq, *lastPos - localPos2, seqlen, direction, 0);
             context[0] = 'H'; context[1] = 'G';
         } else if((direction = isCHH(seq, *lastPos-localPos2, seqlen)) != 0) {
             if(!config->keepCHH) continue;
-            triNucContext = getTriNucContext(seq, *lastPos - localPos2, seqlen, direction);
+            triNucContext = getTriNucContext(seq, *lastPos - localPos2, seqlen, direction, 0);
             context[0] = 'H'; context[1] = 'H';
         } else {
             continue;
         }
-        writeCall(ks[0], config, chrom, *lastPos, 1, 0, 0, (direction>0)?'C':'G', context, TriNucleotideContexts[triNucContext]);
+        if(isCpG(seq, *lastPos-localPos2, seqlen)) writeCall(ks[0], config, chrom, *lastPos, 1, 0, 0, (direction>0)?'C':'G', context, CGNucleotideContexts[triNucContext]);
+        else writeCall(ks[0], config, chrom, *lastPos, 1, 0, 0, (direction>0)?'C':'G', context, TriNucleotideContexts[triNucContext]);
     }
 }
 
@@ -248,7 +259,7 @@ void *extractCalls(void *foo) {
     Config *config = (Config*) foo;
     bam_hdr_t *hdr;
     bam_mplp_t iter;
-    int ret, tid, i, seqlen, type, rv, o = 0;
+    int ret, tid, i, seqlen, type, rv, o = 0, cgmode = 0;
     hts_pos_t pos;
     int32_t bedIdx = 0;
     int n_plp; //This will need to be modified for multiple input files
@@ -405,6 +416,7 @@ void *extractCalls(void *foo) {
             }
 
             if((direction = isCpG(seq, pos-localPos2, seqlen))) {
+                cgmode = 1;
                 if(!config->keepCpG) continue;
                 type = 0;
             } else if((direction = isCHG(seq, pos-localPos2, seqlen))) {
@@ -473,9 +485,11 @@ void *extractCalls(void *foo) {
                     }
 
                     //Set the trinucleotide context
-                    tnc = getTriNucContext(seq, pos - localPos2, seqlen, direction);
-
-                    writeCall(os[0], config, hdr->target_name[tid], pos, 1, nmethyl, nunmethyl, base, context, TriNucleotideContexts[tnc]);
+                    tnc = getTriNucContext(seq, pos - localPos2, seqlen, direction, cgmode);
+                    
+                    if(cgmode) writeCall(os[0], config, hdr->target_name[tid], pos, 1, nmethyl, nunmethyl, base, context, CGNucleotideContexts[tnc]);
+                    else writeCall(os[0], config, hdr->target_name[tid], pos, 1, nmethyl, nunmethyl, base, context, TriNucleotideContexts[tnc]);
+                    
                 } else {
                     writeCall(os[type], config, hdr->target_name[tid], pos, 1, nmethyl, nunmethyl, base, NULL, NULL);
                 }
