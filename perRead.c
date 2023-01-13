@@ -381,6 +381,8 @@ void perRead_usage() {
 "                  fragment ends rather than read ends. Experimental, and is not\n"
 "                  accurate in cases where trim length is greater than read length\n"
 " --threePrime INT\n"
+" --minIsize INT  Filter by minimum insert size; inclusive of INT\n"
+" --maxIsize INT  Filter by maximum insert size; also inclusive\n"
 " --version  Print version and quit\n"
 "\n"
 "Note that this program will produce incorrect values for alignments spanning\n"
@@ -421,6 +423,8 @@ int perRead_main(int argc, char *argv[]) {
         {"requireFlags", 1, NULL, 'R'},
         {"fivePrime",  1, NULL, 22},
         {"threePrime", 1, NULL, 23},
+        {"minIsize", 1, NULL, 24},
+        {"maxIsize", 1, NULL, 25},
         {0,         0, NULL,   0}
     };
     while((c = getopt_long(argc, argv, "hvq:p:o:@:r:l:F:R:", lopts, NULL)) >= 0) {
@@ -477,6 +481,12 @@ int perRead_main(int argc, char *argv[]) {
         case 23:
             config.threePrime = atoi(optarg);
             break;
+        case 24:
+            config.minIsize = atoi(optarg);
+            break;
+        case 25:
+            config.maxIsize = atoi(optarg);
+            break;
         default :
             fprintf(stderr, "Invalid option '%c'\n", c);
             perRead_usage();
@@ -510,6 +520,14 @@ int perRead_main(int argc, char *argv[]) {
     if(config.threePrime < 0) {
         fprintf(stderr, "--threePrime %i is invalid. Resetting to 0, which is the lowest possible value.\n", config.threePrime);
         config.threePrime = 0;
+    }
+    if(config.minIsize < 0) {
+        fprintf(stderr, "--minIsize %i is invalid. Resetting to 0, which will not filter based on min insert size.\n", config.minIsize);
+        config.minIsize = 0;
+    }
+    if(config.maxIsize < 0) {
+        fprintf(stderr, "--maxIsize %i is invalid. Resetting to 0, which will not filter based on max insert size.\n", config.maxIsize);
+        config.maxIsize = 0;
     }
 
     if((fai = fai_load(argv[optind])) == NULL) {
