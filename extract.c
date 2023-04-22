@@ -259,7 +259,7 @@ void *extractCalls(void *foo) {
     Config *config = (Config*) foo;
     bam_hdr_t *hdr;
     bam_mplp_t iter;
-    int ret, tid, i, seqlen, type, rv, o = 0, cgmode = 0;
+    int ret, tid, i, seqlen, type, rv, o = 0;
     hts_pos_t pos;
     int32_t bedIdx = 0;
     int n_plp; //This will need to be modified for multiple input files
@@ -416,7 +416,6 @@ void *extractCalls(void *foo) {
             }
 
             if((direction = isCpG(seq, pos-localPos2, seqlen))) {
-                cgmode = 1;
                 if(!config->keepCpG) continue;
                 type = 0;
             } else if((direction = isCHG(seq, pos-localPos2, seqlen))) {
@@ -485,9 +484,9 @@ void *extractCalls(void *foo) {
                     }
 
                     //Set the trinucleotide context
-                    tnc = getTriNucContext(seq, pos - localPos2, seqlen, direction, cgmode);
+                    tnc = getTriNucContext(seq, pos - localPos2, seqlen, direction, isCpG(seq, pos-localPos2, seqlen));
                     
-                    if(cgmode) writeCall(os[0], config, hdr->target_name[tid], pos, 1, nmethyl, nunmethyl, base, context, CGNucleotideContexts[tnc]);
+                    if(isCpG(seq, pos-localPos2, seqlen)) writeCall(os[0], config, hdr->target_name[tid], pos, 1, nmethyl, nunmethyl, base, context, CGNucleotideContexts[tnc]);
                     else writeCall(os[0], config, hdr->target_name[tid], pos, 1, nmethyl, nunmethyl, base, context, TriNucleotideContexts[tnc]);
                     
                 } else {

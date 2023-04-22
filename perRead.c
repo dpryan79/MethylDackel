@@ -143,7 +143,8 @@ void processRead(Config *config, bam1_t *b, char *seq, uint32_t sequenceStart, i
         if(cigarOPType & 2) { //not ISHPB
             if(cigarOPType & 1) { //M=X
                 // If read is on the reverse strand (ie rightward to its mate), skip overlap with mate
-                // Ignorant to phread score; there's a better way of doing this but too cumbersome 
+                // not ideal, as this effectively always ignore reverse strand if insert size < 2x read length
+                // but to combine info from read pair, pileup is needed, while perRead is ran on bam entry alone
                 if(bam_is_rev(b) && (mappedPosition <= matePosition)) {
                     mappedPosition++;
                     readPosition++;
