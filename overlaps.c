@@ -66,7 +66,7 @@ static void cust_tweak_overlap_quality(bam1_t *a, bam1_t *b) {
 
     //Go to the first mapped position
     while(ia<na && posa[ia]<0) ia++;
-    while(ib<nb && posa[ib]<0) ib++;
+    while(ib<nb && posb[ib]<0) ib++;
     if(ia==na || ib==nb) goto quit;
 
     //Go to the first overlapping position
