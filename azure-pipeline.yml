@@ -8,14 +8,12 @@ jobs:
     vmImage: 'ubuntu-latest'
   strategy:
     matrix:
-      htslib111:
-        htslib_version: '1.11'
-      htslib112:
-        htslib_version: '1.12'
-      htslib113:
-        htslib_version: '1.13'
-      htslib114:
-        htslib_version: '1.14'
+      htslib115:
+        htslib_version: '1.15'
+      htslib116:
+        htslib_version: '1.16'
+      htslib117:
+        htslib_version: '1.17'
     maxParallel: 1
 
   steps:
