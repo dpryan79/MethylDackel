@@ -580,6 +580,8 @@ void extract_usage() {
 " -d INT           Minimum per-base depth for reporting output. If you use\n"
 "                  --mergeContext, this then applies to the merged CpG/CHG.\n"
 "                  (default 1)\n"
+" --minInsertSize INT   Minimum insert size to include a read (default 0)\n"
+" --maxInsertSize INT   Maximum insert size to include a read (default 2000)\n"
 " -r STR           Region string in which to extract methylation\n"
 " -l FILE          A BED file listing regions for inclusion.\n"
 " --keepStrand     If a BED file is specified, then this option will cause the\n"
@@ -749,6 +751,8 @@ int extract_main(int argc, char *argv[]) {
     config.cytosine_report = 0;
     config.noBAM = 0;
     config.minConversionEfficiency = 0.0;
+    config.minInsertSize = 0;
+    config.maxInsertSize = 2000;
     for(i=0; i<16; i++) config.bounds[i] = 0;
     for(i=0; i<16; i++) config.absoluteBounds[i] = 0;
 
@@ -781,6 +785,8 @@ int extract_main(int argc, char *argv[]) {
         {"cytosine_report", 0, NULL, 21},
         {"minConversionEfficiency", 1, NULL, 22},
         {"ignoreNH",     0, NULL, 23},
+        {"minInsertSize",1, NULL,  24},
+        {"maxInsertSize",1, NULL,  25},
         {"ignoreFlags",  1, NULL, 'F'},
         {"requireFlags", 1, NULL, 'R'},
         {"help",         0, NULL, 'h'},
@@ -892,6 +898,12 @@ int extract_main(int argc, char *argv[]) {
             break;
         case 23:
             config.ignoreNH = 1;
+            break;
+        case 24:
+            config.minInsertSize = atoi(optarg);
+            break;
+        case 25:    
+            config.maxInsertSize = atoi(optarg);
             break;
         case 'M':
             config.BWName = optarg;
@@ -1337,6 +1349,8 @@ int extract_main(int argc, char *argv[]) {
         fclose(config.BBM_ptr); //done with the file
 
     }
+
+    
 
 
 
