@@ -143,5 +143,13 @@ assert op.exists('test15_CpG.bedGraph')
 lines = sum(1 for _ in open('test15_CpG.bedGraph'))
 assert lines == 49
 rm('test15_CpG.bedGraph')
-print("Finished correctly")
 
+# Test min/max InsertSize
+rm('test16_CpG.bedGraph')
+check_call([MPath, 'extract', '-o', 'test16', '--minInsertSize', '0', '--maxInsertSize', '200', '-q', '1', 'cg100.fa', 'cg_aln.bam'])
+assert op.exists('test16_CpG.bedGraph')
+lines = sum(1 for _ in open('test16_CpG.bedGraph'))
+assert lines == 49
+rm('test16_CpG.bedGraph')
+
+print("Finished correctly")

@@ -191,6 +191,7 @@ void *perReadMetrics(void *foo) {
             if(config->requireFlags && (config->requireFlags & b->core.flag) != config->requireFlags) continue;
             if(config->ignoreFlags && (config->ignoreFlags & b->core.flag) != 0) continue;
             if(b->core.qual < config->minMapq) continue;
+            if(llabs(b->core.isize) < config->minInsertSize || llabs(b->core.isize) > config->maxInsertSize) continue;
             processRead(config, b, seq, localPos2, seqlen, &nmethyl, &nunmethyl);
             addRead(os, b, hdr, nmethyl, nunmethyl);
         }
