@@ -404,9 +404,9 @@ bam1_t *trimAbsoluteAlignment(bam1_t *b, int bounds[16]) {
 
     if(rb) {
         for(i=0; i<rb; i++) {
-            qual[b->core.l_qseq - i] = 0;
-            if((b->core.l_qseq - i)&1) seq[(b->core.l_qseq - i)>>1] |= 0xf;
-            else seq[(b->core.l_qseq - i)>>1] |= 0xf0;
+            qual[b->core.l_qseq - 1 - i] = 0;
+            if((b->core.l_qseq - 1 - i)&1) seq[(b->core.l_qseq - 1 - i)>>1] |= 0xf;
+            else seq[(b->core.l_qseq - 1 - i)>>1] |= 0xf0;
         }
     }
 

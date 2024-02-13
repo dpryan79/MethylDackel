@@ -4,7 +4,7 @@ LIBS ?= -L/mnt/lustre/users/pxie/software/devel/dependency/lib # e.g., -L$PREFIX
 LIBBIGWIG ?= /mnt/lustre/users/pxie/software/devel/dependency/lib/libBigWig.a
 CFLAGS ?= -Wall -g -O3 -pthread
 
-.PHONY: all clean install version.h
+.PHONY: all clean install
 
 .SUFFIXES:.c .o
 
