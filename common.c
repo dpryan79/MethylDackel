@@ -9,6 +9,7 @@
 #include <pthread.h>
 
 void parseBounds(char *s2, int *vals, int mult) {
+    errno = 0; // ARM-specific fix for bounds parsing
     char *p, *s = strdup(s2), *end;
     int i, v;
     long tempV;
