@@ -415,6 +415,10 @@ int filter_func(void *data, bam1_t *b) {
         if(rv<0) return rv;
         if(b->core.tid == -1 || b->core.flag & BAM_FUNMAP) continue; //Unmapped
         if(b->core.qual < ldata->config->minMapq) continue; //-q
+        // Apply insert size filtering only to paired reads with configured insert sizes
+        if(b->core.flag & BAM_FPAIRED) {
+            if(llabs(b->core.isize) < ldata->config->minInsertSize || llabs(b->core.isize) > ldata->config->maxInsertSize) continue;
+        }
         if(b->core.flag & ldata->config->ignoreFlags) continue; //By default: secondary alignments, QC failed, PCR duplicates, and supplemental alignments
         if(ldata->config->requireFlags && (b->core.flag & ldata->config->requireFlags) != ldata->config->requireFlags) continue;
         if(!ldata->config->keepDupes && b->core.flag & BAM_FDUP) continue;

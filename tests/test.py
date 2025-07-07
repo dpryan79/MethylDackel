@@ -1,4 +1,4 @@
-from subprocess import check_call
+from subprocess import check_call, check_output
 import os
 import os.path as op
 wd = op.dirname(op.realpath(__file__))
@@ -151,5 +151,27 @@ assert op.exists('test16_CpG.bedGraph')
 lines = sum(1 for _ in open('test16_CpG.bedGraph'))
 assert lines == 49
 rm('test16_CpG.bedGraph')
+
+# Test mbias functionality
+print("Testing mbias functionality...")
+
+# Test basic mbias functionality with relaxed quality settings
+result = check_output([MPath, 'mbias', '-q', '0', '-p', '1', '--txt', '--noSVG', 'cg100.fa', 'cg_aln.bam'])
+assert b'Strand' in result and b'Position' in result and b'OT' in result
+print("Basic mbias test passed")
+
+# Test mbias with insert size filtering (should include reads with ~100bp insert size)
+print("Testing mbias with insert size filtering (inclusive range)...")
+result = check_output([MPath, 'mbias', '-q', '0', '-p', '1', '--minInsertSize', '90', '--maxInsertSize', '110', '--txt', '--noSVG', 'cg100.fa', 'cg_aln.bam'])
+# Should have same results as basic test since insert size ~100 is included
+assert b'Strand' in result and b'Position' in result and b'OT' in result
+print("mbias insert size filtering (inclusive) test passed")
+
+# Test mbias with restrictive insert size filtering (should exclude all reads)
+print("Testing mbias with restrictive insert size filtering...")
+result = check_output([MPath, 'mbias', '-q', '0', '-p', '1', '--minInsertSize', '200', '--maxInsertSize', '300', '--txt', '--noSVG', 'cg100.fa', 'cg_aln.bam'])
+# Should only have header since no reads match the insert size range
+assert b'Strand' in result and b'Position' in result and b'OT' not in result
+print("mbias restrictive insert size filtering test passed")
 
 print("Finished correctly")
