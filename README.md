@@ -175,7 +175,8 @@ As of version 0.4.0, MethyDackel provides a `perRead` subcommand that will produ
  - chromosome
  - position
  - CpG methylation (%)
- - number of informative bases.
+ - number of informative CpG bases
+ - per-base methylation context string (`XM:Z:`). `Z`/`z`, `X`/`x`, and `H`/`h` represent methylated/unmethylated CpG, CHG, and CHH calls, respectively; `U`/`u` represents an unknown cytosine context; and `.` represents a non-informative base.
 
 Fragments longer than 10kb are currently not handled correctly.
 
@@ -183,4 +184,3 @@ Citing MethylDackel
 ===================
 
 There are no immediate plans for a MethylDackel publication. If you use MethylDackel (or PileOMeth, as it was formerly known) in your research, please simply cite the URL for this repository on github.
-

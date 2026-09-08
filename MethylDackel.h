@@ -211,6 +211,7 @@ void makeTXT(strandMeth **meths);
 int isCpG(char *seq, int pos, int seqlen);
 int isCHG(char *seq, int pos, int seqlen);
 int isCHH(char *seq, int pos, int seqlen);
+int isUnknownC(char *seq, int pos, int seqlen);
 
 /*! @function
  @abstract Determine what strand an alignment originated from

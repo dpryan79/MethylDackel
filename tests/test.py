@@ -143,5 +143,51 @@ assert op.exists('test15_CpG.bedGraph')
 lines = sum(1 for _ in open('test15_CpG.bedGraph'))
 assert lines == 49
 rm('test15_CpG.bedGraph')
-print("Finished correctly")
 
+# Per-read output reports CpG, CHG, CHH, and unknown-C calls using a
+# repository-contained fixture. The records cover both bismark XG directions,
+# gemBS XB directions, bwa-meth YD directions, and a hard-clipped bwa-meth
+# alignment, and insertions/deletions next to a CpG. Removing all-context
+# support, a supported tag, the XM:Z column, correct hard-clip handling, or
+# query-to-reference CIGAR mapping must make this exact behavioral assertion
+# fail. The actual_* fixture records retain scrubbed, data-derived read bases,
+# qualities, flags, CIGARs, and source XM calls from all XB/YD directions.
+rm('test16_perread.tsv')
+check_call([MPath, 'perRead', '-o', 'test16_perread.tsv', 'perread_fixture.fa', 'perread_fixture.bam'])
+with open('test16_perread.tsv') as output:
+    lines = output.readlines()
+    assert ''.join(lines[:15]) == (
+        'xg_ct\tchrTest\t0\t100.000000\t1\tXM:Z:.Z.X..H..U..\n'
+        'xg_ga\tchrTest\t0\t100.000000\t1\tXM:Z:..Z..X......\n'
+        'xb_c\tchrTest\t0\t100.000000\t1\tXM:Z:.Z.X..H..U..\n'
+        'xb_g\tchrTest\t0\t100.000000\t1\tXM:Z:..Z..X......\n'
+        'yd_f\tchrTest\t0\t100.000000\t1\tXM:Z:.Z.X..H..U..\n'
+        'yd_r\tchrTest\t0\t100.000000\t1\tXM:Z:..Z..X......\n'
+        'hard_clipped_yd_f\tchrTest\t0\t100.000000\t1\tXM:Z:.Z.X..H..U..\n'
+        'insertion_yd_f\tchrTest\t0\t100.000000\t1\tXM:Z:.Z..X..H..U..\n'
+        'deletion_yd_f\tchrTest\t0\t100.000000\t1\tXM:Z:.ZX..H..U..\n'
+        'soft_clipped_yd_f\tchrTest\t0\t100.000000\t1\tXM:Z:...Z.X..H..U..\n'
+        'padded_yd_f\tchrTest\t0\t100.000000\t1\tXM:Z:.Z.X..H..U..\n'
+        'unmethylated_yd_f\tchrTest\t0\t0.000000\t1\tXM:Z:.z.x..h..u..\n'
+        'unmethylated_yd_r\tchrTest\t0\t0.000000\t1\tXM:Z:..z..x......\n'
+        'edge_g\tchrEdge\t0\t0.0\t0\tXM:Z:U\n'
+        'edge_c\tchrEdge\t1\t0.0\t0\tXM:Z:U\n'
+    )
+rm('test16_perread.tsv')
+
+# These records preserve actual scrubbed read sequences and their XM calls,
+# generated at the lowest supported per-base quality threshold (-p 1).
+expected_actual_calls = {}
+with open('perread_fixture.sam') as fixture:
+    for line in fixture:
+        if not line.startswith('actual_'):
+            continue
+        fields = line.rstrip().split('\t')
+        expected_actual_calls[fields[0]] = next(field for field in fields[11:] if field.startswith('XM:Z:'))
+rm('test17_actual_perread.tsv')
+check_call([MPath, 'perRead', '-p', '1', '-o', 'test17_actual_perread.tsv', 'perread_fixture.fa', 'perread_fixture.bam'])
+with open('test17_actual_perread.tsv') as output:
+    actual_calls = {line.split('\t')[0]: line.rstrip().split('\t')[-1] for line in output if line.startswith('actual_')}
+    assert actual_calls == expected_actual_calls
+rm('test17_actual_perread.tsv')
+print("Finished correctly")
