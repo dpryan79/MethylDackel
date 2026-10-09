@@ -143,5 +143,16 @@ assert op.exists('test15_CpG.bedGraph')
 lines = sum(1 for _ in open('test15_CpG.bedGraph'))
 assert lines == 49
 rm('test15_CpG.bedGraph')
+
+# With --mergeContext, a CpG must be dropped whether the likely variant is at its C or its G.
+# cg_variants_merged.bam has a C>T at the C of the CpG at 10 and a G>A at the G of the CpG
+# at 20, each seen on 10 reads of the opposite strand (49 CpGs without the filter).
+rm('test16_CpG.bedGraph')
+check_call([MPath, 'extract', '-p', '1', '-q', '0', '-o', 'test16', '--mergeContext', '--minOppositeDepth', '3', '--maxVariantFrac', '0.25', 'cg100.fa', 'cg_variants_merged.bam'])
+assert op.exists('test16_CpG.bedGraph')
+starts = [l.split('\t')[1] for l in open('test16_CpG.bedGraph') if not l.startswith('track')]
+assert len(starts) == 47
+assert '10' not in starts and '20' not in starts
+rm('test16_CpG.bedGraph')
 print("Finished correctly")
 

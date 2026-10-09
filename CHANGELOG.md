@@ -1,3 +1,7 @@
+Unreleased:
+
+   * With `--mergeContext`, `--minOppositeDepth`/`--maxVariantFrac` now drop the whole merged CpG/CHG when the likely variant is at its C, as they already did for a variant at its G. Previously only the C's (top-strand) calls were dropped and the site was still reported from the G's (bottom-strand) calls, so C>T variants at CpGs were kept while G>A variants were removed.
+
 Version 0.6.1:
 
    * Added the `--ignoreNH` option, which allows inclusion of multimappers normally excluded with the NH flag.
