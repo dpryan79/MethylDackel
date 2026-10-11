@@ -839,16 +839,16 @@ int extract_main(int argc, char *argv[]) {
             config.keepDiscordant = 1;
             break;
         case 7:
-            parseBounds(optarg, config.bounds, 0);
+            if(parseBounds(optarg, config.bounds, 0)) return 1;
             break;
         case 8:
-            parseBounds(optarg, config.bounds, 1);
+            if(parseBounds(optarg, config.bounds, 1)) return 1;
             break;
         case 9:
-            parseBounds(optarg, config.bounds, 2);
+            if(parseBounds(optarg, config.bounds, 2)) return 1;
             break;
         case 10:
-            parseBounds(optarg, config.bounds, 3);
+            if(parseBounds(optarg, config.bounds, 3)) return 1;
             break;
         case 11:
             config.merge = 1;
@@ -857,16 +857,16 @@ int extract_main(int argc, char *argv[]) {
             config.methylKit = 1;
             break;
         case 13:
-            parseBounds(optarg, config.absoluteBounds, 0);
+            if(parseBounds(optarg, config.absoluteBounds, 0)) return 1;
             break;
         case 14:
-            parseBounds(optarg, config.absoluteBounds, 1);
+            if(parseBounds(optarg, config.absoluteBounds, 1)) return 1;
             break;
         case 15:
-            parseBounds(optarg, config.absoluteBounds, 2);
+            if(parseBounds(optarg, config.absoluteBounds, 2)) return 1;
             break;
         case 16:
-            parseBounds(optarg, config.absoluteBounds, 3);
+            if(parseBounds(optarg, config.absoluteBounds, 3)) return 1;
             break;
         case 17:
             config.minOppositeDepth = atoi(optarg);

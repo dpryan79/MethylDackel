@@ -1,3 +1,8 @@
+Version 0.6.2 (unreleased):
+
+   * Bounds strings given to `--OT`, `--OB`, `--CTOT`, `--CTOB`, `--nOT`, `--nOB`, `--nCTOT`, and `--nCTOB` now accept 0 in any field. Previously a 0 could be rejected with "Invalid bounds string", after which the remaining fields were silently ignored. Malformed bounds strings (anything other than four comma-separated non-negative integers, including empty fields) are now an error rather than being partially applied or crashing. (issues #101 and #112)
+   * `--nOT`, `--nOB`, `--nCTOT`, and `--nCTOB` now exclude exactly the requested number of bases from the 3' end of an alignment; previously one fewer base was excluded and the trimming wrote one position past the end of the read. (PR #144)
+
 Version 0.6.1:
 
    * Added the `--ignoreNH` option, which allows inclusion of multimappers normally excluded with the NH flag.

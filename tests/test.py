@@ -1,4 +1,4 @@
-from subprocess import check_call
+from subprocess import check_call, PIPE, Popen
 import os
 import os.path as op
 wd = op.dirname(op.realpath(__file__))
@@ -84,6 +84,14 @@ rm('test8_CpG.bedGraph')
 check_call([MPath, 'extract', '--nOT', '50,50,40,40', 'cg100.fa', 'cg_aln.bam', '-q', '2', '-o', 'test8'])
 assert op.exists('test8_CpG.bedGraph')
 lines = sum(1 for _ in open('test8_CpG.bedGraph'))
+assert lines == 11
+rm('test8_CpG.bedGraph')
+
+# Excluding one fewer base from each 3' end keeps one more CpG
+rm('test8_CpG.bedGraph')
+check_call([MPath, 'extract', '--nOT', '50,49,40,39', 'cg100.fa', 'cg_aln.bam', '-q', '2', '-o', 'test8'])
+assert op.exists('test8_CpG.bedGraph')
+lines = sum(1 for _ in open('test8_CpG.bedGraph'))
 assert lines == 12
 rm('test8_CpG.bedGraph')
 
@@ -143,5 +151,38 @@ assert op.exists('test15_CpG.bedGraph')
 lines = sum(1 for _ in open('test15_CpG.bedGraph'))
 assert lines == 49
 rm('test15_CpG.bedGraph')
+
+# Bounds strings may contain 0 in any field, and the fields after a 0 are still applied. The original
+# failure depended on a stale errno at parse time, so these reproduce it only where errno is non-zero by then.
+rm('test16_CpG.bedGraph')
+check_call([MPath, 'extract', '--OT', '0,50,0,40', 'cg100.fa', 'cg_aln.bam', '-q', '2', '-o', 'test16'])
+assert op.exists('test16_CpG.bedGraph')
+lines = sum(1 for _ in open('test16_CpG.bedGraph'))
+assert lines == 25
+rm('test16_CpG.bedGraph')
+
+rm('test17_CpG.bedGraph')
+check_call([MPath, 'extract', '--nOT', '0,50,0,40', 'cg100.fa', 'cg_aln.bam', '-q', '2', '-o', 'test17'])
+assert op.exists('test17_CpG.bedGraph')
+lines = sum(1 for _ in open('test17_CpG.bedGraph'))
+assert lines == 30
+rm('test17_CpG.bedGraph')
+
+# Malformed bounds strings are an error (rather than being partially applied or crashing)
+def bounds_error(args):
+    p = Popen(args, stdout=PIPE, stderr=PIPE)
+    _, err = p.communicate()
+    return p.returncode == 1 and b'Invalid bounds string' in err
+
+malformed = ['5', '5,5', '5,0,0,0,0', '5,,0,0', '5,,0,0,0', ',5,0,0,0', '5,0,0,0,', 'a,0,0,0', '-1,0,0,0',
+             '5x,0,0,0', '99999999999,0,0,0']
+for bounds in malformed:
+    assert bounds_error([MPath, 'extract', '--nOT', bounds, '-o', 'test18', 'cg100.fa', 'cg_aln.bam'])
+    assert bounds_error([MPath, 'mbias', '--nOT', bounds, 'cg100.fa', 'cg_aln.bam', 'test18'])
+for opt in ['OT', 'OB', 'CTOT', 'CTOB', 'nOT', 'nOB', 'nCTOT', 'nCTOB']:
+    assert bounds_error([MPath, 'extract', '--' + opt, '5,,0,0,0', '-o', 'test18', 'cg100.fa', 'cg_aln.bam'])
+for opt in ['nOT', 'nOB', 'nCTOT', 'nCTOB']:
+    assert bounds_error([MPath, 'mbias', '--' + opt, '5,,0,0,0', 'cg100.fa', 'cg_aln.bam', 'test18'])
+
 print("Finished correctly")
 

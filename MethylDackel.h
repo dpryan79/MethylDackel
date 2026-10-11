@@ -237,7 +237,7 @@ int filter_func(void *data, bam1_t *b);
 int updateMetrics(Config *config, const bam_pileup1_t *plp);
 
 //Used internally to parse things like --OT 0,1,2,3
-void parseBounds(char *s2, int *vals, int mult);
+int parseBounds(const char *s2, int *vals, int mult);
 
 //Used internally to not split CpGs/CHGs between threads
 void adjustBounds(Config *config, bam_hdr_t *hdr, faidx_t *fai, uint32_t *localTid, uint32_t *localPos, uint32_t *localEnd);
