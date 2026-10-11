@@ -8,38 +8,31 @@
 #include <assert.h>
 #include <pthread.h>
 
-void parseBounds(char *s2, int *vals, int mult) {
-    char *p, *s = strdup(s2), *end;
-    int i, v;
+/*
+ * Parse a "A,B,C,D" bounds string (as given to --OT, --nOT, etc.) into
+ * vals[4*mult] through vals[4*mult+3]. The string must be exactly four
+ * comma-separated non-negative integers, with no empty fields. Returns 0 on
+ * success and 1 (after printing an error) otherwise, in which case vals is
+ * left unmodified.
+ */
+int parseBounds(const char *s2, int *vals, int mult) {
+    const char *p = s2;
+    char *end;
+    int i, v[4];
     long tempV;
 
-    p = strtok(s, ",");
-    tempV = strtol(p, &end, 10);
-    if((errno == ERANGE && (tempV == LONG_MAX || tempV == LONG_MIN)) || (errno != 0 && tempV == 0) || end == p) v = -1;
-    else if(tempV > INT_MAX || tempV < LONG_MIN) v = -1;
-    else v = tempV;
-
-    if(v>=0) vals[4*mult] = v;
-    else {
-        fprintf(stderr, "Invalid bounds string, %s\n", s2);
-        free(s);
-        return;
-    }
-    for(i=1; i<4; i++) {
-        p = strtok(NULL, ",");
+    for(i=0; i<4; i++) {
+        errno = 0; //strtol only sets errno on failure, so clear any stale value first
         tempV = strtol(p, &end, 10);
-        if((errno == ERANGE && (tempV == LONG_MAX || tempV == LONG_MIN)) || (errno != 0 && tempV == 0) || end == p) v = -1;
-        else if(tempV > INT_MAX || tempV < LONG_MIN) v = -1;
-        else v = tempV;
-
-        if(v>=0) vals[4*mult+i] = v;
-        else {
-            fprintf(stderr, "Invalid bounds string, %s\n", s2);
-            free(s);
-            return;
+        if(errno != 0 || end == p || tempV < 0 || tempV > INT_MAX || *end != ((i < 3) ? ',' : '\0')) {
+            fprintf(stderr, "Error: Invalid bounds string, %s. It must be four comma-separated non-negative integers (e.g., 5,0,0,0).\n", s2);
+            return 1;
         }
+        v[i] = (int) tempV;
+        p = end + 1;
     }
-    free(s);
+    for(i=0; i<4; i++) vals[4*mult+i] = v[i];
+    return 0;
 }
 
 void print_version() {

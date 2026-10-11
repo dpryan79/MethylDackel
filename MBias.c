@@ -399,16 +399,16 @@ int mbias_main(int argc, char *argv[]) {
             txt = 1;
             break;
         case 9 :
-            parseBounds(optarg, config.absoluteBounds, 0);
+            if(parseBounds(optarg, config.absoluteBounds, 0)) return 1;
             break;
         case 10 :
-            parseBounds(optarg, config.absoluteBounds, 1);
+            if(parseBounds(optarg, config.absoluteBounds, 1)) return 1;
             break;
         case 11 :
-            parseBounds(optarg, config.absoluteBounds, 2);
+            if(parseBounds(optarg, config.absoluteBounds, 2)) return 1;
             break;
         case 12 :
-            parseBounds(optarg, config.absoluteBounds, 3);
+            if(parseBounds(optarg, config.absoluteBounds, 3)) return 1;
             break;
         case 13:
             config.chunkSize = strtoul(optarg, NULL, 10);
