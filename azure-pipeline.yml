@@ -49,7 +49,7 @@ jobs:
       ~/uninstall_homebrew -fq
       rm ~/uninstall_homebrew
     displayName: Remove homebrew
-  - bash: echo "##vso[task.prependpath]$CONDA/bin"
+  - bash: echo "##vso[task.prependpath]$CONDA/bin" && echo "conda is $CONDA" && which conda
     displayName: Add conda to PATH
   - bash: ls -l $CONDA && sudo chown -R $USER $CONDA
     displayName: Take ownership of conda installation
