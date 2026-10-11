@@ -134,10 +134,12 @@ bam1_t *trimAlignment(bam1_t *b, int bounds[16]) {
     uint8_t *seq = bam_get_seq(b);
 
     if(b->core.flag & BAM_FREAD2) {
-        lb = bounds[4*strand+2];
+        lb = bounds[4*strand+2] - 1;
+        if(lb < 0) lb = 0;
         rb = bounds[4*strand+3];
     } else {
-        lb = bounds[4*strand];
+        lb = bounds[4*strand] - 1;
+        if(lb < 0) lb = 0;
         rb = bounds[4*strand+1];
     }
 
@@ -171,10 +173,12 @@ bam1_t *trimAbsoluteAlignment(bam1_t *b, int bounds[16]) {
     uint8_t *seq = bam_get_seq(b);
 
     if(b->core.flag & BAM_FREAD2) {
-        lb = bounds[4*strand+2];
+        lb = bounds[4*strand+2] - 1;
+        if(lb < 0) lb = 0;
         rb = bounds[4*strand+3];
     } else {
-        lb = bounds[4*strand];
+        lb = bounds[4*strand] - 1;
+        if(lb < 0) lb = 0;
         rb = bounds[4*strand+1];
     }
 
