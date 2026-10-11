@@ -24,3 +24,31 @@ jobs:
   - bash: conda create -n MethylDackel -q --yes -c conda-forge -c bioconda htslib=$(HTSLIB_VERSION) python gcc_impl_linux-64 binutils_impl_linux-64 binutils_linux-64 gcc_linux-64 libgcc-ng libbigwig
     displayName: Installing dependencies
   - template: .azure-pipelines/test-template.yml
+
+- job: 'OSX'
+  pool:
+    vmImage: 'macOS-latest'
+  strategy:
+    matrix:
+      # Older htslib releases are not built for osx-arm64 on bioconda
+      htslib120:
+        htslib_version: '1.20'
+      htslib121:
+        htslib_version: '1.21'
+      htslib122:
+        htslib_version: '1.22'
+    maxParallel: 1
+
+  steps:
+  # Hosted macOS images no longer ship conda, so install Miniforge for the runner's architecture
+  - bash: |
+      set -euo pipefail
+      curl -fsSL -o miniforge.sh "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-$(uname -m).sh"
+      bash miniforge.sh -b -p "$HOME/miniforge3"
+      rm miniforge.sh
+      echo "##vso[task.prependpath]$HOME/miniforge3/bin"
+    displayName: Install Miniforge
+  # clang_osx-* provides the activation script that sets $CC
+  - bash: conda create -n MethylDackel -q --yes -c conda-forge -c bioconda htslib=$(HTSLIB_VERSION) python c-compiler clang_osx-$(uname -m | sed 's/x86_64/64/') make libbigwig
+    displayName: Installing dependencies
+  - template: .azure-pipelines/test-template.yml
