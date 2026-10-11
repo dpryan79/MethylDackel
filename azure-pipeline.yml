@@ -28,7 +28,7 @@ jobs:
 #This tries to link against 32-bit libraries for some reason
 - job: 'OSX'
   pool:
-    vmImage: 'macOS-latest'
+    vmImage: 'macOS-12'
   strategy:
     matrix:
       htslib115:
