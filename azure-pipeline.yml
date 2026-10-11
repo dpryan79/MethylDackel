@@ -46,6 +46,7 @@ jobs:
       rm miniforge.sh
       echo "##vso[task.prependpath]$HOME/miniforge3/bin"
     displayName: Install Miniforge
-  - bash: conda create -n MethylDackel -q --yes -c conda-forge -c bioconda htslib=$(HTSLIB_VERSION) python c-compiler make libbigwig
+  # clang_osx-* provides the activation script that sets $CC
+  - bash: conda create -n MethylDackel -q --yes -c conda-forge -c bioconda htslib=$(HTSLIB_VERSION) python c-compiler clang_osx-$(uname -m | sed 's/x86_64/64/') make libbigwig
     displayName: Installing dependencies
   - template: .azure-pipelines/test-template.yml
