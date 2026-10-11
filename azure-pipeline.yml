@@ -14,6 +14,8 @@ jobs:
         htslib_version: '1.16'
       htslib117:
         htslib_version: '1.17'
+      htslib124:
+        htslib_version: '1.24'
     maxParallel: 1
 
   steps:
@@ -29,14 +31,14 @@ jobs:
     vmImage: 'macOS-latest'
   strategy:
     matrix:
-      htslib111:
-        htslib_version: '1.11'
-      htslib112:
-        htslib_version: '1.12'
-      htslib113:
-        htslib_version: '1.13'
-      htslib114:
-        htslib_version: '1.14'
+      htslib115:
+        htslib_version: '1.15'
+      htslib116:
+        htslib_version: '1.16'
+      htslib117:
+        htslib_version: '1.17'
+      htslib124:
+        htslib_version: '1.24'
     maxParallel: 1
 
   steps:
@@ -49,8 +51,8 @@ jobs:
     displayName: Remove homebrew
   - bash: echo "##vso[task.prependpath]$CONDA/bin"
     displayName: Add conda to PATH
-  - bash: sudo chown -R 501:20 /usr/local/miniconda/pkgs
-    displayName: Fix permissions
+  - bash: sudo chown -R $USER $CONDA
+    displayName: Take ownership of conda installation
   - bash: conda create -n MethylDackel -q --yes -c conda-forge -c bioconda htslib=$(HTSLIB_VERSION) python clang=11.1.0 clang-11 clang_osx-64=11.1.0 clangxx=11.1.0 cctools_osx-64 compiler-rt ld64_osx-64 libcxx make libbigwig
     displayName: Installing dependencies
   - template: .azure-pipelines/test-template.yml
