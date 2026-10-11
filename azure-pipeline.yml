@@ -28,7 +28,7 @@ jobs:
 #This tries to link against 32-bit libraries for some reason
 - job: 'OSX'
   pool:
-    vmImage: 'macOS-12'
+    vmImage: 'macOS-latest'
   strategy:
     matrix:
       htslib115:
@@ -51,7 +51,7 @@ jobs:
     displayName: Remove homebrew
   - bash: echo "##vso[task.prependpath]$CONDA/bin"
     displayName: Add conda to PATH
-  - bash: echo "conda is $CONDA" && which conda && sudo chown -R $USER $CONDA
+  - bash: find / -name miniconda && sudo chown -R $USER $CONDA
     displayName: Take ownership of conda installation
   - bash: conda create -n MethylDackel -q --yes -c conda-forge -c bioconda htslib=$(HTSLIB_VERSION) python clang=11.1.0 clang-11 clang_osx-64=11.1.0 clangxx=11.1.0 cctools_osx-64 compiler-rt ld64_osx-64 libcxx make libbigwig
     displayName: Installing dependencies
