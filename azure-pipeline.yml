@@ -23,34 +23,29 @@ jobs:
     displayName: Installing dependencies
   - template: .azure-pipelines/test-template.yml
 
-#This tries to link against 32-bit libraries for some reason
 - job: 'OSX'
   pool:
     vmImage: 'macOS-latest'
   strategy:
     matrix:
-      htslib111:
-        htslib_version: '1.11'
-      htslib112:
-        htslib_version: '1.12'
-      htslib113:
-        htslib_version: '1.13'
-      htslib114:
-        htslib_version: '1.14'
+      # Older htslib releases are not built for osx-arm64 on bioconda
+      htslib120:
+        htslib_version: '1.20'
+      htslib121:
+        htslib_version: '1.21'
+      htslib122:
+        htslib_version: '1.22'
     maxParallel: 1
 
   steps:
-  - script: |
-      echo "Removing homebrew from Azure to avoid conflicts."
-      curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/uninstall > ~/uninstall_homebrew
-      chmod +x ~/uninstall_homebrew
-      ~/uninstall_homebrew -fq
-      rm ~/uninstall_homebrew
-    displayName: Remove homebrew
-  - bash: echo "##vso[task.prependpath]$CONDA/bin"
-    displayName: Add conda to PATH
-  - bash: sudo chown -R 501:20 /usr/local/miniconda/pkgs
-    displayName: Fix permissions
-  - bash: conda create -n MethylDackel -q --yes -c conda-forge -c bioconda htslib=$(HTSLIB_VERSION) python clang=11.1.0 clang-11 clang_osx-64=11.1.0 clangxx=11.1.0 cctools_osx-64 compiler-rt ld64_osx-64 libcxx make libbigwig
+  # Hosted macOS images no longer ship conda, so install Miniforge for the runner's architecture
+  - bash: |
+      set -euo pipefail
+      curl -fsSL -o miniforge.sh "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-$(uname -m).sh"
+      bash miniforge.sh -b -p "$HOME/miniforge3"
+      rm miniforge.sh
+      echo "##vso[task.prependpath]$HOME/miniforge3/bin"
+    displayName: Install Miniforge
+  - bash: conda create -n MethylDackel -q --yes -c conda-forge -c bioconda htslib=$(HTSLIB_VERSION) python c-compiler make libbigwig
     displayName: Installing dependencies
   - template: .azure-pipelines/test-template.yml
