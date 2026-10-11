@@ -256,6 +256,9 @@ void *extractCalls(void *foo) {
     uint32_t nmethyl = 0, nunmethyl = 0, nOff = 0, nVariant = 0;
     uint32_t localBin = 0, localPos = 0, localEnd = 0, localTid = 0, localPos2 = 0, lastPos = 0;
     uint64_t nVariantPositions = 0;
+    //With --mergeContext, a CpG/CHG whose C is a likely variant; its G must be skipped too
+    int32_t skipCpGTid = -1, skipCHGTid = -1;
+    hts_pos_t skipCpGPos = -1, skipCHGPos = -1;
     const bam_pileup1_t **plp = NULL;
     char *seq = NULL, base = 'A';
     char context[3] = "HG";
@@ -453,6 +456,13 @@ void *extractCalls(void *foo) {
                     } else if(type == 1 && lastCHG->tid == tid && lastCHG->pos == pos - 2 && (base == 'G' || base == 'g')) {
                         lastCHG->nmethyl = 0;
                         lastCHG->nunmethyl = 0;
+                    } else if(type == 0 && base != 'G' && base != 'g') {
+                        //The C comes first: remember the site so its G is skipped as well
+                        skipCpGTid = tid;
+                        skipCpGPos = pos;
+                    } else if(type == 1 && base != 'G' && base != 'g') {
+                        skipCHGTid = tid;
+                        skipCHGPos = pos;
                     }
                 }
                 continue;
@@ -482,10 +492,17 @@ void *extractCalls(void *foo) {
             } else {
                 //Merge into per-CpG/CHG metrics
                 if(type==0) {
-                    if(base=='G' || base=='g') pos--;
+                    if(base=='G' || base=='g') {
+                        pos--;
+                        //The C of this CpG was a likely variant, so skip the whole site
+                        if(tid == skipCpGTid && pos == skipCpGPos) continue;
+                    }
                     processLast(os_CpG, config, lastCpG, hdr, tid, pos, 2, nmethyl, nunmethyl, base);
                 } else {
-                    if(base=='G' || base=='g') pos-=2;
+                    if(base=='G' || base=='g') {
+                        pos-=2;
+                        if(tid == skipCHGTid && pos == skipCHGPos) continue;
+                    }
                     processLast(os_CHG, config, lastCHG, hdr, tid, pos, 3, nmethyl, nunmethyl, base);
                 }
             }
