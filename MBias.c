@@ -238,6 +238,8 @@ void mbias_usage() {
 " -p INT           Minimum Phred threshold to include a base (default 5). This\n"
 "                  must be >0.\n"
 " -D INT           Maximum per-base depth (default 2000)\n"
+" --minInsertSize INT   Minimum insert size to include a read (default 0)\n"
+" --maxInsertSize INT   Maximum insert size to include a read (default 2000)\n"
 " -r STR           Region string in which to extract methylation\n"
 " -l FILE          A BED file listing regions for inclusion.\n"
 " --keepStrand     If a BED file is specified, then this option will cause the\n"
@@ -324,6 +326,8 @@ int mbias_main(int argc, char *argv[]) {
     config.nThreads = 1;
     config.chunkSize = 1000000;
     config.minConversionEfficiency = 0.0;
+    config.minInsertSize = 0;
+    config.maxInsertSize = 2000;
     for(i=0; i<16; i++) config.bounds[i] = 0;
     for(i=0; i<16; i++) config.absoluteBounds[i] = 0;
 
@@ -344,6 +348,8 @@ int mbias_main(int argc, char *argv[]) {
         {"keepStrand",   0, NULL,  14},
         {"minConversionEfficiency", 1, NULL, 15},
         {"ignoreNH",     0, NULL,  16},
+        {"minInsertSize",1, NULL,  17},
+        {"maxInsertSize",1, NULL,  18},
         {"ignoreFlags",  1, NULL, 'F'},
         {"requireFlags", 1, NULL, 'R'},
         {"help",         0, NULL, 'h'},
@@ -419,6 +425,12 @@ int mbias_main(int argc, char *argv[]) {
             break;
         case 16:
             config.ignoreNH = 1;
+            break;
+        case 17:
+            config.minInsertSize = atoi(optarg);
+            break;
+        case 18:
+            config.maxInsertSize = atoi(optarg);
             break;
         case 'F' :
             config.ignoreFlags = atoi(optarg);

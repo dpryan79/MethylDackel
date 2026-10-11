@@ -89,7 +89,7 @@ typedef struct {
 */
 typedef struct {
     int keepCpG, keepCHG, keepCHH;
-    int minMapq, minPhred, keepDupes, minDepth;
+    int minMapq, minPhred, keepDupes, minDepth, minInsertSize, maxInsertSize;
     int keepDiscordant, keepSingleton, ignoreFlags, requireFlags;
     int merge, methylKit, minOppositeDepth;
     int ignoreNH;
