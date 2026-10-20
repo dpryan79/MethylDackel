@@ -5,6 +5,8 @@ Version 0.6.2:
    * `--nOT`, `--nOB`, `--nCTOT`, and `--nCTOB` now exclude exactly the requested number of bases from the 3' end of an alignment; previously one fewer base was excluded and the trimming wrote one position past the end of the read. (PR #144)
    * `--nOT`, `--nOB`, `--nCTOT`, and `--nCTOB` now include 5' base as documented. (issues #173, #163 and #102)
    * Added the `--minInsertSize` and `--maxInsertSize` options (PR #155)
+   * The Bismark-specific XR and XG tags are not more readily relied upon for determining the strand if they're present.
+   * An error on aarch64 was fixed (issue #180)
 
 Version 0.6.1:
 

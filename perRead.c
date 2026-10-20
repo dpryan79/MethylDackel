@@ -278,7 +278,7 @@ int perRead_main(int argc, char *argv[]) {
     int i, keepStrand = 0;
     faidx_t *fai;
     bam_hdr_t *hdr = NULL;
-    char c;
+    int c;
 
     //Defaults
     config.keepCpG = 1; config.keepCHG = 0; config.keepCHH = 0;
