@@ -178,7 +178,7 @@ void mergeContext_usage() {
 int mergeContext_main(int argc, char *argv[]) {
     faidx_t *fai;
     FILE *ifile, *ofile = stdout;
-    char c;
+    int c;
 
     static struct option lopts[] = {
         {"help",    0, NULL, 'h'},
