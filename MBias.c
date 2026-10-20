@@ -183,7 +183,6 @@ void *extractMBias(void *foo) {
                 if(plp[0][i].is_refskip) continue;
                 if(config->bed) if(!readStrandOverlapsBED(plp[0][i].b, config->bed->region[bedIdx])) continue;
                 strand = getStrand((plp[0]+i)->b);
-fprintf(stderr, "Got strand %i base %c for read %s with flags %i\n", strand, base, bam_get_qname(plp[0][i].b), plp[0][i].b->core.flag);
                 if(strand & 1) {
                     if(base != 'C' && base != 'c') continue;
                 } else {
