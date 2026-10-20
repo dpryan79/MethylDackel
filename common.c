@@ -76,8 +76,10 @@ inline int isCHH(char *seq, int pos, int seqlen) {
 
 int getStrand(bam1_t *b) {
     char *XG = (char *) bam_aux_get(b, "XG");
+    char *XR = (char *) bam_aux_get(b, "XR");
     //Only bismark uses the XG tag like this. Some other aligners use it for other purposes...
-    if(XG != NULL && *(XG+1) != 'C' && *(XG+1) != 'G') XG = NULL;
+    if(XG != NULL && ((*(XG+1) != 'C' && *(XG+1) != 'G') || strlen(XG) != 3)) XG = NULL;
+    if(XR != NULL && ((*(XR+1) != 'C' && *(XR+1) != 'G') || strlen(XR) != 3)) XR = NULL;
     if(XG == NULL) { //Can't handle non-directional libraries!
         if(b->core.flag & BAM_FPAIRED) {
             if((b->core.flag & 0x50) == 0x50) return 2; //Read1, reverse comp. == OB
@@ -90,20 +92,34 @@ int getStrand(bam1_t *b) {
             return 1; //OT
         }
     } else {
-        if(*(XG+1) == 'C') { //OT or CTOT, due to C->T converted genome
-            if((b->core.flag & 0x51) == 0x41) return 1; //Read#1 forward == OT
-            else if((b->core.flag & 0x51) == 0x51) return 3; //Read #1 reverse == CTOT
-            else if((b->core.flag & 0x91) == 0x81) return 3; //Read #2 forward == CTOT
-            else if((b->core.flag & 0x91) == 0x91) return 1; //Read #2 reverse == OT
-            else if(b->core.flag & 0x10) return 3; //Single-end reverse == CTOT
-            else return 1; //Single-end forward == OT
-        } else {
-            if((b->core.flag & 0x51) == 0x41) return 4; //Read#1 forward == CTOB
-            else if((b->core.flag & 0x51) == 0x51) return 2; //Read #1 reverse == OB
-            else if((b->core.flag & 0x91) == 0x81) return 2; //Read #2 forward == OB
-            else if((b->core.flag & 0x91) == 0x91) return 4; //Read #2 reverse == CTOB
-            else if(b->core.flag & 0x10) return 2; //Single-end reverse == OB
-            else return 4; //Single-end forward == CTOB
+        if(XR == NULL) {  // Read orientation-based
+            if(*(XG+1) == 'C') { //OT or CTOT, due to C->T converted genome
+                if((b->core.flag & 0x51) == 0x41) return 1; //Read#1 forward == OT
+                else if((b->core.flag & 0x51) == 0x51) return 3; //Read #1 reverse == CTOT
+                else if((b->core.flag & 0x91) == 0x81) return 3; //Read #2 forward == CTOT
+                else if((b->core.flag & 0x91) == 0x91) return 1; //Read #2 reverse == OT
+                else if(b->core.flag & 0x10) return 3; //Single-end reverse == CTOT
+                else return 1; //Single-end forward == OT
+            } else {
+                if((b->core.flag & 0x51) == 0x41) return 4; //Read#1 forward == CTOB
+                else if((b->core.flag & 0x51) == 0x51) return 2; //Read #1 reverse == OB
+                else if((b->core.flag & 0x91) == 0x81) return 2; //Read #2 forward == OB
+                else if((b->core.flag & 0x91) == 0x91) return 4; //Read #2 reverse == CTOB
+                else if(b->core.flag & 0x10) return 2; //Single-end reverse == OB
+                else return 4; //Single-end forward == CTOB
+            }
+        } else {  // This is how newer bismark handles things. Note that the flags have changed over time
+            if(b->core.flag & 0x80) {  // Read #2
+                if(*(XR+1) == 'G' && *(XG+1) == 'C') return 1;  // OT
+                else if(*(XR+1) == 'G' && *(XG+1) == 'G') return 2;  // OB
+                else if(*(XR+1) == 'C' && *(XG+1) == 'C') return 3;  // CTOB
+                else return 4;  // CTOB
+            } else {
+                if(*(XR+1) == 'C' && *(XG+1) == 'C') return 1;  // OT
+                else if(*(XR+1) == 'C' && *(XG+1) == 'G') return 2;  // OB
+                else if(*(XR+1) == 'G' && *(XG+1) == 'C') return 3;  // CTOT
+                else return 4;  // CTOB
+            }
         }
     }
 }
@@ -359,7 +375,7 @@ float computeConversionEfficiency(bam1_t *b, mplp_data *ldata) {
     unsigned int nMethyl = 0, nUMethyl = 0;
     uint32_t i, j, seqEnd = ldata->offset + ldata->lseq;  // 1-base after the end of the sequence
     uint32_t *cigar = bam_get_cigar(b), op, opLen;
-    int direction, type, state;
+    int direction, state;
     int pos = b->core.pos, seqPos = 0;  //position in the genome and position in the read
 
     for(i=0; i<b->core.n_cigar; i++) {
